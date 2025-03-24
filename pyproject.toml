@@ -20,5 +20,5 @@ license-files = ["LICEN[CS]E*"]
 dependencies = [ "bleak", "pyserial-asyncio" ]
 
 [project.urls]
-Homepage = "https://github.com/mccli"
-Issues = "https://github.com/mccli/issues"
+Homepage = "https://github.com/fdlamotte/meshcore_py"
+Issues = "https://github.com/fdlamotte/meshcore_py/issues"
