@@ -376,6 +376,10 @@ class MeshCore:
                     res["model"] = data[20:60].decode().replace("\0","")
                     res["ver"] = data[60:80].decode().replace("\0","")
                 self.result.set_result(res)
+            case 50: # cli response
+                res = {}
+                res["response"] = data[1:].decode()
+                self.result.set_result(res)
             # push notifications
             case 0x80:
                 printerr ("Advertisment received")
@@ -624,3 +628,7 @@ class MeshCore:
         except TimeoutError :
             printerr("Timeout waiting ack")
             return False
+
+    async def send_cli(self, cmd):
+        data = b"\x32" + cmd.encode('ascii')
+        return await self.send(data)
