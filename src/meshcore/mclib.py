@@ -364,7 +364,7 @@ class MeshCore:
             case 11: # contact
                 self.result.set_result("meshcore://" + data[1:].hex())
             case 12: # battery voltage
-                self.result.set_result(int.from_bytes(data[1:2], byteorder='little'))
+                self.result.set_result(int.from_bytes(data[1:3], byteorder='little'))
             case 13: # device info
                 res = {}
                 res["fw ver"] = data[1]
