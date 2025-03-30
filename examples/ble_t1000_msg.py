@@ -3,15 +3,14 @@
 import asyncio
 import json
 from meshcore import MeshCore
-from meshcore import TCPConnection
+from meshcore import BLEConnection
 
-HOSTNAME = "mchome"
-PORT = 5000
-DEST = "t1000"
+ADDRESS = "t1000" # node ble adress or name
+DEST = "mchome"
 MSG = "Hello World"
 
 async def main () :
-    con  = TCPConnection(HOSTNAME, PORT)
+    con  = BLEConnection(ADDRESS)
     await con.connect()
     mc = MeshCore(con)
     await mc.connect()
