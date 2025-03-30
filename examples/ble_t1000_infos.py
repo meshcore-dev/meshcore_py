@@ -1,14 +1,14 @@
 #!/usr/bin/python
 
-from meshcore import TCPConnection
-from meshcore import MeshCore
 import asyncio
 
-HOSTNAME = "mchome"
-PORT = 5000
+from meshcore import MeshCore
+from meshcore import BLEConnection
+
+ADDRESS = "t1000"
 
 async def main () :
-    con  = TCPConnection(HOSTNAME, PORT)
+    con  = BLEConnection(ADDRESS)
     await con.connect()
     mc = MeshCore(con)
     await mc.connect()

@@ -1,9 +1,10 @@
 #!/usr/bin/python
 DISPLAYNAME="Center at MC node location"
 
-from meshcore import BLEConnection
-from meshcore import MeshCore
 import asyncio
+
+from meshcore import MeshCore
+from meshcore import BLEConnection
 
 ADDRESS = "t1000"
 

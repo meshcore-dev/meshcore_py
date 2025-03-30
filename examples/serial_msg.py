@@ -2,17 +2,19 @@
 
 import asyncio
 import json
-from meshcore import TCPConnection
 from meshcore import MeshCore
+from meshcore import SerialConnection
 
-HOSTNAME = "mchome"
-PORT = 5000
-DEST = "t1000"
-MSG = "Hello World"
+PORT = "/dev/ttyUSB0"
+BAUDRATE = 115200
+DEST = "mchome"
+MSG = "hello from serial"
 
 async def main () :
-    con  = TCPConnection(HOSTNAME, PORT)
+    con  = SerialConnection(PORT, BAUDRATE)
     await con.connect()
+    await asyncio.sleep(0.1) # time for transport to establish    
+
     mc = MeshCore(con)
     await mc.connect()
 

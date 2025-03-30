@@ -1,8 +1,9 @@
 #!/usr/bin/python
 
-from meshcore import TCPConnection
-from meshcore import MeshCore
 import asyncio
+
+from meshcore import MeshCore
+from meshcore import TCPConnection
 
 HOSTNAME = "mchome"
 PORT = 5000
