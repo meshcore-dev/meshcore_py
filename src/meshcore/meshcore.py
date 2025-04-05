@@ -233,9 +233,12 @@ class MeshCore:
     async def send_device_qeury(self):
         return await self.send(b"\x16\x03");
 
-    async def send_advert(self):
+    async def send_advert(self, flood=False):
         """ Make the node send an advertisement """
-        return await self.send(b"\x07")
+        if flood :
+            return await self.send(b"\x07\x01")
+        else :
+            return await self.send(b"\x07")
 
     async def set_name(self, name):
         """ Changes the name of the node """
