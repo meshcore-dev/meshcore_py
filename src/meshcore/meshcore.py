@@ -28,11 +28,11 @@ class MeshCore:
     """
     Interface to a MeshCore device
     """
-    def __init__(self, cx, debug=False):
+    def __init__(self, cx, debug=False, default_timeout=None):
         self.cx = cx
         self.dispatcher = EventDispatcher()
         self._reader = MessageReader(self.dispatcher)
-        self.commands = CommandHandler()
+        self.commands = CommandHandler(default_timeout=default_timeout)
         
         # Set up logger
         if debug:
@@ -58,19 +58,19 @@ class MeshCore:
         cx.set_reader(self._reader)
     
     @classmethod
-    async def create_tcp(cls, host: str, port: int, debug: bool = False) -> 'MeshCore':
+    async def create_tcp(cls, host: str, port: int, debug: bool = False, default_timeout=None) -> 'MeshCore':
         """Create and connect a MeshCore instance using TCP connection"""
         from .tcp_cx import TCPConnection
         
         connection = TCPConnection(host, port)
         await connection.connect()
         
-        mc = cls(connection, debug=debug)
+        mc = cls(connection, debug=debug, default_timeout=default_timeout)
         await mc.connect()
         return mc
     
     @classmethod
-    async def create_serial(cls, port: str, baudrate: int = 115200, debug: bool = False) -> 'MeshCore':
+    async def create_serial(cls, port: str, baudrate: int = 115200, debug: bool = False, default_timeout=None) -> 'MeshCore':
         """Create and connect a MeshCore instance using serial connection"""
         from .serial_cx import SerialConnection
         import asyncio
@@ -79,12 +79,12 @@ class MeshCore:
         await connection.connect()
         await asyncio.sleep(0.1)  # Time for transport to establish
         
-        mc = cls(connection, debug=debug)
+        mc = cls(connection, debug=debug, default_timeout=default_timeout)
         await mc.connect()
         return mc
     
     @classmethod
-    async def create_ble(cls, address: Optional[str] = None, debug: bool = False) -> 'MeshCore':
+    async def create_ble(cls, address: Optional[str] = None, debug: bool = False, default_timeout=None) -> 'MeshCore':
         """Create and connect a MeshCore instance using BLE connection
         
         If address is None, it will scan for and connect to the first available MeshCore device.
@@ -96,7 +96,7 @@ class MeshCore:
         if result is None:
             raise ConnectionError("Failed to connect to BLE device")
         
-        mc = cls(connection, debug=debug)
+        mc = cls(connection, debug=debug, default_timeout=default_timeout)
         await mc.connect()
         return mc
         
@@ -142,11 +142,15 @@ class MeshCore:
         
         Args:
             event_type: Type of event to wait for, from EventType enum
-            timeout: Maximum time to wait in seconds, or None for no timeout
+            timeout: Maximum time to wait in seconds, or None to use default_timeout
             
         Returns:
             Event object or None if timeout
         """
+        # Use the provided timeout or fall back to default_timeout
+        if timeout is None:
+            timeout = self.default_timeout
+            
         return await self.dispatcher.wait_for_event(event_type, timeout)
     
     def _setup_data_tracking(self):
@@ -180,6 +184,16 @@ class MeshCore:
     def time(self):
         """Get the current device time"""
         return self._time
+        
+    @property
+    def default_timeout(self):
+        """Get the default timeout for commands"""
+        return self.commands.default_timeout
+        
+    @default_timeout.setter
+    def default_timeout(self, value):
+        """Set the default timeout for commands"""
+        self.commands.default_timeout = value
         
     def get_contact_by_name(self, name):
         """
@@ -275,7 +289,7 @@ class MeshCore:
         if hasattr(self, '_auto_fetch_task') and self._auto_fetch_task and not self._auto_fetch_task.done():
             self._auto_fetch_task.cancel()
             try:
-                await self._auto_fetch_task
+                await self._auto_fetch_task # type: ignore
             except asyncio.CancelledError:
                 pass
             self._auto_fetch_task = None

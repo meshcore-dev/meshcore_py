@@ -40,7 +40,7 @@ class EventType(Enum):
 class Event:
     type: EventType
     payload: Any
-    attributes: Dict[str, Any] = None
+    attributes: Dict[str, Any] = {}
     
     def __post_init__(self):
         if self.attributes is None:
@@ -64,7 +64,7 @@ class EventDispatcher:
         self.running = False
         self._task = None
         
-    def subscribe(self, event_type: Union[EventType, None], callback: Callable[[Event], None]) -> Subscription:
+    def subscribe(self, event_type: Union[EventType, None], callback: Callable[[Event], Union[None, asyncio.Future]]) -> Subscription:
         subscription = Subscription(self, event_type, callback)
         self.subscriptions.append(subscription)
         return subscription
@@ -83,7 +83,9 @@ class EventDispatcher:
             for subscription in self.subscriptions.copy():
                 if subscription.event_type is None or subscription.event_type == event.type:
                     try:
-                        await subscription.callback(event)
+                        result = subscription.callback(event)
+                        if asyncio.iscoroutine(result):
+                            await result
                     except Exception as e:
                         print(f"Error in event handler: {e}")
                         
@@ -106,13 +108,13 @@ class EventDispatcher:
                     pass
                 self._task = None
                 
-    async def wait_for_event(self, event_type: EventType, timeout: float = None) -> Optional[Event]:
+    async def wait_for_event(self, event_type: EventType, timeout: float | None = None) -> Optional[Event]:
         future = asyncio.Future()
         
-        async def event_handler(event: Event):
+        def event_handler(event: Event):
             if not future.done():
                 future.set_result(event)
-                
+        
         subscription = self.subscribe(event_type, event_handler)
         
         try:

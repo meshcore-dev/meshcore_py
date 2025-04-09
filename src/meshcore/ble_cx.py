@@ -62,6 +62,9 @@ class BLEConnection:
         await self.client.start_notify(UART_TX_CHAR_UUID, self.handle_rx)
 
         nus = self.client.services.get_service(UART_SERVICE_UUID)
+        if nus is None:
+            logger.error("Could not find UART service")
+            return None
         self.rx_char = nus.get_characteristic(UART_RX_CHAR_UUID)
 
         logger.info("BLE Connection started")
@@ -82,4 +85,10 @@ class BLEConnection:
             asyncio.create_task(self.reader.handle_rx(data))
 
     async def send(self, data):
+        if not self.client:
+            logger.error("Client is not connected")
+            return False
+        if not self.rx_char:
+            logger.error("RX characteristic not found")
+            return False
         await self.client.write_gatt_char(self.rx_char, bytes(data), response=False)

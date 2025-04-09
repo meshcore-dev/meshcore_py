@@ -18,7 +18,7 @@ class TCPConnection:
         self.header = b""
         self.inframe = b""
 
-    class MCClientProtocol:
+    class MCClientProtocol(asyncio.Protocol):
         def __init__(self, cx):
             self.cx = cx
 
@@ -76,6 +76,9 @@ class TCPConnection:
                     self.handle_rx(data[self.frame_size-framelen:])
 
     async def send(self, data):
+        if not self.transport:
+            logger.error("Transport not connected, cannot send data")
+            return
         size = len(data)
         pkt = b"\x3c" + size.to_bytes(2, byteorder="little") + data
         logger.debug(f"sending pkt : {pkt}")

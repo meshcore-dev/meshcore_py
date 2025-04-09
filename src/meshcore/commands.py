@@ -26,10 +26,13 @@ def deprecated(func):
 
 
 class CommandHandler:
-    def __init__(self):
+    DEFAULT_TIMEOUT = 5.0
+    
+    def __init__(self, default_timeout=None):
         self._sender_func = None
         self._reader = None
         self.dispatcher = None
+        self.default_timeout = default_timeout if default_timeout is not None else self.DEFAULT_TIMEOUT
         
     def set_connection(self, connection):
         async def sender(data):
@@ -42,9 +45,12 @@ class CommandHandler:
     def set_dispatcher(self, dispatcher):
         self.dispatcher = dispatcher
         
-    async def send(self, data, expected_events=None, timeout=5.0):
+    async def send(self, data, expected_events=None, timeout=None):
         if not self.dispatcher:
             raise RuntimeError("Dispatcher not set, cannot send commands")
+            
+        # Use the provided timeout or fall back to default_timeout
+        timeout = timeout if timeout is not None else self.default_timeout
             
         if self._sender_func:
             logger.debug(f"Sending raw data: {data.hex() if isinstance(data, bytes) else data}")
@@ -163,14 +169,19 @@ class CommandHandler:
         data = b"\x0f" + key
         return await self.send(data, [EventType.OK, EventType.ERROR])
         
-    async def get_msg(self):
+    async def get_msg(self, timeout=1):
         logger.debug("Requesting pending messages")
-        return await self.send(b"\x0A", [EventType.CONTACT_MSG_RECV, EventType.CHANNEL_MSG_RECV, EventType.ERROR], 1)
+        return await self.send(b"\x0A", [EventType.CONTACT_MSG_RECV, EventType.CHANNEL_MSG_RECV, EventType.ERROR], timeout)
         
     async def send_login(self, dst, pwd):
         logger.debug(f"Sending login request to: {dst.hex() if isinstance(dst, bytes) else dst}")
         data = b"\x1a" + dst + pwd.encode("ascii")
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
+        
+    async def send_logout(self, dst):
+         self.login_resp = asyncio.Future()
+         data = b"\x1d" + dst
+         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
         
     async def send_statusreq(self, dst):
         logger.debug(f"Sending status request to: {dst.hex() if isinstance(dst, bytes) else dst}")

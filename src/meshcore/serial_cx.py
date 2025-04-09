@@ -15,6 +15,7 @@ class SerialConnection:
         self.baudrate = baudrate
         self.frame_started = False
         self.frame_size = 0
+        self.transport = None
         self.header = b""
         self.inframe = b""
 
@@ -25,7 +26,8 @@ class SerialConnection:
         def connection_made(self, transport):
             self.cx.transport = transport
             logger.debug('port opened')
-            transport.serial.rts = False  # You can manipulate Serial object via transport
+            if isinstance(transport, serial_asyncio.SerialTransport) and transport.serial:
+                transport.serial.rts = False  # You can manipulate Serial object via transport
     
         def data_received(self, data):
             self.cx.handle_rx(data)    
@@ -79,6 +81,9 @@ class SerialConnection:
                     self.handle_rx(data[self.frame_size-framelen:])
 
     async def send(self, data):
+        if not self.transport:
+            logger.error("Transport not connected, cannot send data")
+            return
         size = len(data)
         pkt = b"\x3c" + size.to_bytes(2, byteorder="little") + data
         logger.debug(f"sending pkt : {pkt}")
