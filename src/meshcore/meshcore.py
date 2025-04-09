@@ -348,6 +348,11 @@ class MeshCore:
             printerr ("Timeout ...")
             return False
 
+    async def send_logout(self, dst):
+        self.login_resp = asyncio.Future()
+        data = b"\x1d" + dst + pwd.encode("ascii")
+        return await self.send(data)
+
     async def send_statusreq(self, dst):
         self.status_resp = asyncio.Future()
         data = b"\x1b" + dst
