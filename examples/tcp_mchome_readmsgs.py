@@ -18,7 +18,7 @@ async def main () :
 
     res = True
     while res:
-        res = await mc.get_msg()
+        res = await mc.commands.get_msg()
         if res :
             print (res)
 

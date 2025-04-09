@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+
 from meshcore import MeshCore
 from meshcore import SerialConnection
 
@@ -15,6 +16,6 @@ async def main () :
     mc = MeshCore(con)
     await mc.connect()
 
-    print(json.dumps(await mc.get_contacts(),indent=4))
+    print(json.dumps(await mc.commands.get_contacts(),indent=4))
 
 asyncio.run(main())

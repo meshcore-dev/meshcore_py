@@ -3,8 +3,10 @@
 """
 import asyncio
 import sys
+import logging
 
-from meshcore import printerr
+# Get logger
+logger = logging.getLogger("meshcore")
 
 from bleak import BleakClient, BleakScanner
 from bleak.backends.characteristic import BleakGATTCharacteristic
@@ -40,11 +42,11 @@ class BLEConnection:
 
         if self.address is None or self.address == "" or len(self.address.split(":")) != 6 :
             scanner = BleakScanner()
-            printerr("Scanning for devices")
+            logger.info("Scanning for devices")
             device = await scanner.find_device_by_filter(match_meshcore_device)
             if device is None :
                 return None
-            printerr(f"Found device : {device}")
+            logger.info(f"Found device : {device}")
             self.client = BleakClient(device)
             self.address = self.client.address
         else:
@@ -62,22 +64,22 @@ class BLEConnection:
         nus = self.client.services.get_service(UART_SERVICE_UUID)
         self.rx_char = nus.get_characteristic(UART_RX_CHAR_UUID)
 
-        printerr("BLE Connexion started")
+        logger.info("BLE Connection started")
         return self.address
 
     def handle_disconnect(self, _: BleakClient):
         """ Callback to handle disconnection """
-        printerr ("Device was disconnected, goodbye.")
+        logger.info("Device was disconnected, goodbye.")
         # cancelling all tasks effectively ends the program
         for task in asyncio.all_tasks():
             task.cancel()
 
-    def set_mc(self, mc) :
-        self.mc = mc
+    def set_reader(self, reader) :
+        self.reader = reader
 
     def handle_rx(self, _: BleakGATTCharacteristic, data: bytearray):
-        if not self.mc is None:
-            self.mc.handle_rx(data)
+        if not self.reader is None:
+            asyncio.create_task(self.reader.handle_rx(data))
 
     async def send(self, data):
         await self.client.write_gatt_char(self.rx_char, bytes(data), response=False)

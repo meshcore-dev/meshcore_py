@@ -3,16 +3,14 @@
 import asyncio
 
 from meshcore import MeshCore
-from meshcore import BLEConnection
 
 ADDRESS = "t1000"
 
-async def main () :
-    con  = BLEConnection(ADDRESS)
-    await con.connect()
-    mc = MeshCore(con)
-    await mc.connect()
-
+async def main():
+    mc = await MeshCore.create_ble(ADDRESS)
+    
     print(mc.self_info)
+    
+    await mc.disconnect()
 
 asyncio.run(main())
