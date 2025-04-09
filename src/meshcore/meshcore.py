@@ -350,7 +350,7 @@ class MeshCore:
 
     async def send_logout(self, dst):
         self.login_resp = asyncio.Future()
-        data = b"\x1d" + dst + pwd.encode("ascii")
+        data = b"\x1d" + dst
         return await self.send(data)
 
     async def send_statusreq(self, dst):
