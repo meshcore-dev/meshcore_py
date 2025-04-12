@@ -227,8 +227,34 @@ class MessageReader:
             await self.dispatcher.dispatch(Event(EventType.STATUS_RESPONSE, res))
             
         elif packet_type_value == PacketType.LOG_DATA.value:
-            logger.debug("Received log data")
-            await self.dispatcher.dispatch(Event(EventType.LOG_DATA, data[1:].decode('utf-8', errors='replace')))
+            logger.debug(f"Received RF log data: {data.hex()}")
+            
+            # Parse as raw RX data
+            log_data = {
+                "raw_hex": data[1:].hex()
+            }
+            
+            # First byte is SNR (signed byte, multiplied by 4)
+            if len(data) > 1:
+                snr_byte = data[1]
+                # Convert to signed value
+                snr = (snr_byte if snr_byte < 128 else snr_byte - 256) / 4.0
+                log_data["snr"] = snr
+            
+            # Second byte is RSSI (signed byte)
+            if len(data) > 2:
+                rssi_byte = data[2]
+                # Convert to signed value
+                rssi = rssi_byte if rssi_byte < 128 else rssi_byte - 256
+                log_data["rssi"] = rssi
+            
+            # Remaining bytes are the raw data payload
+            if len(data) > 3:
+                log_data["payload"] = data[3:].hex()
+                log_data["payload_length"] = len(data) - 3
+                
+            # Dispatch as RF log data
+            await self.dispatcher.dispatch(Event(EventType.RX_LOG_DATA, log_data))
             
         elif packet_type_value == PacketType.TRACE_DATA.value:
             logger.debug(f"Received trace data: {data.hex()}")
