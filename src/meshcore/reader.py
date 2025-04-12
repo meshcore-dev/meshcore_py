@@ -230,6 +230,50 @@ class MessageReader:
             logger.debug("Received log data")
             await self.dispatcher.dispatch(Event(EventType.LOG_DATA, data[1:].decode('utf-8', errors='replace')))
             
+        elif packet_type_value == PacketType.TRACE_DATA.value:
+            logger.debug(f"Received trace data: {data.hex()}")
+            res = {}
+            
+            # According to the source, format is:
+            # 0x89, reserved(0), path_len, flags, tag(4), auth(4), path_hashes[], path_snrs[], final_snr
+            
+            reserved = data[1]
+            path_len = data[2]
+            flags = data[3]
+            tag = int.from_bytes(data[4:8], byteorder='little')
+            auth_code = int.from_bytes(data[8:12], byteorder='little')
+            
+            # Initialize result
+            res["tag"] = tag
+            res["auth"] = auth_code
+            res["flags"] = flags
+            res["path_len"] = path_len
+            
+            # Process path as array of objects with hash and SNR
+            path_nodes = []
+            
+            if path_len > 0 and len(data) >= 12 + path_len*2 + 1:
+                # Extract path with hash and SNR pairs
+                for i in range(path_len):
+                    node = {
+                        "hash": f"{data[12+i]:02x}",
+                        # SNR is stored as a signed byte representing SNR * 4
+                        "snr": (data[12+path_len+i] if data[12+path_len+i] < 128 else data[12+path_len+i] - 256) / 4.0
+                    }
+                    path_nodes.append(node)
+                
+                # Add the final node (our device) with its SNR
+                final_snr_byte = data[12+path_len*2]
+                final_snr = (final_snr_byte if final_snr_byte < 128 else final_snr_byte - 256) / 4.0
+                path_nodes.append({
+                    "snr": final_snr
+                })
+                
+                res["path"] = path_nodes
+            
+            logger.debug(f"Parsed trace data: {res}")
+            await self.dispatcher.dispatch(Event(EventType.TRACE_DATA, res))
+            
         else:
             logger.debug(f"Unhandled data received {data}")
             logger.debug(f"Unhandled packet type: {packet_type_value}")

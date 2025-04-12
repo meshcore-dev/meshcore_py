@@ -225,3 +225,51 @@ class CommandHandler:
         logger.debug(f"Sending CLI command: {cmd}")
         data = b"\x32" + cmd.encode('ascii')
         return await self.send(data, [EventType.CLI_RESPONSE, EventType.ERROR])
+        
+    async def send_trace(self, auth_code=0, tag=None, flags=0, path=None):
+        """
+        Send a trace packet to test routing through specific repeaters
+        
+        Args:
+            auth_code: 32-bit authentication code (default: 0)
+            tag: 32-bit integer to identify this trace (default: random)
+            flags: 8-bit flags field (default: 0)
+            path: Optional string with comma-separated hex values representing repeater pubkeys (e.g. "23,5f,3a")
+                 or a bytes/bytearray object with the raw path data
+                 
+        Returns:
+            Dictionary with sent status, tag, and estimated timeout in milliseconds, or False if command failed
+        """
+        # Generate random tag if not provided
+        if tag is None:
+            import random
+            tag = random.randint(1, 0xFFFFFFFF)
+            
+        logger.debug(f"Sending trace: tag={tag}, auth={auth_code}, flags={flags}, path={path}")
+        
+        # Prepare the command packet: CMD(1) + tag(4) + auth_code(4) + flags(1) + [path]
+        cmd_data = bytearray([36])  # CMD_SEND_TRACE_PATH
+        cmd_data.extend(tag.to_bytes(4, 'little'))
+        cmd_data.extend(auth_code.to_bytes(4, 'little'))
+        cmd_data.append(flags)
+        
+        # Process path if provided
+        if path:
+            if isinstance(path, str):
+                # Convert comma-separated hex values to bytes
+                try:
+                    path_bytes = bytearray()
+                    for hex_val in path.split(','):
+                        hex_val = hex_val.strip()
+                        path_bytes.append(int(hex_val, 16))
+                    cmd_data.extend(path_bytes)
+                except ValueError as e:
+                    logger.error(f"Invalid path format: {e}")
+                    return False
+            elif isinstance(path, (bytes, bytearray)):
+                cmd_data.extend(path)
+            else:
+                logger.error(f"Unsupported path type: {type(path)}")
+                return False
+        
+        return await self.send(cmd_data, [EventType.MSG_SENT, EventType.ERROR])

@@ -28,3 +28,4 @@ class PacketType(Enum):
     LOGIN_FAILED = 0x86
     STATUS_RESPONSE = 0x87
     LOG_DATA = 0x88
+    TRACE_DATA = 0x89

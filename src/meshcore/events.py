@@ -2,7 +2,7 @@ from enum import Enum
 import logging
 from typing import Any, Dict, Optional, Callable, List, Union
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 logger = logging.getLogger("meshcore")
 
@@ -30,6 +30,7 @@ class EventType(Enum):
     LOGIN_FAILED = "login_failed" 
     STATUS_RESPONSE = "status_response"
     LOG_DATA = "log_data"
+    TRACE_DATA = "trace_data"
     
     # Command response types
     OK = "command_ok"
@@ -40,7 +41,7 @@ class EventType(Enum):
 class Event:
     type: EventType
     payload: Any
-    attributes: Dict[str, Any] = {}
+    attributes: Dict[str, Any] = field(default_factory=dict)
     
     def __post_init__(self):
         if self.attributes is None:
