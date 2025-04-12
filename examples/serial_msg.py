@@ -13,6 +13,9 @@ async def main () :
 
     await mc.ensure_contacts()
     contact = mc.get_contact_by_name(DEST)
+    if not contact:
+        print(f"Contact {DEST} not found")
+        return
     await mc.commands.send_msg(bytes.fromhex(contact["public_key"])[0:6], MSG)
     print ("Message sent ... awaiting")
 

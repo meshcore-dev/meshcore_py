@@ -2,7 +2,7 @@ import asyncio
 import functools
 import warnings
 import logging
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from .events import EventDispatcher, EventType
 from .reader import MessageReader
@@ -195,7 +195,7 @@ class MeshCore:
         """Set the default timeout for commands"""
         self.commands.default_timeout = value
         
-    def get_contact_by_name(self, name):
+    def get_contact_by_name(self, name) -> Optional[Dict[str, Any]]:
         """
         Find a contact by its name (adv_name field)
         
@@ -214,7 +214,7 @@ class MeshCore:
                 
         return None
         
-    def get_contact_by_key_prefix(self, prefix):
+    def get_contact_by_key_prefix(self, prefix) -> Optional[Dict[str, Any]]:
         """
         Find a contact by its public key prefix
         
