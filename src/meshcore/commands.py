@@ -1,29 +1,9 @@
-import functools
 import asyncio
 import logging
-import warnings
-import time
-from typing import Any, Callable, Awaitable, Optional, Union
+from typing import Any
 from .events import EventType
 
 logger = logging.getLogger("meshcore")
-
-class CommandError(Exception):
-    def __init__(self, details=None):
-        self.details = details
-        super().__init__(f"Command error: {details}")
-
-def deprecated(func):
-    @functools.wraps(func)
-    async def wrapper(*args, **kwargs):
-        warnings.warn(
-            f"Method {func.__name__} is deprecated. Use commands.{func.__name__} instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        return await func(*args, **kwargs)
-    return wrapper
-
 
 class CommandHandler:
     DEFAULT_TIMEOUT = 5.0

@@ -2,7 +2,6 @@
     mccli.py : CLI interface to MeschCore BLE companion app
 """
 import asyncio
-import sys
 import logging
 
 # Get logger

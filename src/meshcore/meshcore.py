@@ -1,6 +1,4 @@
 import asyncio
-import functools
-import warnings
 import logging
 from typing import Optional, Dict, Any
 
@@ -11,18 +9,6 @@ from .commands import CommandHandler
 
 # Setup default logger
 logger = logging.getLogger("meshcore")
-
-
-def deprecated(func):
-    @functools.wraps(func)
-    async def wrapper(*args, **kwargs):
-        warnings.warn(
-            f"Method {func.__name__} is deprecated. Use commands.{func.__name__} instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        return await func(*args, **kwargs)
-    return wrapper
 
 class MeshCore:
     """
