@@ -208,7 +208,7 @@ class MeshCore:
         if not self._contacts:
             return None
             
-        for contact_id, contact in self._contacts.items():
+        for _, contact in self._contacts.items():
             if contact.get("adv_name", "").lower() == name.lower():
                 return contact
                 
