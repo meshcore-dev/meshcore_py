@@ -3,31 +3,27 @@
 import asyncio
 
 from meshcore import MeshCore
-from meshcore import printerr
-from meshcore import SerialConnection
+from meshcore.events import EventType
 
-PORT = "/dev/ttyUSB0"
+PORT = "/dev/tty.usbserial-583A0069501"
 BAUDRATE = 115200
 
-REPEATER="FdlRoom"
-PASSWORD="password"
+REPEATER="Orion"
+PASSWORD="floopyboopy"
 
 async def main () :
-    con  = SerialConnection(PORT, BAUDRATE)
-    await con.connect()
-    await asyncio.sleep(0.1) # time for transport to establish    
+    mc = await MeshCore.create_serial(PORT, BAUDRATE)
+    await mc.commands.get_contacts()
+    repeater = mc.get_contact_by_name(REPEATER)
+    
+    await mc.commands.send_login(bytes.fromhex(repeater["public_key"]), PASSWORD)
 
-    mc = MeshCore(con)
-    await mc.connect()
+    print("Login sent ... awaiting")
 
-    contacts = await mc.get_contacts()
-    repeater = contacts[REPEATER]
-    await mc.send_login(bytes.fromhex(repeater["public_key"]), PASSWORD)
-
-    printerr("Login sent ... awaiting")
-
-    if await mc.wait_login() :
-        await mc.send_statusreq(bytes.fromhex(repeater["public_key"]))
-        print(await mc.wait_status())
+    if await mc.wait_for_event(EventType.LOGIN_SUCCESS):
+        print("Logged in success")
+        await mc.commands.send_statusreq(bytes.fromhex(repeater["public_key"]))
+        print("Status request sent ... awaiting")
+        print(await mc.wait_for_event(EventType.STATUS_RESPONSE))
     
 asyncio.run(main())

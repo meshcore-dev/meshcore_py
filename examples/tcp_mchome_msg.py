@@ -17,6 +17,6 @@ async def main () :
     await mc.connect()
 
     await mc.ensure_contacts()
-    await mc.send_msg(bytes.fromhex(mc.contacts[DEST]["public_key"])[0:6],MSG)
+    await mc.commands.send_msg(bytes.fromhex(mc.get_contact_by_name(DEST)["public_key"])[0:6],MSG)
 
 asyncio.run(main())

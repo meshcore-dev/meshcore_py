@@ -3,17 +3,15 @@
 import asyncio
 
 from meshcore import MeshCore
-from meshcore import TCPConnection
 
 HOSTNAME = "mchome"
 PORT = 5000
 
-async def main () :
-    con  = TCPConnection(HOSTNAME, PORT)
-    await con.connect()
-    mc = MeshCore(con)
-    await mc.connect()
-
+async def main():
+    mc = await MeshCore.create_tcp(HOSTNAME, PORT)
+    
     print(mc.self_info)
+    
+    await mc.disconnect()
 
 asyncio.run(main())

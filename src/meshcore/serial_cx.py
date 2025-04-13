@@ -2,10 +2,11 @@
     mccli.py : CLI interface to MeschCore BLE companion app
 """
 import asyncio
-import sys
+import logging
 import serial_asyncio
 
-from meshcore import printerr
+# Get logger
+logger = logging.getLogger("meshcore")
 
 class SerialConnection:
     def __init__(self, port, baudrate):
@@ -13,6 +14,7 @@ class SerialConnection:
         self.baudrate = baudrate
         self.frame_started = False
         self.frame_size = 0
+        self.transport = None
         self.header = b""
         self.inframe = b""
 
@@ -22,21 +24,21 @@ class SerialConnection:
 
         def connection_made(self, transport):
             self.cx.transport = transport
-#            printerr('port opened')
-            transport.serial.rts = False  # You can manipulate Serial object via transport
+            logger.debug('port opened')
+            if isinstance(transport, serial_asyncio.SerialTransport) and transport.serial:
+                transport.serial.rts = False  # You can manipulate Serial object via transport
     
         def data_received(self, data):
-#            printerr('data received')
             self.cx.handle_rx(data)    
     
         def connection_lost(self, exc):
-            printerr('port closed')
+            logger.info('port closed')
     
         def pause_writing(self):
-            printerr('pause writing')
+            logger.debug('pause writing')
     
         def resume_writing(self):
-            printerr('resume writing')
+            logger.debug('resume writing')
 
     async def connect(self):
         """
@@ -47,11 +49,11 @@ class SerialConnection:
                 loop, lambda: self.MCSerialClientProtocol(self), 
                 self.port, baudrate=self.baudrate)
 
-        printerr("Serial Connexion started")
+        logger.info("Serial Connection started")
         return self.port
 
-    def set_mc(self, mc) :
-        self.mc = mc
+    def set_reader(self, reader) :
+        self.reader = reader
 
     def handle_rx(self, data: bytearray):
         headerlen = len(self.header)
@@ -69,8 +71,8 @@ class SerialConnection:
                 self.inframe = self.inframe + data
             else:
                 self.inframe = self.inframe + data[:self.frame_size-framelen]
-                if not self.mc is None:
-                    self.mc.handle_rx(self.inframe)
+                if not self.reader is None:
+                    asyncio.create_task(self.reader.handle_rx(self.inframe))
                 self.frame_started = False
                 self.header = b""
                 self.inframe = b""
@@ -78,7 +80,10 @@ class SerialConnection:
                     self.handle_rx(data[self.frame_size-framelen:])
 
     async def send(self, data):
+        if not self.transport:
+            logger.error("Transport not connected, cannot send data")
+            return
         size = len(data)
         pkt = b"\x3c" + size.to_bytes(2, byteorder="little") + data
-#        printerr(f"sending pkt : {pkt}")
+        logger.debug(f"sending pkt : {pkt}")
         self.transport.write(pkt)

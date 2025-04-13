@@ -2,9 +2,10 @@
     mccli.py : CLI interface to MeschCore BLE companion app
 """
 import asyncio
-import sys
+import logging
 
-from meshcore import printerr
+# Get logger
+logger = logging.getLogger("meshcore")
 
 class TCPConnection:
     def __init__(self, host, port):
@@ -16,21 +17,23 @@ class TCPConnection:
         self.header = b""
         self.inframe = b""
 
-    class MCClientProtocol:
+    class MCClientProtocol(asyncio.Protocol):
         def __init__(self, cx):
             self.cx = cx
 
         def connection_made(self, transport):
             self.cx.transport = transport
+            logger.debug('connection established')
     
         def data_received(self, data):
+            logger.debug('data received')
             self.cx.handle_rx(data)
 
         def error_received(self, exc):
-            printerr(f'Error received: {exc}')
+            logger.error(f'Error received: {exc}')
     
         def connection_lost(self, exc):
-            printerr('The server closed the connection')
+            logger.info('The server closed the connection')
 
     async def connect(self):
         """
@@ -41,11 +44,11 @@ class TCPConnection:
                 lambda: self.MCClientProtocol(self), 
                 self.host, self.port)
 
-        printerr("TCP Connexion started")
+        logger.info("TCP Connection started")
         return self.host
 
-    def set_mc(self, mc) :
-        self.mc = mc
+    def set_reader(self, reader) :
+        self.reader = reader
 
     def handle_rx(self, data: bytearray):
         headerlen = len(self.header)
@@ -63,8 +66,8 @@ class TCPConnection:
                 self.inframe = self.inframe + data
             else:
                 self.inframe = self.inframe + data[:self.frame_size-framelen]
-                if not self.mc is None:
-                    self.mc.handle_rx(self.inframe)
+                if not self.reader is None:
+                    asyncio.create_task(self.reader.handle_rx(self.inframe))
                 self.frame_started = False
                 self.header = b""
                 self.inframe = b""
@@ -72,6 +75,10 @@ class TCPConnection:
                     self.handle_rx(data[self.frame_size-framelen:])
 
     async def send(self, data):
+        if not self.transport:
+            logger.error("Transport not connected, cannot send data")
+            return
         size = len(data)
         pkt = b"\x3c" + size.to_bytes(2, byteorder="little") + data
+        logger.debug(f"sending pkt : {pkt}")
         self.transport.write(pkt)
