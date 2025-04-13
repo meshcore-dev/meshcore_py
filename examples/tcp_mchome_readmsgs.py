@@ -18,8 +18,10 @@ async def main () :
 
     res = True
     while res:
-        res = await mc.commands.get_msg()
-        if res :
-            print (res)
+        result = await mc.commands.get_msg()
+        if result.get("success") == False:
+            res = False
+            print("No more messages")
+        print (result)
 
 asyncio.run(main())

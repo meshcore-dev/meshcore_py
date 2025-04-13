@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union
 
 from .events import EventDispatcher, EventType
 from .reader import MessageReader
@@ -99,18 +99,27 @@ class MeshCore:
             self.dispatcher.running = False
             self.dispatcher._task.cancel()
     
-    def subscribe(self, event_type: EventType, callback):
+    def subscribe(self, event_type: EventType, callback, attribute_filters: Optional[Dict[str, Any]] = None):
         """
-        Subscribe to events using EventType enum
+        Subscribe to events using EventType enum with optional attribute filtering
         
         Args:
             event_type: Type of event to subscribe to, from EventType enum
             callback: Async function to call when event occurs
+            attribute_filters: Dictionary of attribute key-value pairs that must match for the event to trigger the callback
             
         Returns:
             Subscription object that can be used to unsubscribe
+            
+        Example:
+            # Subscribe to ACK events where the 'code' attribute has a specific value
+            mc.subscribe(
+                EventType.ACK, 
+                my_callback_function,
+                attribute_filters={'code': 'SUCCESS'}
+            )
         """
-        return self.dispatcher.subscribe(event_type, callback)
+        return self.dispatcher.subscribe(event_type, callback, attribute_filters)
     
     def unsubscribe(self, subscription):
         """
@@ -122,22 +131,31 @@ class MeshCore:
         if subscription:
             subscription.unsubscribe()
     
-    async def wait_for_event(self, event_type: EventType, timeout=None):
+    async def wait_for_event(self, event_type: EventType, attribute_filters: Optional[Dict[str, Any]] = None, timeout=None):
         """
-        Wait for an event using EventType enum
+        Wait for an event using EventType enum with optional attribute filtering
         
         Args:
             event_type: Type of event to wait for, from EventType enum
+            attribute_filters: Dictionary of attribute key-value pairs to match against the event
             timeout: Maximum time to wait in seconds, or None to use default_timeout
             
         Returns:
             Event object or None if timeout
+            
+        Example:
+            # Wait for an ACK event where the 'code' attribute has a specific value
+            await mc.wait_for_event(
+                EventType.ACK, 
+                attribute_filters={'code': 'SUCCESS'},
+                timeout=30.0
+            )
         """
         # Use the provided timeout or fall back to default_timeout
         if timeout is None:
             timeout = self.default_timeout
             
-        return await self.dispatcher.wait_for_event(event_type, timeout)
+        return await self.dispatcher.wait_for_event(event_type, attribute_filters, timeout)
     
     def _setup_data_tracking(self):
         """Set up event subscriptions to track data internally"""
@@ -148,7 +166,7 @@ class MeshCore:
             self._self_info = event.payload
             
         async def _update_time(event):
-            self._time = event.payload
+            self._time = event.payload.get("time", 0)
             
         # Subscribe to events to update internal state
         self.subscribe(EventType.CONTACTS, _update_contacts)
@@ -244,7 +262,7 @@ class MeshCore:
                     result = await self.commands.get_msg()
                     
                     # If we got a NO_MORE_MSGS event or an error, stop fetching
-                    if not result or isinstance(result, dict) and "error" in result:
+                    if not result.get("success") or isinstance(result, dict) and "error" in result:
                         break
                     
                     # Small delay to prevent overwhelming the device

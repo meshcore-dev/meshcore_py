@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import asyncio
 import argparse
+import random
 from meshcore import MeshCore
 from meshcore.events import EventType
 
@@ -29,14 +30,23 @@ async def main():
         
         # Send trace packet
         print(f"Sending trace packet...")
-        result = await mc.commands.send_trace(path=args.path)
+        # Send trace with a path if provided
+        tag = random.randint(1, 0xFFFFFFFF)
+        result = await mc.commands.send_trace(path=args.path, tag=tag)
         
-        if result:
-            print("Trace packet sent successfully")
-            print("Waiting for trace response...")
+        # Check if the result has a success indicator
+        if result.get("success") == False:
+            print(f"Failed to send trace packet: {result.get('reason', 'unknown error')}")
+        elif result:
+            print(f"Trace packet sent successfully with tag={tag}")
+            print("Waiting for trace response matching our tag...")
             
-            # Wait for a trace response with 15-second timeout
-            event = await mc.wait_for_event(EventType.TRACE_DATA, timeout=15)
+            # Wait for a trace response with our specific tag
+            event = await mc.wait_for_event(
+                EventType.TRACE_DATA,
+                attribute_filters={"tag": tag},
+                timeout=15
+            )
             
             if event:
                 trace = event.payload

@@ -125,6 +125,47 @@ meshcore.subscribe(EventType.ADVERTISEMENT, handle_advert)
 meshcore.unsubscribe(subscription)
 ```
 
+#### Filtering Events by Attributes
+
+Filter events based on their attributes to handle only specific ones:
+
+```python
+# Subscribe only to messages from a specific contact
+async def handle_specific_contact_messages(event):
+    print(f"Message from Alice: {event.payload['text']}")
+    
+contact = meshcore.get_contact_by_name("Alice")
+if contact:
+    alice_subscription = meshcore.subscribe(
+        EventType.CONTACT_MSG_RECV,
+        handle_specific_contact_messages,
+        attribute_filters={"pubkey_prefix": contact["public_key"][:12]}
+    )
+
+# Send a message and wait for its specific acknowledgment
+async def send_and_confirm_message(meshcore, dst_key, message):
+    # Send the message and get information about the sent message
+    sent_result = await meshcore.commands.send_msg(dst_key, message)
+    
+    # Extract the expected acknowledgment code from the message sent event
+    expected_ack = sent_result["expected_ack"].hex()
+    print(f"Message sent, waiting for ack with code: {expected_ack}")
+    
+    # Wait specifically for this acknowledgment
+    result = await meshcore.wait_for_event(
+        EventType.ACK,
+        attribute_filters={"code": expected_ack},
+        timeout=10.0
+    )
+    
+    if result:
+        print("Message confirmed delivered!")
+        return True
+    else:
+        print("Message delivery confirmation timed out")
+        return False
+```
+
 ### Hybrid Approach (Commands + Events)
 
 Combine command-based and event-based styles:

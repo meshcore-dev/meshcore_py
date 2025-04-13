@@ -22,19 +22,18 @@ class MessageReader:
         
         # Handle command responses
         if packet_type_value == PacketType.OK.value:
-            result = None
+            result: Dict[str, Any] = {"success": True}
             if len(data) == 5:
-                result = int.from_bytes(data[1:5], byteorder='little')
-            else:
-                result = True
+                result["value"] = int.from_bytes(data[1:5], byteorder='little')
                 
             # Dispatch event for the OK response
             await self.dispatcher.dispatch(Event(EventType.OK, result))
             
         elif packet_type_value == PacketType.ERROR.value:
-            result = False
             if len(data) > 1:
-                result = {"error_code": data[1]}
+                result = {"success": False, "error_code": data[1]}
+            else:
+                result = {"success": False}
             
             # Dispatch event for the ERROR response
             await self.dispatcher.dispatch(Event(EventType.ERROR, result))
@@ -84,7 +83,13 @@ class MessageReader:
             res["type"] = data[1]
             res["expected_ack"] = bytes(data[2:6])
             res["suggested_timeout"] = int.from_bytes(data[6:10], byteorder='little')
-            await self.dispatcher.dispatch(Event(EventType.MSG_SENT, res))
+            
+            attributes = {
+                "type": res["type"],
+                "expected_ack": res["expected_ack"].hex()
+            }
+            
+            await self.dispatcher.dispatch(Event(EventType.MSG_SENT, res, attributes))
             
         elif packet_type_value == PacketType.CONTACT_MSG_RECV.value:
             res = {}
@@ -98,7 +103,13 @@ class MessageReader:
                 res["text"] = data[17:].decode()
             else:
                 res["text"] = data[13:].decode()
-            await self.dispatcher.dispatch(Event(EventType.CONTACT_MSG_RECV, res))
+                
+            attributes = {
+                "pubkey_prefix": res["pubkey_prefix"],
+                "txt_type": res["txt_type"]
+            }
+            
+            await self.dispatcher.dispatch(Event(EventType.CONTACT_MSG_RECV, res, attributes))
             
         elif packet_type_value == 16:  # A reply to CMD_SYNC_NEXT_MESSAGE (ver >= 3)
             res = {}
@@ -113,7 +124,13 @@ class MessageReader:
                 res["text"] = data[20:].decode()
             else:
                 res["text"] = data[16:].decode()
-            await self.dispatcher.dispatch(Event(EventType.CONTACT_MSG_RECV, res, {"extended": True}))
+                
+            attributes = {
+                "pubkey_prefix": res["pubkey_prefix"],
+                "txt_type": res["txt_type"]
+            }
+            
+            await self.dispatcher.dispatch(Event(EventType.CONTACT_MSG_RECV, res, attributes))
             
         elif packet_type_value == PacketType.CHANNEL_MSG_RECV.value:
             res = {}
@@ -123,7 +140,13 @@ class MessageReader:
             res["txt_type"] = data[3]
             res["sender_timestamp"] = int.from_bytes(data[4:8], byteorder='little')
             res["text"] = data[8:].decode()
-            await self.dispatcher.dispatch(Event(EventType.CHANNEL_MSG_RECV, res))
+            
+            attributes = {
+                "channel_idx": res["channel_idx"],
+                "txt_type": res["txt_type"]
+            }
+            
+            await self.dispatcher.dispatch(Event(EventType.CHANNEL_MSG_RECV, res, attributes))
             
         elif packet_type_value == 17:  # A reply to CMD_SYNC_NEXT_MESSAGE (ver >= 3)
             res = {}
@@ -134,21 +157,31 @@ class MessageReader:
             res["txt_type"] = data[6]
             res["sender_timestamp"] = int.from_bytes(data[7:11], byteorder='little')
             res["text"] = data[11:].decode()
-            await self.dispatcher.dispatch(Event(EventType.CHANNEL_MSG_RECV, res, {"extended": True}))
+            
+            attributes = {
+                "channel_idx": res["channel_idx"],
+                "txt_type": res["txt_type"]
+            }
+            
+            await self.dispatcher.dispatch(Event(EventType.CHANNEL_MSG_RECV, res, attributes))
             
         elif packet_type_value == PacketType.CURRENT_TIME.value:
-            result = int.from_bytes(data[1:5], byteorder='little')
+            time_value = int.from_bytes(data[1:5], byteorder='little')
+            result = {"time": time_value}
             await self.dispatcher.dispatch(Event(EventType.CURRENT_TIME, result))
             
         elif packet_type_value == PacketType.NO_MORE_MSGS.value:
-            await self.dispatcher.dispatch(Event(EventType.NO_MORE_MSGS, False))
+            result = {"messages_available": False}
+            await self.dispatcher.dispatch(Event(EventType.NO_MORE_MSGS, result))
             
         elif packet_type_value == PacketType.CONTACT_SHARE.value:
-            result = "meshcore://" + data[1:].hex()
+            contact_uri = "meshcore://" + data[1:].hex()
+            result = {"uri": contact_uri}
             await self.dispatcher.dispatch(Event(EventType.CONTACT_SHARE, result))
             
         elif packet_type_value == PacketType.BATTERY.value:
-            result = int.from_bytes(data[1:3], byteorder='little')
+            battery_level = int.from_bytes(data[1:3], byteorder='little')
+            result = {"level": battery_level}
             await self.dispatcher.dispatch(Event(EventType.BATTERY, result))
             
         elif packet_type_value == PacketType.DEVICE_INFO.value:
@@ -171,20 +204,30 @@ class MessageReader:
         # Push notifications
         elif packet_type_value == PacketType.ADVERTISEMENT.value:
             logger.debug("Advertisement received")
-            # todo: Read advertisement?
-            await self.dispatcher.dispatch(Event(EventType.ADVERTISEMENT, None))
+            # TODO: Read advertisement attributes
+            await self.dispatcher.dispatch(Event(EventType.ADVERTISEMENT, {}))
             
         elif packet_type_value == PacketType.PATH_UPDATE.value:
             logger.debug("Code path update")
-            await self.dispatcher.dispatch(Event(EventType.PATH_UPDATE, None))
+            # TODO: Read path update attributes
+            await self.dispatcher.dispatch(Event(EventType.PATH_UPDATE, {}))
             
         elif packet_type_value == PacketType.ACK.value:
             logger.debug("Received ACK")
-            await self.dispatcher.dispatch(Event(EventType.ACK, None))
+            ack_data = {}
+            
+            if len(data) >= 5:
+                ack_data["code"] = bytes(data[1:5]).hex()
+            
+            attributes = {
+                "code": ack_data.get("code", "")
+            }
+            
+            await self.dispatcher.dispatch(Event(EventType.ACK, ack_data, attributes))
             
         elif packet_type_value == PacketType.MESSAGES_WAITING.value:
             logger.debug("Msgs are waiting")
-            await self.dispatcher.dispatch(Event(EventType.MESSAGES_WAITING, None))
+            await self.dispatcher.dispatch(Event(EventType.MESSAGES_WAITING, {}))
             
         elif packet_type_value == PacketType.RAW_DATA.value:
             res = {}
@@ -197,11 +240,13 @@ class MessageReader:
             
         elif packet_type_value == PacketType.LOGIN_SUCCESS.value:
             logger.debug("Login success")
-            await self.dispatcher.dispatch(Event(EventType.LOGIN_SUCCESS, None))
+             # TODO: Read login attributes
+            await self.dispatcher.dispatch(Event(EventType.LOGIN_SUCCESS, {}))
             
         elif packet_type_value == PacketType.LOGIN_FAILED.value:
             logger.debug("Login failed")
-            await self.dispatcher.dispatch(Event(EventType.LOGIN_FAILED, None))
+             # TODO: Read login attributes
+            await self.dispatcher.dispatch(Event(EventType.LOGIN_FAILED, {}))
             
         elif packet_type_value == PacketType.STATUS_RESPONSE.value:
             res = {}
@@ -224,16 +269,20 @@ class MessageReader:
             res["flood_dups"] = int.from_bytes(data[54:56], byteorder='little')
             data_hex = data[8:].hex()
             logger.debug(f"Status response: {data_hex}")
-            await self.dispatcher.dispatch(Event(EventType.STATUS_RESPONSE, res))
+            
+            attributes = {
+                "pubkey_prefix": res["pubkey_pre"],
+            }
+            await self.dispatcher.dispatch(Event(EventType.STATUS_RESPONSE, res, attributes))
             
         elif packet_type_value == PacketType.LOG_DATA.value:
             logger.debug(f"Received RF log data: {data.hex()}")
             
             # Parse as raw RX data
-            log_data = {
+            log_data: Dict[str, Any] = {
                 "raw_hex": data[1:].hex()
             }
-            
+                        
             # First byte is SNR (signed byte, multiplied by 4)
             if len(data) > 1:
                 snr_byte = data[1]
@@ -253,8 +302,12 @@ class MessageReader:
                 log_data["payload"] = data[3:].hex()
                 log_data["payload_length"] = len(data) - 3
                 
+            attributes = {
+                "pubkey_prefix": log_data["raw_hex"],
+            }
+                
             # Dispatch as RF log data
-            await self.dispatcher.dispatch(Event(EventType.RX_LOG_DATA, log_data))
+            await self.dispatcher.dispatch(Event(EventType.RX_LOG_DATA, log_data, attributes))
             
         elif packet_type_value == PacketType.TRACE_DATA.value:
             logger.debug(f"Received trace data: {data.hex()}")
@@ -298,7 +351,13 @@ class MessageReader:
                 res["path"] = path_nodes
             
             logger.debug(f"Parsed trace data: {res}")
-            await self.dispatcher.dispatch(Event(EventType.TRACE_DATA, res))
+            
+            attributes = {
+                "tag": res["tag"],
+                "auth_code": res["auth"],
+            }
+            
+            await self.dispatcher.dispatch(Event(EventType.TRACE_DATA, res, attributes))
             
         else:
             logger.debug(f"Unhandled data received {data}")

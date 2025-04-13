@@ -1,8 +1,9 @@
 import asyncio
 import logging
-from typing import Any
+from typing import Any, Dict
 from .events import EventType
-
+import random
+            
 logger = logging.getLogger("meshcore")
 
 class CommandHandler:
@@ -25,7 +26,18 @@ class CommandHandler:
     def set_dispatcher(self, dispatcher):
         self.dispatcher = dispatcher
         
-    async def send(self, data, expected_events=None, timeout=None):
+    async def send(self, data, expected_events=None, timeout=None) -> Dict[str, Any]:
+        """
+        Send a command and wait for expected event responses.
+        
+        Args:
+            data: The data to send
+            expected_events: EventType or list of EventTypes to wait for
+            timeout: Timeout in seconds, or None to use default_timeout
+            
+        Returns:
+            Dict[str, Any]: Dictionary containing the response data or status
+        """
         if not self.dispatcher:
             raise RuntimeError("Dispatcher not set, cannot send commands")
             
@@ -44,17 +56,18 @@ class CommandHandler:
                     
                 logger.debug(f"Waiting for events {expected_events}, timeout={timeout}")
                 for event_type in expected_events:
-                    event = await self.dispatcher.wait_for_event(event_type, timeout)
+                    # don't apply any filters for now, might change later
+                    event = await self.dispatcher.wait_for_event(event_type, {}, timeout)
                     if event:
                         return event.payload
-                return False
+                return {"success": False, "reason": "no_event_received"}
             except asyncio.TimeoutError:
                 logger.debug(f"Command timed out {data}")
-                return False
+                return {"success": False, "reason": "timeout"}
             except Exception as e:
                 logger.debug(f"Command error: {e}")
                 return {"error": str(e)}
-        return True
+        return {"success": True}
         
         
     async def send_appstart(self):
@@ -222,8 +235,9 @@ class CommandHandler:
         """
         # Generate random tag if not provided
         if tag is None:
-            import random
             tag = random.randint(1, 0xFFFFFFFF)
+        if auth_code is None:
+            auth_code = random.randint(1, 0xFFFFFFFF)
             
         logger.debug(f"Sending trace: tag={tag}, auth={auth_code}, flags={flags}, path={path}")
         
@@ -245,11 +259,11 @@ class CommandHandler:
                     cmd_data.extend(path_bytes)
                 except ValueError as e:
                     logger.error(f"Invalid path format: {e}")
-                    return False
+                    return { "success": False, "reason": "invalid_path_format" }
             elif isinstance(path, (bytes, bytearray)):
                 cmd_data.extend(path)
             else:
                 logger.error(f"Unsupported path type: {type(path)}")
-                return False
+                return { "success": False, "reason": "unsupported_path_type" }
         
         return await self.send(cmd_data, [EventType.MSG_SENT, EventType.ERROR])
