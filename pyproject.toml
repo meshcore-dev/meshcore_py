@@ -4,9 +4,10 @@ build-backend = "hatchling.build"
 
 [project]
 name = "meshcore"
-version = "0.4.2"
+version = "1.9.0"
 authors = [
   { name="Florent de Lamotte", email="florent@frizoncorrea.fr" },
+  { name="Alex Wolden", email="awolden@gmail.com" },
 ]
 description = "Base classes for communicating with meshcore companion radios"
 readme = "README.md"
