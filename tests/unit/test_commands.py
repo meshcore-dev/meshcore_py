@@ -47,22 +47,25 @@ def setup_event_response(mock_dispatcher, event_type, payload, attribute_filters
 async def test_send_basic(command_handler, mock_connection):
     result = await command_handler.send(b"test_data")
     mock_connection.send.assert_called_once_with(b"test_data")
-    assert result == {"success": True}
+    assert result.type == EventType.OK
+    assert result.payload == {}
 
 async def test_send_with_event(command_handler, mock_connection, mock_dispatcher):
-    expected_payload = {"success": True, "value": 42}
+    expected_payload = {"value": 42}
     setup_event_response(mock_dispatcher, EventType.OK, expected_payload)
     
     result = await command_handler.send(b"test_command", [EventType.OK])
     
     mock_connection.send.assert_called_once_with(b"test_command")
-    assert result == expected_payload
+    assert result.type == EventType.OK
+    assert result.payload == expected_payload
 
 async def test_send_timeout(command_handler, mock_connection, mock_dispatcher):
     mock_dispatcher.wait_for_event.side_effect = asyncio.TimeoutError
     
     result = await command_handler.send(b"test_command", [EventType.OK], timeout=0.1)
-    assert result == {"success": False, "reason": "timeout"}
+    assert result.type == EventType.ERROR
+    assert result.payload == {"reason": "timeout"}
 
 # Destination validation tests
 async def test_validate_destination_bytes(command_handler, mock_connection):
@@ -235,7 +238,7 @@ async def test_send_trace(command_handler, mock_connection):
 
 async def test_send_with_multiple_expected_events_returns_first_completed(command_handler, mock_connection, mock_dispatcher):
     # Setup the dispatcher to return an ERROR event
-    error_payload = {"success": False, "reason": "command_failed"}
+    error_payload = {"reason": "command_failed"}
     
     async def simulate_error_event(*args, **kwargs):
         # Simulate an ERROR event being returned
@@ -251,4 +254,5 @@ async def test_send_with_multiple_expected_events_returns_first_completed(comman
     mock_connection.send.assert_called_once_with(b"test_command")
     
     # Verify that even though OK was listed first, the ERROR event was returned
-    assert result == error_payload
+    assert result.type == EventType.ERROR
+    assert result.payload == error_payload

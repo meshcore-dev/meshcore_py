@@ -4,6 +4,7 @@ import asyncio
 import json
 from meshcore import TCPConnection
 from meshcore import MeshCore
+from meshcore import EventType
 
 HOSTNAME = "mchome"
 PORT = 5000
@@ -14,5 +15,9 @@ async def main () :
     mc = MeshCore(con)
     await mc.connect()
 
-    print(json.dumps(await mc.commands.get_contacts(),indent=4))
+    result = await mc.commands.get_contacts()
+    if result.type == EventType.ERROR:
+        print(f"Error getting contacts: {result.payload}")
+    else:
+        print(json.dumps(result.payload, indent=4))
 asyncio.run(main())

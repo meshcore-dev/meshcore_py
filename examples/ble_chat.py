@@ -69,8 +69,12 @@ async def main () :
             else :
                 if line.startswith("send") :
                     line = line[5:]
-                ret = await mc.commands.send_msg(contact , line)
-                exp_ack = ret["expected_ack"].hex()
+                result = await mc.commands.send_msg(contact, line)
+                if result.type == EventType.ERROR:
+                    print(f"⚠️ Failed to send message: {result.payload}")
+                    continue
+                    
+                exp_ack = result.payload["expected_ack"].hex()
                 print(" Sent ... ", end="", flush=True)
                 res = await mc.wait_for_event(EventType.ACK, attribute_filters={"code": exp_ack}, timeout=5)
                 if res is None :

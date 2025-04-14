@@ -21,7 +21,12 @@ async def main():
     meshcore = await MeshCore.create_serial("/dev/ttyUSB0")
     
     # Get your contacts
-    contacts = await meshcore.commands.get_contacts()
+    result = await meshcore.commands.get_contacts()
+    if result.type == EventType.ERROR:
+        print(f"Error getting contacts: {result.payload}")
+        return
+        
+    contacts = result.payload
     print(f"Found {len(contacts)} contacts")
     
     # Send a message to the first contact
@@ -30,7 +35,12 @@ async def main():
         contact = next(iter(contacts.items()))[1]
         
         # Pass the contact object directly to send_msg
-        await meshcore.commands.send_msg(contact, "Hello from Python!")
+        result = await meshcore.commands.send_msg(contact, "Hello from Python!")
+        
+        if result.type == EventType.ERROR:
+            print(f"Error sending message: {result.payload}")
+        else:
+            print("Message sent successfully!")
     
     await meshcore.disconnect()
 
@@ -55,6 +65,37 @@ python examples/pubsub_example.py -p /dev/ttyUSB0
 
 ## Usage Guide
 
+### Command Return Values
+
+All command methods in MeshCore return an `Event` object that contains both the event type and its payload. This allows for consistent error handling and type checking:
+
+```python
+# Command result structure
+result = await meshcore.commands.some_command()
+
+# Check if the command was successful or resulted in an error
+if result.type == EventType.ERROR:
+    # Handle error case
+    print(f"Command failed: {result.payload}")
+else:
+    # Handle success case - the event type will be specific to the command
+    # (e.g., EventType.DEVICE_INFO, EventType.CONTACTS, EventType.MSG_SENT)
+    print(f"Command succeeded with event type: {result.type}")
+    # Access the payload data
+    data = result.payload
+```
+
+Common error handling pattern:
+
+```python
+result = await meshcore.commands.send_msg(contact, "Hello!")
+if result.type == EventType.ERROR:
+    print(f"Error sending message: {result.payload}")
+else:
+    # For send_msg, a successful result will have type EventType.MSG_SENT
+    print(f"Message sent with expected ack: {result.payload['expected_ack'].hex()}")
+```
+
 ### Connecting to Your Device
 
 Connect via Serial, BLE, or TCP:
@@ -76,20 +117,34 @@ Send commands and wait for responses:
 
 ```python
 # Get device information
-device_info = await meshcore.commands.send_device_query()
-print(f"Device model: {device_info['model']}")
+result = await meshcore.commands.send_device_query()
+if result.type == EventType.ERROR:
+    print(f"Error getting device info: {result.payload}")
+else:
+    print(f"Device model: {result.payload['model']}")
 
 # Get list of contacts
-contacts = await meshcore.commands.get_contacts()
-for contact_id, contact in contacts.items():
-    print(f"Contact: {contact['adv_name']} ({contact_id})")
+result = await meshcore.commands.get_contacts()
+if result.type == EventType.ERROR:
+    print(f"Error getting contacts: {result.payload}")
+else:
+    contacts = result.payload
+    for contact_id, contact in contacts.items():
+        print(f"Contact: {contact['adv_name']} ({contact_id})")
 
 # Send a message (destination key in bytes)
-await meshcore.commands.send_msg(dst_key, "Hello!")
+result = await meshcore.commands.send_msg(dst_key, "Hello!")
+if result.type == EventType.ERROR:
+    print(f"Error sending message: {result.payload}")
 
 # Setting device parameters
-await meshcore.commands.set_name("My Device")
-await meshcore.commands.set_tx_power(20)  # Set transmit power
+result = await meshcore.commands.set_name("My Device")
+if result.type == EventType.ERROR:
+    print(f"Error setting name: {result.payload}")
+    
+result = await meshcore.commands.set_tx_power(20)  # Set transmit power
+if result.type == EventType.ERROR:
+    print(f"Error setting TX power: {result.payload}")
 ```
 
 ### Finding Contacts
@@ -151,7 +206,11 @@ async def send_and_confirm_message(meshcore, dst_key, message):
     sent_result = await meshcore.commands.send_msg(dst_key, message)
     
     # Extract the expected acknowledgment code from the message sent event
-    expected_ack = sent_result["expected_ack"].hex()
+    if sent_result.type == EventType.ERROR:
+        print(f"Error sending message: {sent_result.payload}")
+        return False
+        
+    expected_ack = sent_result.payload["expected_ack"].hex()
     print(f"Message sent, waiting for ack with code: {expected_ack}")
     
     # Wait specifically for this acknowledgment
@@ -196,7 +255,10 @@ async def main():
         while True:
             # Send command (returns battery level)
             result = await meshcore.commands.get_bat()
-            print(f"Battery check initiated, response: {result}")
+            if result.type == EventType.ERROR:
+                print(f"Error checking battery: {result.payload}")
+            else:
+                print(f"Battery level: {result.payload.get('level', 'unknown')}%")
             await asyncio.sleep(60)  # Wait 60 seconds between checks
     
     # Start the background task
@@ -257,24 +319,36 @@ Commands that require a destination (`send_msg`, `send_login`, `send_statusreq`,
 
 ```python
 # Get contacts and send to a specific one
-contacts = await meshcore.commands.get_contacts()
-for key, contact in contacts.items():
-    if contact["adv_name"] == "Alice":
-        # Option 1: Pass the contact object directly
-        await meshcore.commands.send_msg(contact, "Hello Alice!")
-        
-        # Option 2: Use the public key string
-        await meshcore.commands.send_msg(contact["public_key"], "Hello again Alice!")
-        
-        # Option 3 (backward compatible): Convert the hex key to bytes
-        dst_key = bytes.fromhex(contact["public_key"])
-        await meshcore.commands.send_msg(dst_key, "Hello once more Alice!")
-        break
+result = await meshcore.commands.get_contacts()
+if result.type == EventType.ERROR:
+    print(f"Error getting contacts: {result.payload}")
+else:
+    contacts = result.payload
+    for key, contact in contacts.items():
+        if contact["adv_name"] == "Alice":
+            # Option 1: Pass the contact object directly
+            result = await meshcore.commands.send_msg(contact, "Hello Alice!")
+            if result.type == EventType.ERROR:
+                print(f"Error sending message: {result.payload}")
+            
+            # Option 2: Use the public key string
+            result = await meshcore.commands.send_msg(contact["public_key"], "Hello again Alice!")
+            if result.type == EventType.ERROR:
+                print(f"Error sending message: {result.payload}")
+            
+            # Option 3 (backward compatible): Convert the hex key to bytes
+            dst_key = bytes.fromhex(contact["public_key"])
+            result = await meshcore.commands.send_msg(dst_key, "Hello once more Alice!")
+            if result.type == EventType.ERROR:
+                print(f"Error sending message: {result.payload}")
+            break
 
 # You can also directly use a contact found by name
 contact = meshcore.get_contact_by_name("Bob")
 if contact:
-    await meshcore.commands.send_msg(contact, "Hello Bob!")
+    result = await meshcore.commands.send_msg(contact, "Hello Bob!")
+    if result.type == EventType.ERROR:
+        print(f"Error sending message: {result.payload}")
 ```
 
 ### Monitoring Channel Messages

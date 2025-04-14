@@ -45,7 +45,11 @@ async def main():
     print("Connected to MeshCore device")
     
     # Get contacts
-    contacts = await meshcore.commands.get_contacts()
+    result = await meshcore.commands.get_contacts()
+    if result.type == EventType.ERROR:
+        print(f"Error fetching contacts: {result.payload}")
+        return
+    contacts = result.payload
     if contacts:
         print(f"\nFound {len(contacts)} contacts:")
         for name, contact in contacts.items():

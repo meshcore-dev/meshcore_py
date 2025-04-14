@@ -45,7 +45,10 @@ class TCPConnection:
                 self.host, self.port)
 
         logger.info("TCP Connection started")
-        return self.host
+        future = asyncio.Future()
+        future.set_result(self.host)
+            
+        return future
 
     def set_reader(self, reader) :
         self.reader = reader

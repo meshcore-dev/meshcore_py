@@ -32,7 +32,7 @@ async def main():
         print(f"Logging in to repeater '{args.repeater}'...")
         login_event = await mc.commands.send_login(repeater, args.password)
         
-        if login_event and login_event.get("success") != False:
+        if login_event.type != EventType.ERROR:
             print("Login successful")
             
             # Send status request

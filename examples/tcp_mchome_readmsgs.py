@@ -4,6 +4,7 @@ import asyncio
 import json
 from meshcore import TCPConnection
 from meshcore import MeshCore
+from meshcore import EventType
 
 HOSTNAME = "mchome"
 PORT = 5000
@@ -19,9 +20,12 @@ async def main () :
     res = True
     while res:
         result = await mc.commands.get_msg()
-        if result.get("success") == False:
+        if result.type == EventType.NO_MORE_MSGS:
             res = False
             print("No more messages")
-        print (result)
+        elif result.type == EventType.ERROR:
+            res = False
+            print(f"Error retrieving messages: {result.payload}")
+        print(result)
 
 asyncio.run(main())

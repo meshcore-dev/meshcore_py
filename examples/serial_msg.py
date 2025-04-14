@@ -37,13 +37,17 @@ async def main():
         
         # Send the message and get the MSG_SENT event
         print(f"Sending message: '{args.message}'")
-        send_result = await mc.commands.send_msg(
+        result = await mc.commands.send_msg(
             contact, 
             args.message
         )
         
+        if result.type == EventType.ERROR:
+            print(f"⚠️ Failed to send message: {result.payload}")
+            return
+            
         # Extract the expected ACK code
-        expected_ack = send_result["expected_ack"].hex()
+        expected_ack = result.payload["expected_ack"].hex()
         print(f"Message sent, waiting for ACK with code: {expected_ack}")
         
         # Wait for the specific ACK that matches our message
