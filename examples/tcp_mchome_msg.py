@@ -17,6 +17,10 @@ async def main () :
     await mc.connect()
 
     await mc.ensure_contacts()
-    await mc.commands.send_msg(bytes.fromhex(mc.get_contact_by_name(DEST)["public_key"])[0:6],MSG)
+    contact = mc.get_contact_by_name(DEST)
+    if contact is None:
+        print(f"Contact '{DEST}' not found in contacts.")
+        return
+    await mc.commands.send_msg(contact ,MSG)
 
 asyncio.run(main())

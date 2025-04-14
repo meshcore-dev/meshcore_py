@@ -26,8 +26,11 @@ async def main():
     
     # Send a message to the first contact
     if contacts:
-        contact_key = next(iter(contacts.items()))[1]['public_key']
-        await meshcore.commands.send_msg(bytes.fromhex(contact_key), "Hello from Python!")
+        # Get the first contact
+        contact = next(iter(contacts.items()))[1]
+        
+        # Pass the contact object directly to send_msg
+        await meshcore.commands.send_msg(contact, "Hello from Python!")
     
     await meshcore.disconnect()
 
@@ -247,15 +250,31 @@ This logs detailed information about commands sent and events received.
 
 ### Sending Messages to Contacts
 
+Commands that require a destination (`send_msg`, `send_login`, `send_statusreq`, etc.) now accept either:
+- A string with the hex representation of a public key
+- A contact object with a "public_key" field
+- Bytes object (for backward compatibility)
+
 ```python
 # Get contacts and send to a specific one
 contacts = await meshcore.commands.get_contacts()
 for key, contact in contacts.items():
     if contact["adv_name"] == "Alice":
-        # Convert the hex key to bytes
+        # Option 1: Pass the contact object directly
+        await meshcore.commands.send_msg(contact, "Hello Alice!")
+        
+        # Option 2: Use the public key string
+        await meshcore.commands.send_msg(contact["public_key"], "Hello again Alice!")
+        
+        # Option 3 (backward compatible): Convert the hex key to bytes
         dst_key = bytes.fromhex(contact["public_key"])
-        await meshcore.commands.send_msg(dst_key, "Hello Alice!")
+        await meshcore.commands.send_msg(dst_key, "Hello once more Alice!")
         break
+
+# You can also directly use a contact found by name
+contact = meshcore.get_contact_by_name("Bob")
+if contact:
+    await meshcore.commands.send_msg(contact, "Hello Bob!")
 ```
 
 ### Monitoring Channel Messages

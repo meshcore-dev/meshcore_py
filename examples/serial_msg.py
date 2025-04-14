@@ -38,7 +38,7 @@ async def main():
         # Send the message and get the MSG_SENT event
         print(f"Sending message: '{args.message}'")
         send_result = await mc.commands.send_msg(
-            bytes.fromhex(contact["public_key"])[0:6], 
+            contact, 
             args.message
         )
         

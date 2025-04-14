@@ -1,10 +1,49 @@
 import asyncio
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional, Union
 from .events import EventType
 import random
+
+# Define types for destination parameters
+DestinationType = Union[bytes, str, Dict[str, Any]]
             
 logger = logging.getLogger("meshcore")
+
+def _validate_destination(dst: DestinationType, prefix_length: int = 6) -> bytes:
+    """
+    Validates and converts a destination to a bytes object.
+    
+    Args:
+        dst: The destination, which can be:
+            - str: Hex string representation of a public key
+            - dict: Contact object with a "public_key" field
+        prefix_length: The length of the prefix to use (default: 6 bytes)
+            
+    Returns:
+        bytes: The destination public key as a bytes object
+        
+    Raises:
+        ValueError: If dst is invalid or doesn't contain required fields
+    """
+    if isinstance(dst, bytes):
+        # Already bytes, use directly
+        return dst[:prefix_length] 
+    elif isinstance(dst, str):
+        # Hex string, convert to bytes
+        try:
+            return bytes.fromhex(dst)[:prefix_length]
+        except ValueError:
+            raise ValueError(f"Invalid public key hex string: {dst}")
+    elif isinstance(dst, dict):
+        # Contact object, extract public_key
+        if "public_key" not in dst:
+            raise ValueError("Contact object must have a 'public_key' field")
+        try:
+            return bytes.fromhex(dst["public_key"])[:prefix_length]
+        except ValueError:
+            raise ValueError(f"Invalid public_key in contact: {dst['public_key']}")
+    else:
+        raise ValueError(f"Destination must be a public key string or contact object, got: {type(dst)}")
 
 class CommandHandler:
     DEFAULT_TIMEOUT = 5.0
@@ -166,41 +205,44 @@ class CommandHandler:
         logger.debug("Requesting pending messages")
         return await self.send(b"\x0A", [EventType.CONTACT_MSG_RECV, EventType.CHANNEL_MSG_RECV, EventType.ERROR], timeout)
         
-    async def send_login(self, dst, pwd):
-        logger.debug(f"Sending login request to: {dst.hex() if isinstance(dst, bytes) else dst}")
-        data = b"\x1a" + dst + pwd.encode("ascii")
+    async def send_login(self, dst: DestinationType, pwd: str) -> Dict[str, Any]:
+        dst_bytes = _validate_destination(dst)
+        logger.debug(f"Sending login request to: {dst_bytes.hex()}")
+        data = b"\x1a" + dst_bytes + pwd.encode("ascii")
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
         
-    async def send_logout(self, dst):
+    async def send_logout(self, dst: DestinationType) -> Dict[str, Any]:
+         dst_bytes = _validate_destination(dst)
          self.login_resp = asyncio.Future()
-         data = b"\x1d" + dst
+         data = b"\x1d" + dst_bytes
          return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
         
-    async def send_statusreq(self, dst):
-        logger.debug(f"Sending status request to: {dst.hex() if isinstance(dst, bytes) else dst}")
-        data = b"\x1b" + dst
+    async def send_statusreq(self, dst: DestinationType) -> Dict[str, Any]:
+        dst_bytes = _validate_destination(dst)
+        logger.debug(f"Sending status request to: {dst_bytes.hex()}")
+        data = b"\x1b" + dst_bytes
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
         
-    async def send_cmd(self, dst, cmd, timestamp=None):
-        logger.debug(f"Sending command to {dst.hex() if isinstance(dst, bytes) else dst}: {cmd}")
+    async def send_cmd(self, dst: DestinationType, cmd: str, timestamp: Optional[int] = None) -> Dict[str, Any]:
+        dst_bytes = _validate_destination(dst)
+        logger.debug(f"Sending command to {dst_bytes.hex()}: {cmd}")
         
-        # Default to current time if timestamp not provided
         if timestamp is None:
             import time
-            timestamp = int(time.time()).to_bytes(4, 'little')
+            timestamp = int(time.time())
             
-        data = b"\x02\x01\x00" + timestamp + dst + cmd.encode("ascii")
+        data = b"\x02\x01\x00" + timestamp.to_bytes(4, 'little') + dst_bytes + cmd.encode("ascii")
         return await self.send(data, [EventType.OK, EventType.ERROR])
         
-    async def send_msg(self, dst, msg, timestamp=None):
-        logger.debug(f"Sending message to {dst.hex() if isinstance(dst, bytes) else dst}: {msg}")
+    async def send_msg(self, dst: DestinationType, msg: str, timestamp: Optional[int] = None) -> Dict[str, Any]:
+        dst_bytes = _validate_destination(dst)
+        logger.debug(f"Sending message to {dst_bytes.hex()}: {msg}")
         
-        # Default to current time if timestamp not provided
         if timestamp is None:
             import time
-            timestamp = int(time.time()).to_bytes(4, 'little')
+            timestamp = int(time.time())
             
-        data = b"\x02\x00\x00" + timestamp + dst + msg.encode("ascii")
+        data = b"\x02\x00\x00" + timestamp.to_bytes(4, 'little') + dst_bytes + msg.encode("ascii")
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
         
     async def send_chan_msg(self, chan, msg, timestamp=None):
