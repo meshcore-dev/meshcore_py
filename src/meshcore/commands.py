@@ -183,20 +183,20 @@ class CommandHandler:
         return await self.send(b"\x04", [EventType.CONTACTS, EventType.ERROR])
         
     async def reset_path(self, key: DestinationType) -> Dict[str, Any]:
-        key_bytes = _validate_destination(key)
+        key_bytes = _validate_destination(key, prefix_length=32)
         logger.debug(f"Resetting path for contact: {key_bytes.hex()}")
         data = b"\x0D" + key_bytes
         return await self.send(data, [EventType.OK, EventType.ERROR])
         
     async def share_contact(self, key: DestinationType) -> Dict[str, Any]:
-        key_bytes = _validate_destination(key)
+        key_bytes = _validate_destination(key, prefix_length=32)
         logger.debug(f"Sharing contact: {key_bytes.hex()}")
         data = b"\x10" + key_bytes
         return await self.send(data, [EventType.CONTACT_SHARE, EventType.ERROR])
         
     async def export_contact(self, key: Optional[DestinationType] = None) -> Dict[str, Any]:
         if key:
-            key_bytes = _validate_destination(key)
+            key_bytes = _validate_destination(key, prefix_length=32)
             logger.debug(f"Exporting contact: {key_bytes.hex()}")
             data = b"\x11" + key_bytes
         else:
@@ -205,7 +205,7 @@ class CommandHandler:
         return await self.send(data, [EventType.OK, EventType.ERROR])
         
     async def remove_contact(self, key: DestinationType) -> Dict[str, Any]:
-        key_bytes = _validate_destination(key)
+        key_bytes = _validate_destination(key, prefix_length=32)
         logger.debug(f"Removing contact: {key_bytes.hex()}")
         data = b"\x0f" + key_bytes
         return await self.send(data, [EventType.OK, EventType.ERROR])
@@ -215,7 +215,7 @@ class CommandHandler:
         return await self.send(b"\x0A", [EventType.CONTACT_MSG_RECV, EventType.CHANNEL_MSG_RECV, EventType.ERROR], timeout)
         
     async def send_login(self, dst: DestinationType, pwd: str) -> Dict[str, Any]:
-        dst_bytes = _validate_destination(dst)
+        dst_bytes = _validate_destination(dst, prefix_length=32)
         logger.debug(f"Sending login request to: {dst_bytes.hex()}")
         data = b"\x1a" + dst_bytes + pwd.encode("ascii")
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
@@ -227,7 +227,7 @@ class CommandHandler:
          return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
         
     async def send_statusreq(self, dst: DestinationType) -> Dict[str, Any]:
-        dst_bytes = _validate_destination(dst)
+        dst_bytes = _validate_destination(dst, prefix_length=32)
         logger.debug(f"Sending status request to: {dst_bytes.hex()}")
         data = b"\x1b" + dst_bytes
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
