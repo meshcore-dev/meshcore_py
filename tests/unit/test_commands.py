@@ -232,3 +232,23 @@ async def test_send_trace(command_handler, mock_connection):
     )
     second_call = mock_connection.send.call_args[0][0]
     assert second_call.startswith(b"\x24")
+
+async def test_send_with_multiple_expected_events_returns_first_completed(command_handler, mock_connection, mock_dispatcher):
+    # Setup the dispatcher to return an ERROR event
+    error_payload = {"success": False, "reason": "command_failed"}
+    
+    async def simulate_error_event(*args, **kwargs):
+        # Simulate an ERROR event being returned
+        return Event(EventType.ERROR, error_payload)
+    
+    # Patch the wait_for_event method to return our simulated event
+    mock_dispatcher.wait_for_event.side_effect = simulate_error_event
+    
+    # Call send with both OK and ERROR in the expected_events list, with OK first
+    result = await command_handler.send(b"test_command", [EventType.OK, EventType.ERROR])
+    
+    # Verify the command was sent
+    mock_connection.send.assert_called_once_with(b"test_command")
+    
+    # Verify that even though OK was listed first, the ERROR event was returned
+    assert result == error_payload

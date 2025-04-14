@@ -95,11 +95,32 @@ class CommandHandler:
                     expected_events = [expected_events]
                     
                 logger.debug(f"Waiting for events {expected_events}, timeout={timeout}")
+                
+                # Create futures for all expected events
+                futures = []
                 for event_type in expected_events:
-                    # don't apply any filters for now, might change later
-                    event = await self.dispatcher.wait_for_event(event_type, {}, timeout)
+                    future = asyncio.create_task(
+                        self.dispatcher.wait_for_event(event_type, {}, timeout)
+                    )
+                    futures.append(future)
+                
+                # Wait for the first event to complete or all to timeout
+                done, pending = await asyncio.wait(
+                    futures, 
+                    timeout=timeout,
+                    return_when=asyncio.FIRST_COMPLETED
+                )
+                
+                # Cancel all pending futures
+                for future in pending:
+                    future.cancel()
+                
+                # Check if any future completed successfully
+                for future in done:
+                    event = await future
                     if event:
                         return event.payload
+                        
                 return {"success": False, "reason": "no_event_received"}
             except asyncio.TimeoutError:
                 logger.debug(f"Command timed out {data}")

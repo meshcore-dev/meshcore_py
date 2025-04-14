@@ -116,10 +116,11 @@ class EventDispatcher:
             event = await self.queue.get()
             logger.debug(f"Dispatching event: {event.type}, {event.payload}, {event.attributes}")
             for subscription in self.subscriptions.copy():
+                logger.debug(f"Checking subscription: {subscription.event_type}, {subscription.attribute_filters}")
                 # Check if event type matches
                 if subscription.event_type is None or subscription.event_type == event.type:
                     # Check if all attribute filters match
-                    if subscription.attribute_filters:
+                    if subscription.attribute_filters and subscription.attribute_filters != {}:
                         # Skip if any filter doesn't match the corresponding event attribute
                         if not all(event.attributes.get(key) == value 
                                 for key, value in subscription.attribute_filters.items()):
