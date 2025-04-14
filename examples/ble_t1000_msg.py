@@ -14,7 +14,11 @@ async def main () :
     mc = MeshCore(con)
     await mc.connect()
 
-    await mc.get_contacts()
-    await mc.commands.send_msg(bytes.fromhex(mc.contacts[DEST]["public_key"])[0:6],MSG)
+    await mc.ensure_contacts()
+    contact = mc.get_contact_by_name(DEST)
+    if contact is None:
+        print(f"Contact '{DEST}' not found in contacts.")
+        return
+    await mc.commands.send_msg(contact,MSG)
 
 asyncio.run(main())
