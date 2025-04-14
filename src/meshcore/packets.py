@@ -13,7 +13,7 @@ class PacketType(Enum):
     CHANNEL_MSG_RECV = 8
     CURRENT_TIME = 9
     NO_MORE_MSGS = 10
-    CONTACT_SHARE = 11
+    CONTACT_URI = 11
     BATTERY = 12
     DEVICE_INFO = 13
     CLI_RESPONSE = 50

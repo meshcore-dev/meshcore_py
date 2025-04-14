@@ -174,10 +174,10 @@ class MessageReader:
             result = {"messages_available": False}
             await self.dispatcher.dispatch(Event(EventType.NO_MORE_MSGS, result))
             
-        elif packet_type_value == PacketType.CONTACT_SHARE.value:
+        elif packet_type_value == PacketType.CONTACT_URI.value:
             contact_uri = "meshcore://" + data[1:].hex()
             result = {"uri": contact_uri}
-            await self.dispatcher.dispatch(Event(EventType.CONTACT_SHARE, result))
+            await self.dispatcher.dispatch(Event(EventType.CONTACT_URI, result))
             
         elif packet_type_value == PacketType.BATTERY.value:
             battery_level = int.from_bytes(data[1:3], byteorder='little')

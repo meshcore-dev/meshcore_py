@@ -15,7 +15,7 @@ class EventType(Enum):
     CHANNEL_MSG_RECV = "channel_message"
     CURRENT_TIME = "time_update"
     NO_MORE_MSGS = "no_more_messages"
-    CONTACT_SHARE = "contact_share"
+    CONTACT_URI = "contact_uri"
     BATTERY = "battery_info"
     DEVICE_INFO = "device_info"
     CLI_RESPONSE = "cli_response"

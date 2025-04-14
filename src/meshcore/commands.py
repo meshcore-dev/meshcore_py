@@ -215,7 +215,7 @@ class CommandHandler:
         key_bytes = _validate_destination(key, prefix_length=32)
         logger.debug(f"Sharing contact: {key_bytes.hex()}")
         data = b"\x10" + key_bytes
-        return await self.send(data, [EventType.CONTACT_SHARE, EventType.ERROR])
+        return await self.send(data, [EventType.OK, EventType.ERROR])
         
     async def export_contact(self, key: Optional[DestinationType] = None) -> Event:
         if key:
@@ -223,9 +223,9 @@ class CommandHandler:
             logger.debug(f"Exporting contact: {key_bytes.hex()}")
             data = b"\x11" + key_bytes
         else:
-            logger.debug("Exporting all contacts")
+            logger.debug("Exporting node")
             data = b"\x11"
-        return await self.send(data, [EventType.OK, EventType.ERROR])
+        return await self.send(data, [EventType.CONTACT_URI, EventType.ERROR])
         
     async def remove_contact(self, key: DestinationType) -> Event:
         key_bytes = _validate_destination(key, prefix_length=32)
@@ -253,7 +253,7 @@ class CommandHandler:
 
     async def get_msg(self, timeout: Optional[float] = 1) -> Event:
         logger.debug("Requesting pending messages")
-        return await self.send(b"\x0A", [EventType.CONTACT_MSG_RECV, EventType.CHANNEL_MSG_RECV, EventType.ERROR], timeout)
+        return await self.send(b"\x0A", [EventType.CONTACT_MSG_RECV, EventType.CHANNEL_MSG_RECV, EventType.ERROR, EventType.NO_MORE_MSGS], timeout)
         
     async def send_login(self, dst: DestinationType, pwd: str) -> Event:
         dst_bytes = _validate_destination(dst, prefix_length=32)
@@ -282,7 +282,7 @@ class CommandHandler:
             timestamp = int(time.time())
             
         data = b"\x02\x01\x00" + timestamp.to_bytes(4, 'little') + dst_bytes + cmd.encode("ascii")
-        return await self.send(data, [EventType.OK, EventType.ERROR])
+        return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
         
     async def send_msg(self, dst: DestinationType, msg: str, timestamp: Optional[int] = None) -> Event:
         dst_bytes = _validate_destination(dst)
