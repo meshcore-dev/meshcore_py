@@ -210,6 +210,24 @@ class CommandHandler:
         data = b"\x0f" + key_bytes
         return await self.send(data, [EventType.OK, EventType.ERROR])
         
+    async def change_contact_path (self, contact, path) -> Dict[str, Any]:
+        out_path_hex = path
+        out_path_len = int(len(path) / 2)
+        out_path_hex = out_path_hex + (128-len(out_path_hex)) * "0" 
+        adv_name_hex = contact["adv_name"].encode().hex()
+        adv_name_hex = adv_name_hex + (64-len(adv_name_hex)) * "0"
+        data = b"\x09" \
+            + bytes.fromhex(contact["public_key"])\
+            + contact["type"].to_bytes(1)\
+            + contact["flags"].to_bytes(1)\
+            + out_path_len.to_bytes(1, 'little', signed=True)\
+            + bytes.fromhex(out_path_hex)\
+            + bytes.fromhex(adv_name_hex)\
+            + contact["last_advert"].to_bytes(4, 'little')\
+            + int(contact["adv_lat"]*1e6).to_bytes(4, 'little', signed=True)\
+            + int(contact["adv_lon"]*1e6).to_bytes(4, 'little', signed=True)
+        return await self.send(data, [EventType.OK, EventType.ERROR])
+
     async def get_msg(self, timeout: Optional[float] = 1) -> Dict[str, Any]:
         logger.debug("Requesting pending messages")
         return await self.send(b"\x0A", [EventType.CONTACT_MSG_RECV, EventType.CHANNEL_MSG_RECV, EventType.ERROR], timeout)
