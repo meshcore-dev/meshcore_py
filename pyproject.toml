@@ -20,6 +20,9 @@ license = "MIT"
 license-files = ["LICEN[CS]E*"]
 dependencies = [ "bleak", "pyserial-asyncio" ]
 
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio"]
+
 [project.urls]
 Homepage = "https://github.com/fdlamotte/meshcore_py"
 Issues = "https://github.com/fdlamotte/meshcore_py/issues"
