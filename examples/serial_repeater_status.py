@@ -16,7 +16,10 @@ async def main () :
     await mc.commands.get_contacts()
     repeater = mc.get_contact_by_name(REPEATER)
     
-    await mc.commands.send_login(bytes.fromhex(repeater["public_key"]), PASSWORD)
+    if repeater is None:
+        print(f"Repeater '{REPEATER}' not found in contacts.")
+        return
+    await mc.commands.send_login(repeater, PASSWORD)
 
     print("Login sent ... awaiting")
 

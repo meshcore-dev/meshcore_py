@@ -15,6 +15,6 @@ async def main () :
     mc = MeshCore(con)
     await mc.connect()
 
-    await mc.send_chan_msg(0, MSG)
+    await mc.commands.send_chan_msg(0, MSG)
 
 asyncio.run(main())
