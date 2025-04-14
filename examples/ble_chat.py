@@ -29,6 +29,7 @@ async def main () :
     args = parser.parse_args()
 
     mc = await MeshCore.create_ble(args.addr)
+    await mc.ensure_contacts()
 
     # Subscribe to private messages
     private_subscription = mc.subscribe(EventType.CONTACT_MSG_RECV, handle_message)
@@ -37,8 +38,6 @@ async def main () :
     channel_subscription = mc.subscribe(EventType.CHANNEL_MSG_RECV, handle_message)
     
     await mc.start_auto_message_fetching()
-
-    await mc.ensure_contacts()
 
     contact = mc.get_contact_by_name(args.dest)
     if contact is None:
