@@ -22,9 +22,14 @@ async def main () :
     if contact is None:
         print(f"Contact '{DEST}' not found in contacts.")
         return
-    ret = await mc.commands.send_msg(contact ,MSG)
-    print (ret)
-    exp_ack = ret["expected_ack"].hex()
+    result = await mc.commands.send_msg(contact, MSG)
+    print(result)
+    
+    if result.type == EventType.ERROR:
+        print(f"⚠️ Failed to send message: {result.payload}")
+        return
+        
+    exp_ack = result.payload["expected_ack"].hex()
     print(await mc.wait_for_event(EventType.ACK, attribute_filters={"code": exp_ack}, timeout=5))
 
 asyncio.run(main())

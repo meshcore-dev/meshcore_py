@@ -34,10 +34,10 @@ async def main():
         tag = random.randint(1, 0xFFFFFFFF)
         result = await mc.commands.send_trace(path=args.path, tag=tag)
         
-        # Check if the result has a success indicator
-        if result.get("success") == False:
-            print(f"Failed to send trace packet: {result.get('reason', 'unknown error')}")
-        elif result:
+        # Check if the result is an error
+        if result.type == EventType.ERROR:
+            print(f"Failed to send trace packet: {result.payload.get('reason', 'unknown error')}")
+        elif result.type == EventType.MSG_SENT:
             print(f"Trace packet sent successfully with tag={tag}")
             print("Waiting for trace response matching our tag...")
             

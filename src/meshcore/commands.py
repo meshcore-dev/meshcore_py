@@ -1,8 +1,8 @@
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional, Union
-from .events import EventType
 import random
+from typing import Any, Dict, List, Optional, Union
+from .events import Event, EventType
 
 # Define types for destination parameters
 DestinationType = Union[bytes, str, Dict[str, Any]]
@@ -66,7 +66,7 @@ class CommandHandler:
         self.dispatcher = dispatcher
         
     async def send(self, data: bytes, expected_events: Optional[Union[EventType, List[EventType]]] = None, 
-                timeout: Optional[float] = None) -> Dict[str, Any]:
+                timeout: Optional[float] = None) -> Event:
         """
         Send a command and wait for expected event responses.
         
@@ -76,7 +76,7 @@ class CommandHandler:
             timeout: Timeout in seconds, or None to use default_timeout
             
         Returns:
-            Dict[str, Any]: Dictionary containing the response data or status
+            Event: The full event object that was received in response to the command
         """
         if not self.dispatcher:
             raise RuntimeError("Dispatcher not set, cannot send commands")
@@ -119,66 +119,68 @@ class CommandHandler:
                 for future in done:
                     event = await future
                     if event:
-                        return event.payload
+                        return event
                         
-                return {"success": False, "reason": "no_event_received"}
+                # Create an error event when no event is received
+                return Event(EventType.ERROR, {"reason": "no_event_received"})
             except asyncio.TimeoutError:
                 logger.debug(f"Command timed out {data}")
-                return {"success": False, "reason": "timeout"}
+                return Event(EventType.ERROR, {"reason": "timeout"})
             except Exception as e:
                 logger.debug(f"Command error: {e}")
-                return {"error": str(e)}
-        return {"success": True}
+                return Event(EventType.ERROR, {"error": str(e)})
+        # For commands that don't expect events, return a success event
+        return Event(EventType.OK, {})
         
         
-    async def send_appstart(self) -> Dict[str, Any]:
+    async def send_appstart(self) -> Event:
         logger.debug("Sending appstart command")
         b1 = bytearray(b'\x01\x03      mccli')
         return await self.send(b1, [EventType.SELF_INFO])
         
-    async def send_device_query(self) -> Dict[str, Any]:
+    async def send_device_query(self) -> Event:
         logger.debug("Sending device query command")
         return await self.send(b"\x16\x03", [EventType.DEVICE_INFO, EventType.ERROR])
         
-    async def send_advert(self, flood: bool = False) -> Dict[str, Any]:
+    async def send_advert(self, flood: bool = False) -> Event:
         logger.debug(f"Sending advertisement command (flood={flood})")
         if flood:
             return await self.send(b"\x07\x01", [EventType.OK, EventType.ERROR])
         else:
             return await self.send(b"\x07", [EventType.OK, EventType.ERROR])
             
-    async def set_name(self, name: str) -> Dict[str, Any]:
+    async def set_name(self, name: str) -> Event:
         logger.debug(f"Setting device name to: {name}")
         return await self.send(b'\x08' + name.encode("ascii"), [EventType.OK, EventType.ERROR])
         
-    async def set_coords(self, lat: float, lon: float) -> Dict[str, Any]:
+    async def set_coords(self, lat: float, lon: float) -> Event:
         logger.debug(f"Setting coordinates to: lat={lat}, lon={lon}")
         return await self.send(b'\x0e'\
                 + int(lat*1e6).to_bytes(4, 'little', signed=True)\
                 + int(lon*1e6).to_bytes(4, 'little', signed=True)\
                 + int(0).to_bytes(4, 'little'), [EventType.OK, EventType.ERROR])
                 
-    async def reboot(self) -> Dict[str, Any]:
+    async def reboot(self) -> Event:
         logger.debug("Sending reboot command")
         return await self.send(b'\x13reboot')
         
-    async def get_bat(self) -> Dict[str, Any]:
+    async def get_bat(self) -> Event:
         logger.debug("Getting battery information")
         return await self.send(b'\x14', [EventType.BATTERY, EventType.ERROR])
         
-    async def get_time(self) -> Dict[str, Any]:
+    async def get_time(self) -> Event:
         logger.debug("Getting device time")
         return await self.send(b"\x05", [EventType.CURRENT_TIME, EventType.ERROR])
         
-    async def set_time(self, val: int) -> Dict[str, Any]:
+    async def set_time(self, val: int) -> Event:
         logger.debug(f"Setting device time to: {val}")
         return await self.send(b"\x06" + int(val).to_bytes(4, 'little'), [EventType.OK, EventType.ERROR])
         
-    async def set_tx_power(self, val: int) -> Dict[str, Any]:
+    async def set_tx_power(self, val: int) -> Event:
         logger.debug(f"Setting TX power to: {val}")
         return await self.send(b"\x0c" + int(val).to_bytes(4, 'little'), [EventType.OK, EventType.ERROR])
         
-    async def set_radio(self, freq: float, bw: float, sf: int, cr: int) -> Dict[str, Any]:
+    async def set_radio(self, freq: float, bw: float, sf: int, cr: int) -> Event:
         logger.debug(f"Setting radio params: freq={freq}, bw={bw}, sf={sf}, cr={cr}")
         return await self.send(b"\x0b" \
                 + int(float(freq)*1000).to_bytes(4, 'little')\
@@ -186,7 +188,7 @@ class CommandHandler:
                 + int(sf).to_bytes(1, 'little')\
                 + int(cr).to_bytes(1, 'little'), [EventType.OK, EventType.ERROR])
                 
-    async def set_tuning(self, rx_dly: int, af: int) -> Dict[str, Any]:
+    async def set_tuning(self, rx_dly: int, af: int) -> Event:
         logger.debug(f"Setting tuning params: rx_dly={rx_dly}, af={af}")
         return await self.send(b"\x15" \
                 + int(rx_dly).to_bytes(4, 'little')\
@@ -194,28 +196,28 @@ class CommandHandler:
                 + int(0).to_bytes(1, 'little')\
                 + int(0).to_bytes(1, 'little'), [EventType.OK, EventType.ERROR])
                 
-    async def set_devicepin(self, pin: int) -> Dict[str, Any]:
+    async def set_devicepin(self, pin: int) -> Event:
         logger.debug(f"Setting device PIN to: {pin}")
         return await self.send(b"\x25" \
                 + int(pin).to_bytes(4, 'little'), [EventType.OK, EventType.ERROR])
                 
-    async def get_contacts(self) -> Dict[str, Any]:
+    async def get_contacts(self) -> Event:
         logger.debug("Getting contacts")
         return await self.send(b"\x04", [EventType.CONTACTS, EventType.ERROR])
         
-    async def reset_path(self, key: DestinationType) -> Dict[str, Any]:
+    async def reset_path(self, key: DestinationType) -> Event:
         key_bytes = _validate_destination(key, prefix_length=32)
         logger.debug(f"Resetting path for contact: {key_bytes.hex()}")
         data = b"\x0D" + key_bytes
         return await self.send(data, [EventType.OK, EventType.ERROR])
         
-    async def share_contact(self, key: DestinationType) -> Dict[str, Any]:
+    async def share_contact(self, key: DestinationType) -> Event:
         key_bytes = _validate_destination(key, prefix_length=32)
         logger.debug(f"Sharing contact: {key_bytes.hex()}")
         data = b"\x10" + key_bytes
         return await self.send(data, [EventType.CONTACT_SHARE, EventType.ERROR])
         
-    async def export_contact(self, key: Optional[DestinationType] = None) -> Dict[str, Any]:
+    async def export_contact(self, key: Optional[DestinationType] = None) -> Event:
         if key:
             key_bytes = _validate_destination(key, prefix_length=32)
             logger.debug(f"Exporting contact: {key_bytes.hex()}")
@@ -225,13 +227,13 @@ class CommandHandler:
             data = b"\x11"
         return await self.send(data, [EventType.OK, EventType.ERROR])
         
-    async def remove_contact(self, key: DestinationType) -> Dict[str, Any]:
+    async def remove_contact(self, key: DestinationType) -> Event:
         key_bytes = _validate_destination(key, prefix_length=32)
         logger.debug(f"Removing contact: {key_bytes.hex()}")
         data = b"\x0f" + key_bytes
         return await self.send(data, [EventType.OK, EventType.ERROR])
         
-    async def change_contact_path (self, contact, path) -> Dict[str, Any]:
+    async def change_contact_path (self, contact, path) -> Event:
         out_path_hex = path
         out_path_len = int(len(path) / 2)
         out_path_hex = out_path_hex + (128-len(out_path_hex)) * "0" 
@@ -249,29 +251,29 @@ class CommandHandler:
             + int(contact["adv_lon"]*1e6).to_bytes(4, 'little', signed=True)
         return await self.send(data, [EventType.OK, EventType.ERROR])
 
-    async def get_msg(self, timeout: Optional[float] = 1) -> Dict[str, Any]:
+    async def get_msg(self, timeout: Optional[float] = 1) -> Event:
         logger.debug("Requesting pending messages")
         return await self.send(b"\x0A", [EventType.CONTACT_MSG_RECV, EventType.CHANNEL_MSG_RECV, EventType.ERROR], timeout)
         
-    async def send_login(self, dst: DestinationType, pwd: str) -> Dict[str, Any]:
+    async def send_login(self, dst: DestinationType, pwd: str) -> Event:
         dst_bytes = _validate_destination(dst, prefix_length=32)
         logger.debug(f"Sending login request to: {dst_bytes.hex()}")
         data = b"\x1a" + dst_bytes + pwd.encode("ascii")
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
         
-    async def send_logout(self, dst: DestinationType) -> Dict[str, Any]:
+    async def send_logout(self, dst: DestinationType) -> Event:
          dst_bytes = _validate_destination(dst)
          self.login_resp = asyncio.Future()
          data = b"\x1d" + dst_bytes
          return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
         
-    async def send_statusreq(self, dst: DestinationType) -> Dict[str, Any]:
+    async def send_statusreq(self, dst: DestinationType) -> Event:
         dst_bytes = _validate_destination(dst, prefix_length=32)
         logger.debug(f"Sending status request to: {dst_bytes.hex()}")
         data = b"\x1b" + dst_bytes
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
         
-    async def send_cmd(self, dst: DestinationType, cmd: str, timestamp: Optional[int] = None) -> Dict[str, Any]:
+    async def send_cmd(self, dst: DestinationType, cmd: str, timestamp: Optional[int] = None) -> Event:
         dst_bytes = _validate_destination(dst)
         logger.debug(f"Sending command to {dst_bytes.hex()}: {cmd}")
         
@@ -282,7 +284,7 @@ class CommandHandler:
         data = b"\x02\x01\x00" + timestamp.to_bytes(4, 'little') + dst_bytes + cmd.encode("ascii")
         return await self.send(data, [EventType.OK, EventType.ERROR])
         
-    async def send_msg(self, dst: DestinationType, msg: str, timestamp: Optional[int] = None) -> Dict[str, Any]:
+    async def send_msg(self, dst: DestinationType, msg: str, timestamp: Optional[int] = None) -> Event:
         dst_bytes = _validate_destination(dst)
         logger.debug(f"Sending message to {dst_bytes.hex()}: {msg}")
         
@@ -293,7 +295,7 @@ class CommandHandler:
         data = b"\x02\x00\x00" + timestamp.to_bytes(4, 'little') + dst_bytes + msg.encode("ascii")
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
         
-    async def send_chan_msg(self, chan, msg, timestamp=None):
+    async def send_chan_msg(self, chan, msg, timestamp=None) -> Event:
         logger.debug(f"Sending channel message to channel {chan}: {msg}")
         
         # Default to current time if timestamp not provided
@@ -304,13 +306,13 @@ class CommandHandler:
         data = b"\x03\x00" + chan.to_bytes(1, 'little') + timestamp + msg.encode("ascii")
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
         
-    async def send_cli(self, cmd):
+    async def send_cli(self, cmd) -> Event:
         logger.debug(f"Sending CLI command: {cmd}")
         data = b"\x32" + cmd.encode('ascii')
         return await self.send(data, [EventType.CLI_RESPONSE, EventType.ERROR])
         
     async def send_trace(self, auth_code: int = 0, tag: Optional[int] = None, 
-                      flags: int = 0, path: Optional[Union[str, bytes, bytearray]] = None) -> Dict[str, Any]:
+                      flags: int = 0, path: Optional[Union[str, bytes, bytearray]] = None) -> Event:
         """
         Send a trace packet to test routing through specific repeaters
         
@@ -322,7 +324,7 @@ class CommandHandler:
                  or a bytes/bytearray object with the raw path data
                  
         Returns:
-            Dictionary with sent status, tag, and estimated timeout in milliseconds, or False if command failed
+            Event object with sent status, tag, and estimated timeout in milliseconds
         """
         # Generate random tag if not provided
         if tag is None:
@@ -350,11 +352,11 @@ class CommandHandler:
                     cmd_data.extend(path_bytes)
                 except ValueError as e:
                     logger.error(f"Invalid path format: {e}")
-                    return { "success": False, "reason": "invalid_path_format" }
+                    return Event(EventType.ERROR, {"reason": "invalid_path_format"})
             elif isinstance(path, (bytes, bytearray)):
                 cmd_data.extend(path)
             else:
                 logger.error(f"Unsupported path type: {type(path)}")
-                return { "success": False, "reason": "unsupported_path_type" }
+                return Event(EventType.ERROR, {"reason": "unsupported_path_type"})
         
         return await self.send(cmd_data, [EventType.MSG_SENT, EventType.ERROR])

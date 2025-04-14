@@ -22,7 +22,7 @@ class MessageReader:
         
         # Handle command responses
         if packet_type_value == PacketType.OK.value:
-            result: Dict[str, Any] = {"success": True}
+            result: Dict[str, Any] = {}
             if len(data) == 5:
                 result["value"] = int.from_bytes(data[1:5], byteorder='little')
                 
@@ -31,9 +31,9 @@ class MessageReader:
             
         elif packet_type_value == PacketType.ERROR.value:
             if len(data) > 1:
-                result = {"success": False, "error_code": data[1]}
+                result = {"error_code": data[1]}
             else:
-                result = {"success": False}
+                result = {}
             
             # Dispatch event for the ERROR response
             await self.dispatcher.dispatch(Event(EventType.ERROR, result))

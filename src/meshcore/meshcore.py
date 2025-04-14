@@ -262,7 +262,8 @@ class MeshCore:
                     result = await self.commands.get_msg()
                     
                     # If we got a NO_MORE_MSGS event or an error, stop fetching
-                    if not result.get("success") or isinstance(result, dict) and "error" in result:
+                    if result.type == EventType.NO_MORE_MSGS or result.type == EventType.ERROR:
+                        logger.debug("No more messages or error occurred, stopping auto-fetch.")
                         break
                     
                     # Small delay to prevent overwhelming the device
