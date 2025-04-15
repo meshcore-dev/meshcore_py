@@ -5,7 +5,7 @@ import json
 from meshcore import MeshCore
 from meshcore import BLEConnection
 
-ADDRESS = "t1000" # node ble adress or name
+ADDRESS = "echo" # node ble adress or name
 DEST = "mchome"
 MSG = "Hello World"
 

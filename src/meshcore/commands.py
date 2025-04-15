@@ -304,7 +304,7 @@ class CommandHandler:
             timestamp = int(time.time()).to_bytes(4, 'little')
             
         data = b"\x03\x00" + chan.to_bytes(1, 'little') + timestamp + msg.encode("ascii")
-        return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
+        return await self.send(data, [EventType.OK, EventType.ERROR])
         
     async def send_cli(self, cmd) -> Event:
         logger.debug(f"Sending CLI command: {cmd}")
