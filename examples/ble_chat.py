@@ -83,7 +83,7 @@ async def main () :
                     print ("Ack")
             
     except KeyboardInterrupt:
-        meshcore.stop()
+        mc.stop()
         print("\nExiting...")
     except asyncio.CancelledError:
         # Handle task cancellation from KeyboardInterrupt in asyncio.run()
