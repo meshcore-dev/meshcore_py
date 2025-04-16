@@ -151,7 +151,7 @@ class CommandHandler:
             
     async def set_name(self, name: str) -> Event:
         logger.debug(f"Setting device name to: {name}")
-        return await self.send(b'\x08' + name.encode("ascii"), [EventType.OK, EventType.ERROR])
+        return await self.send(b'\x08' + name.encode("utf-8"), [EventType.OK, EventType.ERROR])
         
     async def set_coords(self, lat: float, lon: float) -> Event:
         logger.debug(f"Setting coordinates to: lat={lat}, lon={lon}")
@@ -258,7 +258,7 @@ class CommandHandler:
     async def send_login(self, dst: DestinationType, pwd: str) -> Event:
         dst_bytes = _validate_destination(dst, prefix_length=32)
         logger.debug(f"Sending login request to: {dst_bytes.hex()}")
-        data = b"\x1a" + dst_bytes + pwd.encode("ascii")
+        data = b"\x1a" + dst_bytes + pwd.encode("utf-8")
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
         
     async def send_logout(self, dst: DestinationType) -> Event:
@@ -281,7 +281,7 @@ class CommandHandler:
             import time
             timestamp = int(time.time())
             
-        data = b"\x02\x01\x00" + timestamp.to_bytes(4, 'little') + dst_bytes + cmd.encode("ascii")
+        data = b"\x02\x01\x00" + timestamp.to_bytes(4, 'little') + dst_bytes + cmd.encode("utf-8")
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
         
     async def send_msg(self, dst: DestinationType, msg: str, timestamp: Optional[int] = None) -> Event:
@@ -292,7 +292,7 @@ class CommandHandler:
             import time
             timestamp = int(time.time())
             
-        data = b"\x02\x00\x00" + timestamp.to_bytes(4, 'little') + dst_bytes + msg.encode("ascii")
+        data = b"\x02\x00\x00" + timestamp.to_bytes(4, 'little') + dst_bytes + msg.encode("utf-8")
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
         
     async def send_chan_msg(self, chan, msg, timestamp=None) -> Event:
@@ -303,12 +303,12 @@ class CommandHandler:
             import time
             timestamp = int(time.time()).to_bytes(4, 'little')
             
-        data = b"\x03\x00" + chan.to_bytes(1, 'little') + timestamp + msg.encode("ascii")
+        data = b"\x03\x00" + chan.to_bytes(1, 'little') + timestamp + msg.encode("utf-8")
         return await self.send(data, [EventType.OK, EventType.ERROR])
         
     async def send_cli(self, cmd) -> Event:
         logger.debug(f"Sending CLI command: {cmd}")
-        data = b"\x32" + cmd.encode('ascii')
+        data = b"\x32" + cmd.encode('utf-8')
         return await self.send(data, [EventType.CLI_RESPONSE, EventType.ERROR])
         
     async def send_trace(self, auth_code: int = 0, tag: Optional[int] = None, 
