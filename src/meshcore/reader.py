@@ -114,7 +114,7 @@ class MessageReader:
         elif packet_type_value == 16:  # A reply to CMD_SYNC_NEXT_MESSAGE (ver >= 3)
             res = {}
             res["type"] = "PRIV"
-            res["SNR"] = int.from_bytes(data[1:2], byteorder='little', signed=True) * 4
+            res["SNR"] = int.from_bytes(data[1:2], byteorder='little', signed=True) / 4
             res["pubkey_prefix"] = data[4:10].hex()
             res["path_len"] = data[10]
             res["txt_type"] = data[11]
@@ -151,7 +151,7 @@ class MessageReader:
         elif packet_type_value == 17:  # A reply to CMD_SYNC_NEXT_MESSAGE (ver >= 3)
             res = {}
             res["type"] = "CHAN"
-            res["SNR"] = int.from_bytes(data[1:2], byteorder='little', signed=True) * 4
+            res["SNR"] = int.from_bytes(data[1:2], byteorder='little', signed=True) / 4
             res["channel_idx"] = data[4]
             res["path_len"] = data[5]
             res["txt_type"] = data[6]
