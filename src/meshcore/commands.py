@@ -262,10 +262,10 @@ class CommandHandler:
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
         
     async def send_logout(self, dst: DestinationType) -> Event:
-         dst_bytes = _validate_destination(dst)
+         dst_bytes = _validate_destination(dst, prefix_length=32)
          self.login_resp = asyncio.Future()
          data = b"\x1d" + dst_bytes
-         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
+         return await self.send(data, [EventType.OK, EventType.ERROR])
         
     async def send_statusreq(self, dst: DestinationType) -> Event:
         dst_bytes = _validate_destination(dst, prefix_length=32)
