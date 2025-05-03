@@ -29,3 +29,5 @@ class PacketType(Enum):
     STATUS_RESPONSE = 0x87
     LOG_DATA = 0x88
     TRACE_DATA = 0x89
+    PUSH_CODE_NEW_ADVERT = 0x8A
+    TELEMETRY_RESPONSE = 0x8B

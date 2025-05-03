@@ -33,6 +33,7 @@ class EventType(Enum):
     LOG_DATA = "log_data"
     TRACE_DATA = "trace_data"
     RX_LOG_DATA = "rx_log_data"
+    TELEMETRY_RESPONSE = "telemetry_response"
     
     # Command response types
     OK = "command_ok"

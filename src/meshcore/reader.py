@@ -358,7 +358,20 @@ class MessageReader:
             }
             
             await self.dispatcher.dispatch(Event(EventType.TRACE_DATA, res, attributes))
+
+        elif packet_type_value == PacketType.TELEMETRY_RESPONSE.value:
+            logger.debug(f"Received telemetry data: {data.hex()}")
+            res = {}
+
+            res["pubkey_pre"] = data[2:8].hex()
+            res["data"] = data[8:12].hex()
+
+            attributes = {
+                "data" : res["data"],
+            }
             
+            await self.dispatcher.dispatch(Event(EventType.TELEMETRY_RESPONSE, res, attributes))
+
         else:
             logger.debug(f"Unhandled data received {data}")
             logger.debug(f"Unhandled packet type: {packet_type_value}")

@@ -306,6 +306,13 @@ class CommandHandler:
         data = b"\x03\x00" + chan.to_bytes(1, 'little') + timestamp + msg.encode("utf-8")
         return await self.send(data, [EventType.OK, EventType.ERROR])
         
+    async def send_telemetry_req(self, dst: DestinationType) -> Event :
+        dst_bytes = _validate_destination(dst, prefix_length=32)
+        logger.debug(f"Asking telemetry to {dst_bytes.hex()}")
+
+        data = b"\x27\x00\x00\x00" + dst_bytes
+        return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
+
     async def send_cli(self, cmd) -> Event:
         logger.debug(f"Sending CLI command: {cmd}")
         data = b"\x32" + cmd.encode('utf-8')
