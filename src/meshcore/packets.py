@@ -16,6 +16,14 @@ class PacketType(Enum):
     CONTACT_URI = 11
     BATTERY = 12
     DEVICE_INFO = 13
+    PRIVATE_KEY = 14
+    DISABLED = 15
+    CONTACT_MSG_RECV_V3 = 16
+    CHANNEL_MSG_RECV_V3 = 17
+    CHANNEL_INFO = 18
+    SIGN_START = 19
+    SIGNATURE = 20
+    CUSTOM_VARS = 21
     CLI_RESPONSE = 50
     
     # Push notifications
