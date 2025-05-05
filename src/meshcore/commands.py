@@ -313,6 +313,16 @@ class CommandHandler:
         data = b"\x27\x00\x00\x00" + dst_bytes
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
 
+    async def get_custom_vars(self) -> Event:
+        logger.debug(f"Asking for custom vars")
+        data = b"\x28"
+        return await self.send(data, [EventType.CUSTOM_VARS, EventType.ERROR])
+
+    async def set_custom_var(self, key, value) -> Event:
+        logger.debug(f"Setting custom var {key} to {value}")
+        data = b"\x29" + key.encode("utf-8") + ":" + value.encode("utf-8")
+        return await self.send(data, [EventType.OK, EventType.ERROR])
+
     async def send_cli(self, cmd) -> Event:
         logger.debug(f"Sending CLI command: {cmd}")
         data = b"\x32" + cmd.encode('utf-8')

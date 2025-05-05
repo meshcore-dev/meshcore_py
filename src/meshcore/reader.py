@@ -201,6 +201,17 @@ class MessageReader:
             res["response"] = data[1:].decode()
             await self.dispatcher.dispatch(Event(EventType.CLI_RESPONSE, res))
             
+        elif packet_type_value == PacketType.CUSTOM_VARS.value:
+            logger.debug(f"received custom vars response: {data.hex()}")
+            res = {}
+            rawdata = data[1:].decode()
+            pairs = rawdata.split(",")
+            for p in pairs :
+                psplit = p.split(":")
+                res[psplit[0]] = psplit[1]
+            logger.debug(f"got custom vars : {res}")
+            await self.dispatcher.dispatch(Event(EventType.CUSTOM_VARS, res))   
+
         # Push notifications
         elif packet_type_value == PacketType.ADVERTISEMENT.value:
             logger.debug("Advertisement received")
@@ -375,3 +386,4 @@ class MessageReader:
         else:
             logger.debug(f"Unhandled data received {data}")
             logger.debug(f"Unhandled packet type: {packet_type_value}")
+

@@ -34,6 +34,7 @@ class EventType(Enum):
     TRACE_DATA = "trace_data"
     RX_LOG_DATA = "rx_log_data"
     TELEMETRY_RESPONSE = "telemetry_response"
+    CUSTOM_VARS = "custom_vars"
     
     # Command response types
     OK = "command_ok"
