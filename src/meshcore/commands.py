@@ -320,7 +320,7 @@ class CommandHandler:
 
     async def set_custom_var(self, key, value) -> Event:
         logger.debug(f"Setting custom var {key} to {value}")
-        data = b"\x29" + key.encode("utf-8") + ":" + value.encode("utf-8")
+        data = b"\x29" + key.encode("utf-8") + b":" + value.encode("utf-8")
         return await self.send(data, [EventType.OK, EventType.ERROR])
 
     async def send_cli(self, cmd) -> Event:
