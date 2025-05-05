@@ -205,10 +205,11 @@ class MessageReader:
             logger.debug(f"received custom vars response: {data.hex()}")
             res = {}
             rawdata = data[1:].decode()
-            pairs = rawdata.split(",")
-            for p in pairs :
-                psplit = p.split(":")
-                res[psplit[0]] = psplit[1]
+            if not rawdata == "" :
+                pairs = rawdata.split(",")
+                for p in pairs :
+                    psplit = p.split(":")
+                    res[psplit[0]] = psplit[1]
             logger.debug(f"got custom vars : {res}")
             await self.dispatcher.dispatch(Event(EventType.CUSTOM_VARS, res))   
 
