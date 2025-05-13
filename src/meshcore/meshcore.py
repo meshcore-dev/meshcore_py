@@ -105,7 +105,7 @@ class MeshCore:
             self.dispatcher.running = False
             self.dispatcher._task.cancel()
     
-    def subscribe(self, event_type: EventType, callback, attribute_filters: Optional[Dict[str, Any]] = None):
+    def subscribe(self, event_type: Union[EventType, None], callback, attribute_filters: Optional[Dict[str, Any]] = None):
         """
         Subscribe to events using EventType enum with optional attribute filtering
         
