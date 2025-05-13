@@ -58,10 +58,13 @@ async def main():
         login_result = await mc.wait_for_event(EventType.LOGIN_SUCCESS, filter, timeout=10)
         print(f"Login result: {login_result}")
             
-    
-        # Wait a bit for the login response
-        print("Waiting for login events...")
-        await asyncio.sleep(3)
+        send_ver = await mc.commands.send_cmd(repeater, "ver")
+        if send_ver.type == EventType.ERROR:
+            print(f"Error sending version command: {send_ver.payload}")
+            return
+        await mc.wait_for_event(EventType.MESSAGES_WAITING)
+        ver_msg = await mc.commands.get_msg()
+        print(f"Version message: {ver_msg.payload}")
         
         # Send status request
         print("Sending status request...")
