@@ -85,3 +85,10 @@ class TCPConnection:
         pkt = b"\x3c" + size.to_bytes(2, byteorder="little") + data
         logger.debug(f"sending pkt : {pkt}")
         self.transport.write(pkt)
+        
+    async def disconnect(self):
+        """Close the TCP connection."""
+        if self.transport:
+            self.transport.close()
+            self.transport = None
+            logger.info("TCP Connection closed")

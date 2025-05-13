@@ -91,3 +91,9 @@ class BLEConnection:
             logger.error("RX characteristic not found")
             return False
         await self.client.write_gatt_char(self.rx_char, bytes(data), response=False)
+        
+    async def disconnect(self):
+        """Disconnect from the BLE device."""
+        if self.client and self.client.is_connected:
+            await self.client.disconnect()
+            logger.info("BLE Connection closed")
