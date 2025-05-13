@@ -306,6 +306,11 @@ class CommandHandler:
         data = b"\x03\x00" + chan.to_bytes(1, 'little') + timestamp + msg.encode("utf-8")
         return await self.send(data, [EventType.OK, EventType.ERROR])
         
+    async def send_other_params(self, manual_add_contacts : bool, telemetry_mode_base : bool, telemetry_mode_loc : bool) :
+        telemetry_mode = (telemetry_mode_base & 0b11) | ((telemetry_mode_loc & 0b11) << 2)
+        data = b"\x26" + manual_add_contacts.to_bytes(1) + telemetry_mode.to_bytes(1) 
+        return await self.send(data, [EventType.OK, EventType.ERROR])
+
     async def send_telemetry_req(self, dst: DestinationType) -> Event :
         dst_bytes = _validate_destination(dst, prefix_length=32)
         logger.debug(f"Asking telemetry to {dst_bytes.hex()}")
