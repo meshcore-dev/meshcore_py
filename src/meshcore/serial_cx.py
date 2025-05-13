@@ -93,4 +93,4 @@ class SerialConnection:
         if self.transport:
             self.transport.close()
             self.transport = None
-            logger.info("Serial Connection closed")
+            logger.debug("Serial Connection closed")

@@ -91,4 +91,4 @@ class TCPConnection:
         if self.transport:
             self.transport.close()
             self.transport = None
-            logger.info("TCP Connection closed")
+            logger.debug("TCP Connection closed")

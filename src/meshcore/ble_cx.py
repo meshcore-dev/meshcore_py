@@ -96,4 +96,4 @@ class BLEConnection:
         """Disconnect from the BLE device."""
         if self.client and self.client.is_connected:
             await self.client.disconnect()
-            logger.info("BLE Connection closed")
+            logger.debug("BLE Connection closed")
