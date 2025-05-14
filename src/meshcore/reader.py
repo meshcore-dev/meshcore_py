@@ -380,7 +380,7 @@ class MessageReader:
             res = {}
 
             res["pubkey_pre"] = data[2:8].hex()
-            buf = data[8:]
+            buf = data[8:-8]
             res["data"] = buf.hex()
             res["lpp"] = LppFrame().from_bytes(buf)
 
