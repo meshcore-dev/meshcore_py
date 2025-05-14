@@ -18,7 +18,7 @@ classifiers = [
 ]
 license = "MIT"
 license-files = ["LICEN[CS]E*"]
-dependencies = [ "bleak", "pyserial-asyncio" ]
+dependencies = [ "bleak", "pyserial-asyncio", "pycayennelpp" ]
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-asyncio"]

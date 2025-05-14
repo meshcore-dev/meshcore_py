@@ -1,6 +1,7 @@
 import sys
 import logging
 import asyncio
+from cayennelpp import LppFrame
 from typing import Any, Optional, Dict
 from .events import Event, EventType, EventDispatcher
 from .packets import PacketType
@@ -378,7 +379,9 @@ class MessageReader:
             res = {}
 
             res["pubkey_pre"] = data[2:8].hex()
-            res["data"] = data[8:12].hex()
+            buf = data[8:]
+            res["data"] = buf.hex()
+            res["lpp"] = LppFrame().from_bytes(buf)
 
             attributes = {
                 "data" : res["data"],
