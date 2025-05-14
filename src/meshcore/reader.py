@@ -72,8 +72,9 @@ class MessageReader:
             self_info["public_key"] = data[4:36].hex()
             self_info["adv_lat"] = int.from_bytes(data[36:40], byteorder='little', signed=True)/1e6
             self_info["adv_lon"] = int.from_bytes(data[40:44], byteorder='little', signed=True)/1e6
-            self_info["telemetry_mode_loc"] = (data[47] >> 2) & 0b11
-            self_info["telemetry_mode_base"] = (data[47]) & 0b11
+            self_info["telemetry_mode_loc"] = (data[46] >> 2) & 0b11
+            self_info["telemetry_mode_base"] = (data[46]) & 0b11
+            self_info["manual_add_contacts"] = data[47] > 0
             self_info["radio_freq"] = int.from_bytes(data[48:52], byteorder='little') / 1000
             self_info["radio_bw"] = int.from_bytes(data[52:56], byteorder='little') / 1000
             self_info["radio_sf"] = data[56]
