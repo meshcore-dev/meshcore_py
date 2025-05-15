@@ -256,14 +256,31 @@ class MessageReader:
             await self.dispatcher.dispatch(Event(EventType.RAW_DATA, res))
             
         elif packet_type_value == PacketType.LOGIN_SUCCESS.value:
-            logger.debug("Login success")
-             # TODO: Read login attributes
-            await self.dispatcher.dispatch(Event(EventType.LOGIN_SUCCESS, {}))
+            res = {}
+            if len(data) > 1:
+                res["permissions"] = data[1]
+                res["is_admin"] = (data[1] & 1) == 1  # Check if admin bit is set
+            
+            if len(data) > 7:
+                res["pubkey_prefix"] = data[2:8].hex()
+                
+            attributes = {
+                "pubkey_prefix": res.get("pubkey_prefix")
+            }
+            
+            await self.dispatcher.dispatch(Event(EventType.LOGIN_SUCCESS, res, attributes))
             
         elif packet_type_value == PacketType.LOGIN_FAILED.value:
-            logger.debug("Login failed")
-             # TODO: Read login attributes
-            await self.dispatcher.dispatch(Event(EventType.LOGIN_FAILED, {}))
+            res = {}
+            
+            if len(data) > 7:
+                res["pubkey_prefix"] = data[2:8].hex()
+                
+            attributes = {
+                "pubkey_prefix": res.get("pubkey_prefix")
+            }
+            
+            await self.dispatcher.dispatch(Event(EventType.LOGIN_FAILED, res, attributes))
             
         elif packet_type_value == PacketType.STATUS_RESPONSE.value:
             res = {}

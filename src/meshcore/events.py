@@ -64,6 +64,15 @@ class Event:
         # Add any keyword arguments to the attributes dictionary
         if kwargs:
             self.attributes.update(kwargs)
+    def clone(self):
+        """
+        Create a copy of the event.
+        
+        Returns:
+            A new Event object with the same type, payload, and attributes.
+        """
+        copied_payload = self.payload.copy() if isinstance(self.payload, dict) else self.payload
+        return Event(self.type, copied_payload, self.attributes.copy())
 
 
 class Subscription:
@@ -79,7 +88,7 @@ class Subscription:
 
 class EventDispatcher:
     def __init__(self):
-        self.queue = asyncio.Queue()
+        self.queue: asyncio.Queue[Event] = asyncio.Queue()
         self.subscriptions: List[Subscription] = []
         self.running = False
         self._task = None
@@ -118,7 +127,6 @@ class EventDispatcher:
             event = await self.queue.get()
             logger.debug(f"Dispatching event: {event.type}, {event.payload}, {event.attributes}")
             for subscription in self.subscriptions.copy():
-                logger.debug(f"Checking subscription: {subscription.event_type}, {subscription.attribute_filters}")
                 # Check if event type matches
                 if subscription.event_type is None or subscription.event_type == event.type:
                     # Check if all attribute filters match
@@ -128,7 +136,7 @@ class EventDispatcher:
                                 for key, value in subscription.attribute_filters.items()):
                             continue
                     try:
-                        result = subscription.callback(event)
+                        result = subscription.callback(event.clone())
                         if asyncio.iscoroutine(result):
                             await result
                     except Exception as e:

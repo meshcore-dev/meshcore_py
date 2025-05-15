@@ -5,7 +5,9 @@ from typing import Optional, Dict, Any, Union
 from .events import EventDispatcher, EventType
 from .reader import MessageReader
 from .commands import CommandHandler
-
+from .ble_cx import BLEConnection
+from .tcp_cx import TCPConnection
+from .serial_cx import SerialConnection
 
 # Setup default logger
 logger = logging.getLogger("meshcore")
@@ -45,9 +47,7 @@ class MeshCore:
     
     @classmethod
     async def create_tcp(cls, host: str, port: int, debug: bool = False, default_timeout=None) -> 'MeshCore':
-        """Create and connect a MeshCore instance using TCP connection"""
-        from .tcp_cx import TCPConnection
-        
+        """Create and connect a MeshCore instance using TCP connection"""        
         connection = TCPConnection(host, port)
         await connection.connect()
         
@@ -58,9 +58,6 @@ class MeshCore:
     @classmethod
     async def create_serial(cls, port: str, baudrate: int = 115200, debug: bool = False, default_timeout=None) -> 'MeshCore':
         """Create and connect a MeshCore instance using serial connection"""
-        from .serial_cx import SerialConnection
-        import asyncio
-        
         connection = SerialConnection(port, baudrate)
         await connection.connect()
         await asyncio.sleep(0.1)  # Time for transport to establish
@@ -75,7 +72,6 @@ class MeshCore:
         
         If address is None, it will scan for and connect to the first available MeshCore device.
         """
-        from .ble_cx import BLEConnection
         
         connection = BLEConnection(address)
         result = await connection.connect()
@@ -91,7 +87,17 @@ class MeshCore:
         return await self.commands.send_appstart()
     
     async def disconnect(self):
+        """Disconnect from the device and clean up resources."""
+        # First stop the dispatcher to prevent any new events
         await self.dispatcher.stop()
+        
+        # Stop auto message fetching if it's running
+        if hasattr(self, '_auto_fetch_subscription') and self._auto_fetch_subscription:
+            await self.stop_auto_message_fetching()
+            
+        # Disconnect the connection object
+        if self.cx:
+            await self.cx.disconnect()
     
     def stop(self):
         """Synchronously stop the event dispatcher task"""
@@ -99,7 +105,7 @@ class MeshCore:
             self.dispatcher.running = False
             self.dispatcher._task.cancel()
     
-    def subscribe(self, event_type: EventType, callback, attribute_filters: Optional[Dict[str, Any]] = None):
+    def subscribe(self, event_type: Union[EventType, None], callback, attribute_filters: Optional[Dict[str, Any]] = None):
         """
         Subscribe to events using EventType enum with optional attribute filtering
         
