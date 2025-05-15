@@ -201,6 +201,27 @@ class CommandHandler:
         data = b"\x26" + manual_add_contacts.to_bytes(1) + telemetry_mode.to_bytes(1) 
         return await self.send(data, [EventType.OK, EventType.ERROR])
 
+    async def set_telemetry_mode_base(self, telemetry_mode_base : int) :
+        infos = (await self.send_appstart()).payload
+        return await self.set_other_params( 
+                    infos["manual_add_contacts"], 
+                    telemetry_mode_base,
+                    infos["telemetry_mode_loc"])
+
+    async def set_telemetry_mode_loc(self, telemetry_mode_loc : int) :
+        infos = (await self.send_appstart()).payload
+        return await self.set_other_params(
+                    infos["manual_add_contacts"], 
+                    infos["telemetry_mode_base"],
+                    telemetry_mode_loc)
+
+    async def set_manual_add_contacts(self, manual_add_contacts:bool) :
+        infos = (await self.send_appstart()).payload
+        return await self.set_other_params( 
+                    manual_add_contacts, 
+                    infos["telemetry_mode_base"],
+                    infos["telemetry_mode_loc"])
+
     async def set_devicepin(self, pin: int) -> Event:
         logger.debug(f"Setting device PIN to: {pin}")
         return await self.send(b"\x25" \
@@ -314,7 +335,6 @@ class CommandHandler:
     async def send_telemetry_req(self, dst: DestinationType) -> Event :
         dst_bytes = _validate_destination(dst, prefix_length=32)
         logger.debug(f"Asking telemetry to {dst_bytes.hex()}")
-
         data = b"\x27\x00\x00\x00" + dst_bytes
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
 

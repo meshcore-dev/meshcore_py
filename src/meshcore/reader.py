@@ -382,7 +382,6 @@ class MessageReader:
 
             res["pubkey_pre"] = data[2:8].hex()
             buf = data[8:]
-            res["data"] = buf.hex()
 
             """Parse a given byte string and return as a LppFrame object."""
             i = 0
