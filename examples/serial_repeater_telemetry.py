@@ -41,7 +41,8 @@ async def main():
             
             # Wait for status response
             telemetry_event = await mc.wait_for_event(EventType.TELEMETRY_RESPONSE, timeout=args.timeout)
-            print(telemetry_event)
+            print(telemetry_event.payload["lpp"])
+            
             
         else:
             print("Login failed or timed out")

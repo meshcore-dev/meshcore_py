@@ -1,7 +1,8 @@
 import sys
 import logging
 import asyncio
-from cayennelpp import LppFrame
+import json
+from cayennelpp import LppFrame, LppData, LppUtil
 from typing import Any, Optional, Dict
 from .events import Event, EventType, EventDispatcher
 from .packets import PacketType
@@ -380,12 +381,23 @@ class MessageReader:
             res = {}
 
             res["pubkey_pre"] = data[2:8].hex()
-            buf = data[8:-8]
+            buf = data[8:]
             res["data"] = buf.hex()
-            res["lpp"] = LppFrame().from_bytes(buf)
+
+            """Parse a given byte string and return as a LppFrame object."""
+            i = 0
+            data = []
+            while i < len(buf) and buf[i] != 0:
+                lppdata = LppData.from_bytes(buf[i:])
+                data.append(lppdata)
+                i = i + len(lppdata)
+
+            lpp = json.loads(json.dumps(LppFrame(data), default=LppUtil.json_encode_type_str))
+
+            res["lpp"] = lpp
 
             attributes = {
-                "data" : res["data"],
+                "raw" : buf.hex(),
             }
             
             await self.dispatcher.dispatch(Event(EventType.TELEMETRY_RESPONSE, res, attributes))
