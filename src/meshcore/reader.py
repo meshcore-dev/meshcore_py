@@ -2,10 +2,11 @@ import sys
 import logging
 import asyncio
 import json
-from cayennelpp import LppFrame, LppData, LppUtil
+from cayennelpp import LppFrame, LppData
 from typing import Any, Optional, Dict
 from .events import Event, EventType, EventDispatcher
 from .packets import PacketType
+from meshcore.lpp_json_encoder import lpp_json_encoder
 
 logger = logging.getLogger("meshcore")
 
@@ -408,7 +409,7 @@ class MessageReader:
                 data.append(lppdata)
                 i = i + len(lppdata)
 
-            lpp = json.loads(json.dumps(LppFrame(data), default=LppUtil.json_encode_type_str))
+            lpp = json.loads(json.dumps(LppFrame(data), default=lpp_json_encoder))
 
             res["lpp"] = lpp
 
