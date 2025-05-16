@@ -253,6 +253,10 @@ class CommandHandler:
             data = b"\x11"
         return await self.send(data, [EventType.CONTACT_URI, EventType.ERROR])
         
+    async def import_contact(self, card_data) -> Event:
+        data = b"\x12" + card_data
+        return await self.send(data, [EventType.OK, EventType.ERROR])
+
     async def remove_contact(self, key: DestinationType) -> Event:
         key_bytes = _validate_destination(key, prefix_length=32)
         logger.debug(f"Removing contact: {key_bytes.hex()}")
