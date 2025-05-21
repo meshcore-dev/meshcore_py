@@ -1,7 +1,7 @@
 from cayennelpp import LppFrame, LppData
 from cayennelpp.lpp_type import LppType
 
-# type name "how to display vale"
+# Format : type name "how to display value"
 #   display : None: (use lib default), []: only one value to display, ["field1", "field2" ...]: meaning of each field 
 my_lpp_types = {
     0:      ('digital input', []),
@@ -33,7 +33,7 @@ my_lpp_types = {
     142:    ('switch', []),
 }
 
-def lpp_json_encoder (obj) :
+def lpp_json_encoder (obj, types = my_lpp_types) :
     """Encode LppType, LppData, and LppFrame to JSON."""
     if isinstance(obj, LppFrame):
         return obj.data
