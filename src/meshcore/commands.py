@@ -262,17 +262,25 @@ class CommandHandler:
         logger.debug(f"Removing contact: {key_bytes.hex()}")
         data = b"\x0f" + key_bytes
         return await self.send(data, [EventType.OK, EventType.ERROR])
-        
-    async def change_contact_path (self, contact, path) -> Event:
-        out_path_hex = path
-        out_path_len = int(len(path) / 2)
+
+    async def update_contact (self, contact, path=None, flags=None) -> Event:
+        if path is None :
+            out_path_hex = contact["out_path"]
+            out_path_len = contact["out_path_len"]
+        else :
+            out_path_hex = path
+            out_path_len = int(len(path) / 2)
         out_path_hex = out_path_hex + (128-len(out_path_hex)) * "0" 
+
+        if flags is None :
+            flags = contact["flags"]
+
         adv_name_hex = contact["adv_name"].encode().hex()
         adv_name_hex = adv_name_hex + (64-len(adv_name_hex)) * "0"
         data = b"\x09" \
             + bytes.fromhex(contact["public_key"])\
             + contact["type"].to_bytes(1)\
-            + contact["flags"].to_bytes(1)\
+            + flags.to_bytes(1)\
             + out_path_len.to_bytes(1, 'little', signed=True)\
             + bytes.fromhex(out_path_hex)\
             + bytes.fromhex(adv_name_hex)\
@@ -280,6 +288,12 @@ class CommandHandler:
             + int(contact["adv_lat"]*1e6).to_bytes(4, 'little', signed=True)\
             + int(contact["adv_lon"]*1e6).to_bytes(4, 'little', signed=True)
         return await self.send(data, [EventType.OK, EventType.ERROR])
+        
+    async def change_contact_path (self, contact, path) -> Event:
+        return await self.update_contact(contact, path)
+
+    async def change_contact_flags (self, contact, flags) -> Event:
+        return await self.update_contact(contact, flags=flags)
 
     async def get_msg(self, timeout: Optional[float] = 1) -> Event:
         logger.debug("Requesting pending messages")
