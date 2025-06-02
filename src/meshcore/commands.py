@@ -367,6 +367,11 @@ class CommandHandler:
         data = b"\x27\x00\x00\x00" + dst_bytes
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
 
+    async def get_self_telemetry(self) -> Event :
+        logger.debug(f"Getting self telemetry")
+        data = b"\x27\x00\x00\x00"
+        return await self.send(data, [EventType.TELEMETRY_RESPONSE, EventType.ERROR])
+
     async def get_custom_vars(self) -> Event:
         logger.debug(f"Asking for custom vars")
         data = b"\x28"
