@@ -218,7 +218,23 @@ class MessageReader:
                     psplit = p.split(":")
                     res[psplit[0]] = psplit[1]
             logger.debug(f"got custom vars : {res}")
-            await self.dispatcher.dispatch(Event(EventType.CUSTOM_VARS, res))   
+            await self.dispatcher.dispatch(Event(EventType.CUSTOM_VARS, res))
+            
+        elif packet_type_value == PacketType.CHANNEL_INFO.value:
+            logger.debug(f"received channel info response: {data.hex()}")
+            res = {}
+            res["channel_idx"] = data[1]
+            
+            # Channel name is null-terminated, so find the first null byte
+            name_bytes = data[2:34]
+            null_pos = name_bytes.find(0)
+            if null_pos >= 0:
+                res["channel_name"] = name_bytes[:null_pos].decode('utf-8')
+            else:
+                res["channel_name"] = name_bytes.decode('utf-8')
+                
+            res["channel_secret"] = data[34:50]
+            await self.dispatcher.dispatch(Event(EventType.CHANNEL_INFO, res, res))   
 
         # Push notifications
         elif packet_type_value == PacketType.ADVERTISEMENT.value:
@@ -404,13 +420,13 @@ class MessageReader:
 
             """Parse a given byte string and return as a LppFrame object."""
             i = 0
-            data = []
+            lpp_data_list = []
             while i < len(buf) and buf[i] != 0:
                 lppdata = LppData.from_bytes(buf[i:])
-                data.append(lppdata)
+                lpp_data_list.append(lppdata)
                 i = i + len(lppdata)
 
-            lpp = json.loads(json.dumps(LppFrame(data), default=lpp_json_encoder))
+            lpp = json.loads(json.dumps(LppFrame(lpp_data_list), default=lpp_json_encoder))
 
             res["lpp"] = lpp
 

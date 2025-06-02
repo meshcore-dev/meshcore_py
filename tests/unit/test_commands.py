@@ -256,3 +256,22 @@ async def test_send_with_multiple_expected_events_returns_first_completed(comman
     # Verify that even though OK was listed first, the ERROR event was returned
     assert result.type == EventType.ERROR
     assert result.payload == error_payload
+
+# Channel command tests
+async def test_get_channel(command_handler, mock_connection):
+    await command_handler.get_channel(3)
+    assert mock_connection.send.call_args[0][0] == b"\x1f\x03"
+
+async def test_set_channel(command_handler, mock_connection):
+    channel_secret = bytes(range(16))  # 16 bytes: 0x00, 0x01, ..., 0x0f
+    await command_handler.set_channel(5, "MyChannel", channel_secret)
+    
+    expected_data = b"\x20\x05"  # CMD_SET_CHANNEL + channel_idx=5
+    expected_data += b"MyChannel" + b"\x00" * (32 - len("MyChannel"))  # 32-byte padded name
+    expected_data += channel_secret  # 16-byte secret
+    
+    assert mock_connection.send.call_args[0][0] == expected_data
+
+async def test_set_channel_invalid_secret_length(command_handler):
+    with pytest.raises(ValueError, match="Channel secret must be exactly 16 bytes"):
+        await command_handler.set_channel(1, "Test", b"tooshort")
