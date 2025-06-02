@@ -382,6 +382,25 @@ class CommandHandler:
         data = b"\x32" + cmd.encode('utf-8')
         return await self.send(data, [EventType.CLI_RESPONSE, EventType.ERROR])
         
+    async def get_channel(self, channel_idx: int) -> Event:
+        logger.debug(f"Getting channel info for channel {channel_idx}")
+        data = b"\x1f" + channel_idx.to_bytes(1, 'little')
+        return await self.send(data, [EventType.CHANNEL_INFO, EventType.ERROR])
+        
+    async def set_channel(self, channel_idx: int, channel_name: str, channel_secret: bytes) -> Event:
+        logger.debug(f"Setting channel {channel_idx}: name={channel_name}")
+        
+        # Pad channel name to 32 bytes
+        name_bytes = channel_name.encode('utf-8')[:32]
+        name_bytes = name_bytes.ljust(32, b'\x00')
+        
+        # Ensure channel secret is exactly 16 bytes
+        if len(channel_secret) != 16:
+            raise ValueError("Channel secret must be exactly 16 bytes")
+            
+        data = b"\x20" + channel_idx.to_bytes(1, 'little') + name_bytes + channel_secret
+        return await self.send(data, [EventType.OK, EventType.ERROR])
+        
     async def send_trace(self, auth_code: int = 0, tag: Optional[int] = None, 
                       flags: int = 0, path: Optional[Union[str, bytes, bytearray]] = None) -> Event:
         """

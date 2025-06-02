@@ -35,6 +35,7 @@ class EventType(Enum):
     RX_LOG_DATA = "rx_log_data"
     TELEMETRY_RESPONSE = "telemetry_response"
     CUSTOM_VARS = "custom_vars"
+    CHANNEL_INFO = "channel_info"
     
     # Command response types
     OK = "command_ok"

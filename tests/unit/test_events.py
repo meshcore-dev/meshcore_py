@@ -110,3 +110,18 @@ async def test_event_init_with_kwargs():
     assert event.type == EventType.ACK
     assert event.payload == {"data": "value"}
     assert event.attributes == {"code": "1234", "status": "ok"}
+
+async def test_channel_info_event():
+    # Test CHANNEL_INFO event type
+    channel_payload = {
+        "channel_idx": 3,
+        "channel_name": "TestChannel",
+        "channel_secret": b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10"
+    }
+    
+    event = Event(EventType.CHANNEL_INFO, channel_payload)
+    
+    assert event.type == EventType.CHANNEL_INFO
+    assert event.payload["channel_idx"] == 3
+    assert event.payload["channel_name"] == "TestChannel"
+    assert len(event.payload["channel_secret"]) == 16
