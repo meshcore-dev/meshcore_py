@@ -305,7 +305,7 @@ class MessageReader:
             res["pubkey_pre"] = data[2:8].hex()
             res["bat"] = int.from_bytes(data[8:10], byteorder='little')
             res["tx_queue_len"] = int.from_bytes(data[10:12], byteorder='little')
-            res["free_queue_len"] = int.from_bytes(data[12:14], byteorder='little')
+            res["noise_floor"] = int.from_bytes(data[12:14], byteorder='little', signed=True)
             res["last_rssi"] = int.from_bytes(data[14:16], byteorder='little', signed=True)
             res["nb_recv"] = int.from_bytes(data[16:20], byteorder='little', signed=False)
             res["nb_sent"] = int.from_bytes(data[20:24], byteorder='little', signed=False)
@@ -319,6 +319,7 @@ class MessageReader:
             res["last_snr"] = int.from_bytes(data[50:52], byteorder='little', signed=True) / 4
             res["direct_dups"] = int.from_bytes(data[52:54], byteorder='little')
             res["flood_dups"] = int.from_bytes(data[54:56], byteorder='little')
+
             data_hex = data[8:].hex()
             logger.debug(f"Status response: {data_hex}")
             
