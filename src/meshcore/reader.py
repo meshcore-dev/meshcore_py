@@ -239,13 +239,15 @@ class MessageReader:
         # Push notifications
         elif packet_type_value == PacketType.ADVERTISEMENT.value:
             logger.debug("Advertisement received")
-            # TODO: Read advertisement attributes
-            await self.dispatcher.dispatch(Event(EventType.ADVERTISEMENT, {}))
+            res = {}
+            res["public_key"] = data[1:33].hex()
+            await self.dispatcher.dispatch(Event(EventType.ADVERTISEMENT, res, res))
             
         elif packet_type_value == PacketType.PATH_UPDATE.value:
             logger.debug("Code path update")
-            # TODO: Read path update attributes
-            await self.dispatcher.dispatch(Event(EventType.PATH_UPDATE, {}))
+            res = {}
+            res["public_key"] = data[1:33].hex()
+            await self.dispatcher.dispatch(Event(EventType.PATH_UPDATE, res, res))
             
         elif packet_type_value == PacketType.ACK.value:
             logger.debug("Received ACK")
