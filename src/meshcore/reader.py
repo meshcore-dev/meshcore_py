@@ -189,6 +189,9 @@ class MessageReader:
         elif packet_type_value == PacketType.BATTERY.value:
             battery_level = int.from_bytes(data[1:3], byteorder='little')
             result = {"level": battery_level}
+            if len(data) > 3 : # has storage info as well
+                result["used_kb"] = int.from_bytes(data[3:7], byteorder='little')
+                result["total_kb"] = int.from_bytes(data[7:11], byteorder='little')
             await self.dispatcher.dispatch(Event(EventType.BATTERY, result))
             
         elif packet_type_value == PacketType.DEVICE_INFO.value:
