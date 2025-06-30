@@ -17,6 +17,7 @@ class SerialConnection:
         self.transport = None
         self.header = b""
         self.inframe = b""
+        self._disconnect_callback = None
 
     class MCSerialClientProtocol(asyncio.Protocol):
         def __init__(self, cx):
@@ -32,7 +33,9 @@ class SerialConnection:
             self.cx.handle_rx(data)    
     
         def connection_lost(self, exc):
-            logger.info('port closed')
+            logger.debug('Serial port closed')
+            if self.cx._disconnect_callback:
+                asyncio.create_task(self.cx._disconnect_callback("serial_disconnect"))
     
         def pause_writing(self):
             logger.debug('pause writing')
@@ -94,3 +97,7 @@ class SerialConnection:
             self.transport.close()
             self.transport = None
             logger.debug("Serial Connection closed")
+            
+    def set_disconnect_callback(self, callback):
+        """Set callback to handle disconnections."""
+        self._disconnect_callback = callback

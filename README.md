@@ -111,6 +111,43 @@ meshcore = await MeshCore.create_ble("12:34:56:78:90:AB")
 meshcore = await MeshCore.create_tcp("192.168.1.100", 4000)
 ```
 
+#### Auto-Reconnect and Connection Events
+
+Enable automatic reconnection when connections are lost:
+
+```python
+# Enable auto-reconnect with custom retry limits
+meshcore = await MeshCore.create_tcp(
+    "192.168.1.100", 4000,
+    auto_reconnect=True,
+    max_reconnect_attempts=5
+)
+
+# Subscribe to connection events
+async def on_connected(event):
+    print(f"Connected: {event.payload}")
+    if event.payload.get('reconnected'):
+        print("Successfully reconnected!")
+
+async def on_disconnected(event):
+    print(f"Disconnected: {event.payload['reason']}")
+    if event.payload.get('max_attempts_exceeded'):
+        print("Max reconnection attempts exceeded")
+
+meshcore.subscribe(EventType.CONNECTED, on_connected)
+meshcore.subscribe(EventType.DISCONNECTED, on_disconnected)
+
+# Check connection status
+if meshcore.is_connected:
+    print("Device is currently connected")
+```
+
+**Auto-reconnect features:**
+- Exponential backoff (1s, 2s, 4s, 8s max delay)
+- Configurable retry limits (default: 3 attempts)
+- Automatic disconnect detection (especially useful for TCP connections)
+- Connection events with detailed information
+
 ### Using Commands (Synchronous Style)
 
 Send commands and wait for responses:

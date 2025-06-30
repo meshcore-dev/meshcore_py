@@ -21,9 +21,10 @@ class BLEConnection:
     def __init__(self, address):
         """ Constructor : specify address """
         self.address = address
+        self._user_provided_address = address
         self.client = None
         self.rx_char = None
-        self.mc = None
+        self._disconnect_callback = None
 
     async def connect(self):
         """
@@ -31,6 +32,7 @@ class BLEConnection:
 
         Returns : the address used for connection
         """
+        logger.debug(f"Connecting existing connection: {self.client} with address {self.address}")
         def match_meshcore_device(_: BLEDevice, adv: AdvertisementData):
             """ Filter to mach MeshCore devices """
             if not adv.local_name is None\
@@ -39,20 +41,20 @@ class BLEConnection:
                 return True
             return False
 
-        if self.address is None or self.address == "" or len(self.address.split(":")) != 6 :
+        if self.address is None or self.address == "" or len(self.address.split(":")) != 6:
             scanner = BleakScanner()
             logger.info("Scanning for devices")
             device = await scanner.find_device_by_filter(match_meshcore_device)
-            if device is None :
+            if device is None:
                 return None
             logger.info(f"Found device : {device}")
-            self.client = BleakClient(device)
+            self.client = BleakClient(device, disconnected_callback=self.handle_disconnect)
             self.address = self.client.address
         else:
-            self.client = BleakClient(self.address)
+            self.client = BleakClient(self.address, disconnected_callback=self.handle_disconnect)
 
         try:
-            await self.client.connect(disconnected_callback=self.handle_disconnect)
+            await self.client.connect()
         except BleakDeviceNotFoundError:
             return None
         except TimeoutError:
@@ -69,12 +71,19 @@ class BLEConnection:
         logger.info("BLE Connection started")
         return self.address
 
-    def handle_disconnect(self, _: BleakClient):
+    def handle_disconnect(self, client: BleakClient):
         """ Callback to handle disconnection """
-        logger.info("Device was disconnected, goodbye.")
-        # cancelling all tasks effectively ends the program
-        for task in asyncio.all_tasks():
-            task.cancel()
+        logger.debug(f"BLE device disconnected: {client.address} (is_connected: {client.is_connected})")  
+        # Reset the address we found to what user specified
+        # this allows to reconnect to the same device
+        self.address = self._user_provided_address
+        
+        if self._disconnect_callback:
+            asyncio.create_task(self._disconnect_callback("ble_disconnect"))
+            
+    def set_disconnect_callback(self, callback):
+        """Set callback to handle disconnections."""
+        self._disconnect_callback = callback
 
     def set_reader(self, reader) :
         self.reader = reader
