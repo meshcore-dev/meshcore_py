@@ -5,6 +5,7 @@ from typing import Optional, Dict, Any, Union
 from .events import EventDispatcher, EventType
 from .reader import MessageReader
 from .commands import CommandHandler
+from .connection_manager import ConnectionManager
 from .ble_cx import BLEConnection
 from .tcp_cx import TCPConnection
 from .serial_cx import SerialConnection
@@ -16,9 +17,14 @@ class MeshCore:
     """
     Interface to a MeshCore device
     """
-    def __init__(self, cx, debug=False, default_timeout=None):
-        self.cx = cx
+    def __init__(self, cx, debug=False, default_timeout=None, auto_reconnect=False, max_reconnect_attempts=3):
+        # Wrap connection with ConnectionManager
         self.dispatcher = EventDispatcher()
+        self.connection_manager = ConnectionManager(
+            cx, self.dispatcher, auto_reconnect, max_reconnect_attempts
+        )
+        self.cx = self.connection_manager  # For backward compatibility
+        
         self._reader = MessageReader(self.dispatcher)
         self.commands = CommandHandler(default_timeout=default_timeout)
         
@@ -29,7 +35,7 @@ class MeshCore:
             logger.setLevel(logging.INFO)
         
         # Set up connections
-        self.commands.set_connection(cx)
+        self.commands.set_connection(self.connection_manager)
         
         # Set the dispatcher in the command handler
         self.commands.set_dispatcher(self.dispatcher)
@@ -43,47 +49,54 @@ class MeshCore:
         # Set up event subscriptions to track data
         self._setup_data_tracking()
         
-        cx.set_reader(self._reader)
+        self.connection_manager.set_reader(self._reader)
+        
+        # Set up disconnect callback
+        cx.set_disconnect_callback(self.connection_manager.handle_disconnect)
     
     @classmethod
-    async def create_tcp(cls, host: str, port: int, debug: bool = False, default_timeout=None) -> 'MeshCore':
+    async def create_tcp(cls, host: str, port: int, debug: bool = False, default_timeout=None, 
+                        auto_reconnect: bool = False, max_reconnect_attempts: int = 3) -> 'MeshCore':
         """Create and connect a MeshCore instance using TCP connection"""        
         connection = TCPConnection(host, port)
-        await connection.connect()
         
-        mc = cls(connection, debug=debug, default_timeout=default_timeout)
+        mc = cls(connection, debug=debug, default_timeout=default_timeout,
+                auto_reconnect=auto_reconnect, max_reconnect_attempts=max_reconnect_attempts)
         await mc.connect()
         return mc
     
     @classmethod
-    async def create_serial(cls, port: str, baudrate: int = 115200, debug: bool = False, default_timeout=None) -> 'MeshCore':
+    async def create_serial(cls, port: str, baudrate: int = 115200, debug: bool = False, default_timeout=None,
+                           auto_reconnect: bool = False, max_reconnect_attempts: int = 3) -> 'MeshCore':
         """Create and connect a MeshCore instance using serial connection"""
         connection = SerialConnection(port, baudrate)
-        await connection.connect()
         await asyncio.sleep(0.1)  # Time for transport to establish
         
-        mc = cls(connection, debug=debug, default_timeout=default_timeout)
+        mc = cls(connection, debug=debug, default_timeout=default_timeout,
+                auto_reconnect=auto_reconnect, max_reconnect_attempts=max_reconnect_attempts)
         await mc.connect()
         return mc
     
     @classmethod
-    async def create_ble(cls, address: Optional[str] = None, debug: bool = False, default_timeout=None) -> 'MeshCore':
+    async def create_ble(cls, address: Optional[str] = None, debug: bool = False, default_timeout=None,
+                        auto_reconnect: bool = False, max_reconnect_attempts: int = 3) -> 'MeshCore':
         """Create and connect a MeshCore instance using BLE connection
         
         If address is None, it will scan for and connect to the first available MeshCore device.
         """
         
         connection = BLEConnection(address)
-        result = await connection.connect()
-        if result is None:
-            raise ConnectionError("Failed to connect to BLE device")
         
-        mc = cls(connection, debug=debug, default_timeout=default_timeout)
+        mc = cls(connection, debug=debug, default_timeout=default_timeout,
+                auto_reconnect=auto_reconnect, max_reconnect_attempts=max_reconnect_attempts)
         await mc.connect()
         return mc
         
     async def connect(self):
         await self.dispatcher.start()
+        result = await self.connection_manager.connect()
+        if result is None:
+            raise ConnectionError("Failed to connect to device")
         return await self.commands.send_appstart()
     
     async def disconnect(self):
@@ -96,8 +109,7 @@ class MeshCore:
             await self.stop_auto_message_fetching()
             
         # Disconnect the connection object
-        if self.cx:
-            await self.cx.disconnect()
+        await self.connection_manager.disconnect()
     
     def stop(self):
         """Synchronously stop the event dispatcher task"""
@@ -194,6 +206,11 @@ class MeshCore:
     def time(self):
         """Get the current device time"""
         return self._time
+        
+    @property
+    def is_connected(self):
+        """Check if the connection is active"""
+        return self.connection_manager.is_connected
         
     @property
     def default_timeout(self):

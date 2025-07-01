@@ -40,6 +40,10 @@ class EventType(Enum):
     # Command response types
     OK = "command_ok"
     ERROR = "command_error"
+    
+    # Connection events
+    CONNECTED = "connected"
+    DISCONNECTED = "disconnected"
 
 
 @dataclass
