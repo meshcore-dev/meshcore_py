@@ -196,9 +196,9 @@ class CommandHandler:
                 + int(0).to_bytes(1, 'little')\
                 + int(0).to_bytes(1, 'little'), [EventType.OK, EventType.ERROR])
 
-    async def set_other_params(self, manual_add_contacts : bool, telemetry_mode_base : int, telemetry_mode_loc : int, telemetry_mode_env : int) :
+    async def set_other_params(self, manual_add_contacts : bool, telemetry_mode_base : int, telemetry_mode_loc : int, telemetry_mode_env : int, advert_loc_policy : int) :
         telemetry_mode = (telemetry_mode_base & 0b11) | ((telemetry_mode_loc & 0b11) << 2) | ((telemetry_mode_env & 0b11) << 4)
-        data = b"\x26" + manual_add_contacts.to_bytes(1) + telemetry_mode.to_bytes(1) 
+        data = b"\x26" + manual_add_contacts.to_bytes(1) + telemetry_mode.to_bytes(1) + advert_loc_policy.to_bytes(1)
         return await self.send(data, [EventType.OK, EventType.ERROR])
 
     async def set_telemetry_mode_base(self, telemetry_mode_base : int) :
@@ -207,7 +207,8 @@ class CommandHandler:
                     infos["manual_add_contacts"], 
                     telemetry_mode_base,
                     infos["telemetry_mode_loc"],
-                    infos["telemetry_mode_env"])
+                    infos["telemetry_mode_env"],
+                    infos["advert_loc_policy"])
 
     async def set_telemetry_mode_loc(self, telemetry_mode_loc : int) :
         infos = (await self.send_appstart()).payload
@@ -215,7 +216,8 @@ class CommandHandler:
                     infos["manual_add_contacts"], 
                     infos["telemetry_mode_base"],
                     telemetry_mode_loc,
-                    infos["telemetry_mode_env"])
+                    infos["telemetry_mode_env"],
+                    infos["advert_loc_policy"])
 
     async def set_telemetry_mode_env(self, telemetry_mode_env : int) :
         infos = (await self.send_appstart()).payload
@@ -223,7 +225,8 @@ class CommandHandler:
                     infos["manual_add_contacts"], 
                     infos["telemetry_mode_base"],
                     infos["telemetry_mode_loc"],
-                    telemetry_mode_env)
+                    telemetry_mode_env,
+                    infos["advert_loc_policy"])
 
     async def set_manual_add_contacts(self, manual_add_contacts:bool) :
         infos = (await self.send_appstart()).payload
@@ -231,7 +234,17 @@ class CommandHandler:
                     manual_add_contacts, 
                     infos["telemetry_mode_base"],
                     infos["telemetry_mode_loc"],
-                    infos["telemetry_mode_env"])
+                    infos["telemetry_mode_env"],
+                    infos["advert_loc_policy"])
+
+    async def set_advert_loc_policy(self, advert_loc_policy:int) :
+        infos = (await self.send_appstart()).payload
+        return await self.set_other_params( 
+                    infos["manual_add_contacts"], 
+                    infos["telemetry_mode_base"],
+                    infos["telemetry_mode_loc"],
+                    infos["telemetry_mode_env"],
+                    advert_loc_policy)
 
     async def set_devicepin(self, pin: int) -> Event:
         logger.debug(f"Setting device PIN to: {pin}")
