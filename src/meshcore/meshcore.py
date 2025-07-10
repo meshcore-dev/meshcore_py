@@ -70,7 +70,7 @@ class MeshCore:
                            auto_reconnect: bool = False, max_reconnect_attempts: int = 3) -> 'MeshCore':
         """Create and connect a MeshCore instance using serial connection"""
         connection = SerialConnection(port, baudrate)
-        await asyncio.sleep(0.1)  # Time for transport to establish
+        await asyncio.sleep(0.2)  # Time for transport to establish
         
         mc = cls(connection, debug=debug, default_timeout=default_timeout,
                 auto_reconnect=auto_reconnect, max_reconnect_attempts=max_reconnect_attempts)
