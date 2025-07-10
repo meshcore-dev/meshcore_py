@@ -44,6 +44,8 @@ async def main():
         
     print("Connected to MeshCore device")
     
+    res = await meshcore.commands.send_device_query()
+
     # Get contacts
     result = await meshcore.commands.get_contacts()
     if result.type == EventType.ERROR:

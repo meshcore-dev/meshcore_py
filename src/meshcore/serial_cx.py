@@ -9,7 +9,7 @@ import serial_asyncio
 logger = logging.getLogger("meshcore")
 
 class SerialConnection:
-    def __init__(self, port, baudrate):
+    def __init__(self, port, baudrate, cx_dly=0.2):
         self.port = port
         self.baudrate = baudrate
         self.frame_started = False
@@ -18,6 +18,7 @@ class SerialConnection:
         self.header = b""
         self.inframe = b""
         self._disconnect_callback = None
+        self.cx_dly = cx_dly
 
     class MCSerialClientProtocol(asyncio.Protocol):
         def __init__(self, cx):
@@ -52,6 +53,7 @@ class SerialConnection:
                 loop, lambda: self.MCSerialClientProtocol(self), 
                 self.port, baudrate=self.baudrate)
 
+        await asyncio.sleep(self.cx_dly) # wait for cx to establish
         logger.info("Serial Connection started")
         return self.port
 

@@ -67,10 +67,9 @@ class MeshCore:
     
     @classmethod
     async def create_serial(cls, port: str, baudrate: int = 115200, debug: bool = False, default_timeout=None,
-                           auto_reconnect: bool = False, max_reconnect_attempts: int = 3) -> 'MeshCore':
+                           auto_reconnect: bool = False, max_reconnect_attempts: int = 3, cx_dly:float = 0.1) -> 'MeshCore':
         """Create and connect a MeshCore instance using serial connection"""
-        connection = SerialConnection(port, baudrate)
-        await asyncio.sleep(0.2)  # Time for transport to establish
+        connection = SerialConnection(port, baudrate, cx_dly=cx_dly)
         
         mc = cls(connection, debug=debug, default_timeout=default_timeout,
                 auto_reconnect=auto_reconnect, max_reconnect_attempts=max_reconnect_attempts)
