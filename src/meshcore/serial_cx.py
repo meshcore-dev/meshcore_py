@@ -16,6 +16,7 @@ class SerialConnection:
         self.frame_size = 0
         self.transport = None
         self.header = b""
+        self.reader = None
         self.inframe = b""
         self._disconnect_callback = None
         self.cx_dly = cx_dly
