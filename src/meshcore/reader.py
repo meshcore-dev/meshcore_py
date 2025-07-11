@@ -45,7 +45,8 @@ class MessageReader:
             self.contact_nb = int.from_bytes(data[1:5], byteorder='little')
             self.contacts = {}
             
-        elif packet_type_value == PacketType.CONTACT.value:
+        elif packet_type_value == PacketType.CONTACT.value or\
+             packet_type_value == PacketType.PUSH_CODE_NEW_ADVERT.value:
             c = {}
             c["public_key"] = data[1:33].hex()
             c["type"] = data[33]
@@ -60,7 +61,11 @@ class MessageReader:
             c["adv_lat"] = int.from_bytes(data[136:140], byteorder='little',signed=True)/1e6
             c["adv_lon"] = int.from_bytes(data[140:144], byteorder='little',signed=True)/1e6
             c["lastmod"] = int.from_bytes(data[144:148], byteorder='little')
-            self.contacts[c["public_key"]] = c
+
+            if packet_type_value == PacketType.PUSH_CODE_NEW_ADVERT.value :
+                await self.dispatcher.dispatch(Event(EventType.NEW_CONTACT, c))
+            else:
+                self.contacts[c["public_key"]] = c
             
         elif packet_type_value == PacketType.CONTACT_END.value:
             await self.dispatcher.dispatch(Event(EventType.CONTACTS, self.contacts))
@@ -98,8 +103,7 @@ class MessageReader:
             
             await self.dispatcher.dispatch(Event(EventType.MSG_SENT, res, attributes))
             
-        elif packet_type_value == PacketType.CONTACT_MSG_RECV.value or\
-             packet_type_value == PacketType.PUSH_CODE_NEW_ADVERT.value:
+        elif packet_type_value == PacketType.CONTACT_MSG_RECV.value:
             res = {}
             res["type"] = "PRIV"
             res["pubkey_prefix"] = data[1:7].hex()
@@ -118,8 +122,6 @@ class MessageReader:
             }
             
             evt_type = EventType.CONTACT_MSG_RECV
-            if packet_type_value == PacketType.PUSH_CODE_NEW_ADVERT.value :
-                evt_type = EventType.NEW_CONTACT
 
             await self.dispatcher.dispatch(Event(evt_type, res, attributes))
             
