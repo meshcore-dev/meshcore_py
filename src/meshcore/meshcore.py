@@ -344,9 +344,9 @@ class MeshCore:
                 pass
             self._auto_fetch_task = None
     
-    async def ensure_contacts(self):
+    async def ensure_contacts(self, follow=False):
         """Ensure contacts are fetched"""
-        if not self._contacts or not self._contacts_ok :
+        if not self._contacts or (follow and not self._contacts_ok) :
             await self.commands.get_contacts()
             return True
         return False
