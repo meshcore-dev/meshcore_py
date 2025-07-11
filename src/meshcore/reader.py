@@ -119,8 +119,8 @@ class MessageReader:
             }
             
             evt_type = EventType.CONTACT_MSG_RECV
-            if packet_type_value == PacketType.PUSH_CODE_NEW_ADVERT.value : 
-                evt_type = EventType.NEW_CONTACT 
+            if packet_type_value == PacketType.PUSH_CODE_NEW_ADVERT.value :
+                evt_type = EventType.NEW_CONTACT
 
             await self.dispatcher.dispatch(Event(evt_type, res, attributes))
             
