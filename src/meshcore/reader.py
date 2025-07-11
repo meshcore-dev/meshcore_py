@@ -65,7 +65,6 @@ class MessageReader:
         elif packet_type_value == PacketType.CONTACT_END.value:
             await self.dispatcher.dispatch(Event(EventType.CONTACTS, self.contacts))
             
-            
         elif packet_type_value == PacketType.SELF_INFO.value:
             self_info = {}
             self_info["adv_type"] = data[1]

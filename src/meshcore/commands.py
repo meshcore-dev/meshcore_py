@@ -294,10 +294,16 @@ class CommandHandler:
         else :
             out_path_hex = path
             out_path_len = int(len(path) / 2)
+            # reflect the change
+            contact["out_path"] = out_path_hex
+            contact["out_path_len"] = out_path_len
         out_path_hex = out_path_hex + (128-len(out_path_hex)) * "0" 
 
         if flags is None :
             flags = contact["flags"]
+        else :
+            # reflect the change
+            contact["flags"] = flags
 
         adv_name_hex = contact["adv_name"].encode().hex()
         adv_name_hex = adv_name_hex + (64-len(adv_name_hex)) * "0"

@@ -43,6 +43,8 @@ class MeshCore:
         
         # Initialize state (private)
         self._contacts = {}
+        self._contacts_ok = False
+        self._pending_contacts = {}
         self._self_info = {}
         self._time = 0
         
@@ -178,6 +180,14 @@ class MeshCore:
         """Set up event subscriptions to track data internally"""
         async def _update_contacts(event):
             self._contacts = event.payload
+            self._contacts_ok = True
+            
+        async def _add_pending_contact(event):
+            c = event.payload
+            self._pending_contacts[c["public_key"]] = c
+
+        async def _contact_change(event):
+            self._contacts_ok = False
             
         async def _update_self_info(event):
             self._self_info = event.payload
@@ -187,14 +197,27 @@ class MeshCore:
             
         # Subscribe to events to update internal state
         self.subscribe(EventType.CONTACTS, _update_contacts)
+        self.subscribe(EventType.NEW_CONTACT, _add_pending_contact)
         self.subscribe(EventType.SELF_INFO, _update_self_info)
         self.subscribe(EventType.CURRENT_TIME, _update_time)
+        self.subscribe(EventType.ADVERTISEMENT, _contact_change)
+        self.subscribe(EventType.PATH_UPDATE, _contact_change)
     
     # Getter methods for state
     @property
     def contacts(self):
         """Get the current contacts"""
         return self._contacts
+
+    @property
+    def contacts_ok(self):
+        """Get wether contact list is in sync"""
+        return self._contacts_ok
+        
+    @property
+    def pending_contacts(self):
+        """Get pending contacts"""
+        return self._pending_contacts
         
     @property
     def self_info(self):
@@ -323,7 +346,7 @@ class MeshCore:
     
     async def ensure_contacts(self):
         """Ensure contacts are fetched"""
-        if not self._contacts:
+        if not self._contacts or not self._contacts_ok :
             await self.commands.get_contacts()
             return True
         return False
