@@ -99,7 +99,8 @@ class MessageReader:
             
             await self.dispatcher.dispatch(Event(EventType.MSG_SENT, res, attributes))
             
-        elif packet_type_value == PacketType.CONTACT_MSG_RECV.value:
+        elif packet_type_value == PacketType.CONTACT_MSG_RECV.value or\
+             packet_type_value == PacketType.PUSH_CODE_NEW_ADVERT.value:
             res = {}
             res["type"] = "PRIV"
             res["pubkey_prefix"] = data[1:7].hex()
@@ -117,7 +118,11 @@ class MessageReader:
                 "txt_type": res["txt_type"]
             }
             
-            await self.dispatcher.dispatch(Event(EventType.CONTACT_MSG_RECV, res, attributes))
+            evt_type = EventType.CONTACT_MSG_RECV
+            if packet_type_value == PacketType.PUSH_CODE_NEW_ADVERT.value : 
+                evt_type = EventType.NEW_CONTACT 
+
+            await self.dispatcher.dispatch(Event(evt_type, res, attributes))
             
         elif packet_type_value == 16:  # A reply to CMD_SYNC_NEXT_MESSAGE (ver >= 3)
             res = {}

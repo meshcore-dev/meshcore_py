@@ -20,6 +20,7 @@ class EventType(Enum):
     DEVICE_INFO = "device_info"
     CLI_RESPONSE = "cli_response"
     MSG_SENT = "message_sent"
+    NEW_CONTACT = "new_contact"
     
     # Push notifications
     ADVERTISEMENT = "advertisement"

@@ -313,6 +313,9 @@ class CommandHandler:
             + int(contact["adv_lon"]*1e6).to_bytes(4, 'little', signed=True)
         return await self.send(data, [EventType.OK, EventType.ERROR])
         
+    async def add_contact (self, contact) -> Event:
+        return await self.update_contact(contact)
+
     async def change_contact_path (self, contact, path) -> Event:
         return await self.update_contact(contact, path)
 
