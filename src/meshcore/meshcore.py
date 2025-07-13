@@ -43,7 +43,7 @@ class MeshCore:
         
         # Initialize state (private)
         self._contacts = {}
-        self._contacts_ok = False
+        self._contacts_dirty = True
         self._pending_contacts = {}
         self._self_info = {}
         self._time = 0
@@ -180,14 +180,14 @@ class MeshCore:
         """Set up event subscriptions to track data internally"""
         async def _update_contacts(event):
             self._contacts = event.payload
-            self._contacts_ok = True
+            self._contacts_dirty = False
             
         async def _add_pending_contact(event):
             c = event.payload
             self._pending_contacts[c["public_key"]] = c
 
         async def _contact_change(event):
-            self._contacts_ok = False
+            self._contacts_dirty = True
             
         async def _update_self_info(event):
             self._self_info = event.payload
@@ -210,14 +210,9 @@ class MeshCore:
         return self._contacts
 
     @property
-    def contacts_ok(self):
+    def contacts_dirty(self):
         """Get wether contact list is in sync"""
-        return self._contacts_ok
-        
-    @property
-    def pending_contacts(self):
-        """Get pending contacts"""
-        return self._pending_contacts
+        return self._contacts_dirty
         
     @property
     def self_info(self):
@@ -244,6 +239,17 @@ class MeshCore:
         """Set the default timeout for commands"""
         self.commands.default_timeout = value
         
+    @property
+    def pending_contacts(self):
+        """Get pending contacts"""
+        return self._pending_contacts
+        
+    def pop_pending_contact(self, key):
+        return self._pending_contacts.pop(key, None)
+
+    def flush_pending_contacts(self): # would be interesting to have a time param 
+        self._pending_contacts = {}
+
     def get_contact_by_name(self, name) -> Optional[Dict[str, Any]]:
         """
         Find a contact by its name (adv_name field)
@@ -346,7 +352,7 @@ class MeshCore:
     
     async def ensure_contacts(self, follow=False):
         """Ensure contacts are fetched"""
-        if not self._contacts or (follow and not self._contacts_ok) :
+        if not self._contacts or (follow and self._contacts_dirty) :
             await self.commands.get_contacts()
             return True
         return False
