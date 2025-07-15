@@ -3,6 +3,7 @@ import logging
 import random
 from typing import Any, Dict, List, Optional, Union
 from .events import Event, EventType
+from .binary_commands import BinaryCommandHandler
 
 # Define types for destination parameters
 DestinationType = Union[bytes, str, Dict[str, Any]]
@@ -52,6 +53,7 @@ class CommandHandler:
         self._sender_func = None
         self._reader = None
         self.dispatcher = None
+        self.binary = BinaryCommandHandler(self)
         self.default_timeout = default_timeout if default_timeout is not None else self.DEFAULT_TIMEOUT
         
     def set_connection(self, connection: Any) -> None:
