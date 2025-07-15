@@ -33,6 +33,20 @@ my_lpp_types = {
     142:    ('switch', []),
 }
 
+def lpp_format_val(type, val):
+    if my_lpp_types[type.type][1] is None :
+        return val
+
+    if len(my_lpp_types[type.type][1]) == 0 :
+        return val[0]
+
+    val_dict = {}
+    i = 0
+    for t in my_lpp_types[type.type][1] :
+        val_dict[t] = val[i]
+        i = i + 1
+    return val_dict
+
 def lpp_json_encoder (obj, types = my_lpp_types) :
     """Encode LppType, LppData, and LppFrame to JSON."""
     if isinstance(obj, LppFrame):
@@ -40,17 +54,8 @@ def lpp_json_encoder (obj, types = my_lpp_types) :
     if isinstance(obj, LppType):
         return my_lpp_types[obj.type][0]
     if isinstance(obj, LppData):
-        d = {"channel" : obj.channel, "type" : obj.type}
-        if my_lpp_types[obj.type.type][1] is None :
-            d["value"] = obj.value
-        elif len(my_lpp_types[obj.type.type][1]) == 0 :
-            d["value"] = obj.value[0]
-        else :
-            val_dict = {}
-            i = 0
-            for t in my_lpp_types[obj.type.type][1] :
-                val_dict[t] = obj.value[i]
-                i = i + 1
-            d["value"] = val_dict
-        return d
+        return {"channel" : obj.channel, 
+                "type" : obj.type,
+                "value" : lpp_format_val(obj.type, obj.value)
+        }
     raise TypeError(repr(obj) + " is not JSON serialized")

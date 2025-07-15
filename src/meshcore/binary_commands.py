@@ -5,13 +5,13 @@ import json
 from .events import Event, EventType
 from cayennelpp import LppFrame, LppData
 from cayennelpp.lpp_type import LppType
-from meshcore.lpp_json_encoder import lpp_json_encoder, my_lpp_types
+from meshcore.lpp_json_encoder import lpp_json_encoder, my_lpp_types, lpp_format_val
 
 logger = logging.getLogger("meshcore")
 
 class BinaryReqType(Enum):
     TELEMETRY = 3
-    AMM = 4
+    MMA = 4
 
 def lpp_parse(buf):
     """Parse a given byte string and return as a LppFrame object."""
@@ -24,7 +24,7 @@ def lpp_parse(buf):
 
     return json.loads(json.dumps(LppFrame(lpp_data_list), default=lpp_json_encoder))
 
-def lpp_parse_amm(buf):
+def lpp_parse_mma (buf):
     i = 0
     res = []
     while i < len(buf) and buf[i] != 0:
@@ -34,17 +34,17 @@ def lpp_parse_amm(buf):
         lpp_type = LppType.get_lpp_type(type)
         size = lpp_type.size
         i = i + 1
-        min = lpp_type.decode(buf[i:i+size])
+        min = lpp_format_val(lpp_type, lpp_type.decode(buf[i:i+size]))
         i = i + size
-        max = lpp_type.decode(buf[i:i+size])
+        max = lpp_format_val(lpp_type, lpp_type.decode(buf[i:i+size]))
         i = i + size
-        avg = lpp_type.decode(buf[i:i+size])
+        avg = lpp_format_val(lpp_type, lpp_type.decode(buf[i:i+size]))
         i = i + size
         res.append({"channel":chan, 
                     "type":my_lpp_types[type][0],
-                    "avg":avg[0],
-                    "min":min[0],
-                    "max":max[0],
+                    "min":min,
+                    "max":max,
+                    "avg":avg,
                     })
     return res
 
@@ -74,7 +74,7 @@ class BinaryCommandHandler :
                 return res2.payload
 
     async def req_telemetry (self, contact) :
-        code = BinaryReqType.TELEMETRY
+        code = BinaryReqType.TELEMETRY.value
         req = code.to_bytes(1, 'little', signed=False)
         res = await self.req_binary(contact, req)
         if (res is None) :
@@ -82,8 +82,8 @@ class BinaryCommandHandler :
         else:
             return lpp_parse(bytes.fromhex(res["data"]))
 
-    async def req_amm (self, contact, start, end) :
-        code = 4
+    async def req_mma (self, contact, start, end) :
+        code = BinaryReqType.MMA.value
         req = code.to_bytes(1, 'little', signed=False)\
             + start.to_bytes(4, 'little', signed = False)\
             + end.to_bytes(4, 'little', signed=False)\
@@ -92,4 +92,4 @@ class BinaryCommandHandler :
         if (res is None) :
             return None
         else:
-            return lpp_parse_amm(bytes.fromhex(res["data"])[4:])
+            return lpp_parse_mma(bytes.fromhex(res["data"])[4:])
