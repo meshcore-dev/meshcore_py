@@ -2,10 +2,10 @@ import sys
 import logging
 import asyncio
 import json
-from cayennelpp import LppFrame, LppData
 from typing import Any, Optional, Dict
 from .events import Event, EventType, EventDispatcher
 from .packets import PacketType
+from cayennelpp import LppFrame, LppData
 from meshcore.lpp_json_encoder import lpp_json_encoder
 
 logger = logging.getLogger("meshcore")
