@@ -24,7 +24,8 @@ class PacketType(Enum):
     SIGN_START = 19
     SIGNATURE = 20
     CUSTOM_VARS = 21
-    CLI_RESPONSE = 50
+    BINARY_REQ = 50
+    FACTORY_RESET = 51
     
     # Push notifications
     ADVERTISEMENT = 0x80
@@ -39,3 +40,4 @@ class PacketType(Enum):
     TRACE_DATA = 0x89
     PUSH_CODE_NEW_ADVERT = 0x8A
     TELEMETRY_RESPONSE = 0x8B
+    BINARY_RESPONSE = 0x8C

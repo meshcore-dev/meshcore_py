@@ -213,11 +213,6 @@ class MessageReader:
                 res["ver"] = data[60:80].decode().replace("\0","")
             await self.dispatcher.dispatch(Event(EventType.DEVICE_INFO, res))
             
-        elif packet_type_value == PacketType.CLI_RESPONSE.value:
-            res = {}
-            res["response"] = data[1:].decode()
-            await self.dispatcher.dispatch(Event(EventType.CLI_RESPONSE, res))
-            
         elif packet_type_value == PacketType.CUSTOM_VARS.value:
             logger.debug(f"received custom vars response: {data.hex()}")
             res = {}
@@ -448,6 +443,19 @@ class MessageReader:
             }
             
             await self.dispatcher.dispatch(Event(EventType.TELEMETRY_RESPONSE, res, attributes))
+
+        elif packet_type_value == PacketType.BINARY_RESPONSE.value:
+            logger.debug(f"Received binary data: {data.hex()}")
+            res = {}
+
+            res["tag"] = data[2:6].hex()
+            res["data"] = data[6:].hex()
+
+            attributes = {
+                "tag" : res["tag"]
+            }
+
+            await self.dispatcher.dispatch(Event(EventType.BINARY_RESPONSE, res, attributes))
 
         else:
             logger.debug(f"Unhandled data received {data}")

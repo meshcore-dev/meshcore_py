@@ -18,7 +18,6 @@ class EventType(Enum):
     CONTACT_URI = "contact_uri"
     BATTERY = "battery_info"
     DEVICE_INFO = "device_info"
-    CLI_RESPONSE = "cli_response"
     MSG_SENT = "message_sent"
     NEW_CONTACT = "new_contact"
     
@@ -35,6 +34,7 @@ class EventType(Enum):
     TRACE_DATA = "trace_data"
     RX_LOG_DATA = "rx_log_data"
     TELEMETRY_RESPONSE = "telemetry_response"
+    BINARY_RESPONSE = "binary_response"
     CUSTOM_VARS = "custom_vars"
     CHANNEL_INFO = "channel_info"
     

@@ -80,7 +80,7 @@ class CommandHandler:
         """
         if not self.dispatcher:
             raise RuntimeError("Dispatcher not set, cannot send commands")
-            
+
         # Use the provided timeout or fall back to default_timeout
         timeout = timeout if timeout is not None else self.default_timeout
             
@@ -389,6 +389,12 @@ class CommandHandler:
         data = b"\x27\x00\x00\x00" + dst_bytes
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
 
+    async def send_binary_req(self, dst: DestinationType, bin_data) -> Event :
+        dst_bytes = _validate_destination(dst, prefix_length=32)
+        logger.debug(f"Binary request to {dst_bytes.hex()}")
+        data = b"\x32" + dst_bytes + bin_data
+        return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
+        
     async def get_self_telemetry(self) -> Event :
         logger.debug(f"Getting self telemetry")
         data = b"\x27\x00\x00\x00"
@@ -404,11 +410,6 @@ class CommandHandler:
         data = b"\x29" + key.encode("utf-8") + b":" + value.encode("utf-8")
         return await self.send(data, [EventType.OK, EventType.ERROR])
 
-    async def send_cli(self, cmd) -> Event:
-        logger.debug(f"Sending CLI command: {cmd}")
-        data = b"\x32" + cmd.encode('utf-8')
-        return await self.send(data, [EventType.CLI_RESPONSE, EventType.ERROR])
-        
     async def get_channel(self, channel_idx: int) -> Event:
         logger.debug(f"Getting channel info for channel {channel_idx}")
         data = b"\x1f" + channel_idx.to_bytes(1, 'little')
