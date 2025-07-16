@@ -69,7 +69,7 @@ class BinaryCommandHandler :
     def dispatcher(self):
         return self.commands.dispatcher
 
-    async def req_binary (self, contact, request, timeout_override=0) :
+    async def req_binary (self, contact, request, timeout=0) :
         res = await self.commands.send_binary_req(contact, request)
         logger.debug(res)
         if res.type == EventType.ERROR:
@@ -77,7 +77,7 @@ class BinaryCommandHandler :
             return None
         else:
             exp_tag = res.payload["expected_ack"].hex()
-            timeout = res.payload["suggested_timeout"]/800 if timeout_override == 0 else timeout_override
+            timeout = res.payload["suggested_timeout"]/800 if timeout == 0 else timeout
             res2 = await self.dispatcher.wait_for_event(EventType.BINARY_RESPONSE, attribute_filters={"tag": exp_tag}, timeout=timeout)
             logger.debug(res2)
             if res2 is None :
@@ -85,31 +85,31 @@ class BinaryCommandHandler :
             else:
                 return res2.payload
 
-    async def req_telemetry (self, contact, timeout_override=0) :
+    async def req_telemetry (self, contact, timeout=0) :
         code = BinaryReqType.TELEMETRY.value
         req = code.to_bytes(1, 'little', signed=False)
-        res = await self.req_binary(contact, req, timeout_override)
+        res = await self.req_binary(contact, req, timeout)
         if (res is None) :
             return None
         else:
             return lpp_parse(bytes.fromhex(res["data"]))
 
-    async def req_mma (self, contact, start, end, timeout_override=0) :
+    async def req_mma (self, contact, start, end, timeout=0) :
         code = BinaryReqType.MMA.value
         req = code.to_bytes(1, 'little', signed=False)\
             + start.to_bytes(4, 'little', signed = False)\
             + end.to_bytes(4, 'little', signed=False)\
             + b"\0\0"
-        res = await self.req_binary(contact, req, timeout_override)
+        res = await self.req_binary(contact, req, timeout)
         if (res is None) :
             return None
         else:
             return lpp_parse_mma(bytes.fromhex(res["data"])[4:])
 
-    async def req_acl (self, contact, timeout_override=0) :
+    async def req_acl (self, contact, timeout=0) :
         code = BinaryReqType.ACL.value
         req = code.to_bytes(1, 'little', signed=False) + b"\0\0"
-        res = await self.req_binary(contact, req, timeout_override)
+        res = await self.req_binary(contact, req, timeout)
         if (res is None) :
             return None
         else:
