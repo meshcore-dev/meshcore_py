@@ -10,8 +10,9 @@ from meshcore.lpp_json_encoder import lpp_json_encoder, my_lpp_types, lpp_format
 logger = logging.getLogger("meshcore")
 
 class BinaryReqType(Enum):
-    TELEMETRY = 3
-    MMA = 4
+    TELEMETRY = 0x03
+    MMA = 0x04
+    ACL = 0x05
 
 def lpp_parse(buf):
     """Parse a given byte string and return as a LppFrame object."""
@@ -46,6 +47,17 @@ def lpp_parse_mma (buf):
                     "max":max,
                     "avg":avg,
                     })
+    return res
+
+def parse_acl (buf):
+    i = 0
+    res = []
+    while i + 7 <= len(buf):
+        key = buf[i:i+6].hex()
+        perm = buf[i+6]
+        if (key != "000000000000"):
+            res.append({"key": key, "perm": perm})
+        i = i + 7
     return res
 
 class BinaryCommandHandler :
@@ -93,3 +105,12 @@ class BinaryCommandHandler :
             return None
         else:
             return lpp_parse_mma(bytes.fromhex(res["data"])[4:])
+
+    async def req_acl (self, contact) :
+        code = BinaryReqType.ACL.value
+        req = code.to_bytes(1, 'little', signed=False) + b"\0\0"
+        res = await self.req_binary(contact, req)
+        if (res is None) :
+            return None
+        else:
+            return parse_acl(bytes.fromhex(res['data']))
