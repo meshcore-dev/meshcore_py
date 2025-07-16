@@ -47,6 +47,7 @@ class MeshCore:
         self._pending_contacts = {}
         self._self_info = {}
         self._time = 0
+        self._lastmod = 0
         
         # Set up event subscriptions to track data
         self._setup_data_tracking()
@@ -179,7 +180,9 @@ class MeshCore:
     def _setup_data_tracking(self):
         """Set up event subscriptions to track data internally"""
         async def _update_contacts(event):
-            self._contacts = event.payload
+            self._contacts.update(event.payload)
+            if "lastmod" in event.attributes :
+                self._lastmod = event.attributes['lastmod']
             self._contacts_dirty = False
             
         async def _add_pending_contact(event):
@@ -353,6 +356,6 @@ class MeshCore:
     async def ensure_contacts(self, follow=False):
         """Ensure contacts are fetched"""
         if not self._contacts or (follow and self._contacts_dirty) :
-            await self.commands.get_contacts()
+            await self.commands.get_contacts(lastmod = self._lastmod)
             return True
         return False

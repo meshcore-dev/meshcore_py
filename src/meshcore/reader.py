@@ -68,7 +68,11 @@ class MessageReader:
                 self.contacts[c["public_key"]] = c
             
         elif packet_type_value == PacketType.CONTACT_END.value:
-            await self.dispatcher.dispatch(Event(EventType.CONTACTS, self.contacts))
+            lastmod = int.from_bytes(data[1:5], byteorder='little')
+            attributes = {
+                "lastmod": lastmod,
+            }
+            await self.dispatcher.dispatch(Event(EventType.CONTACTS, self.contacts, attributes))
             
         elif packet_type_value == PacketType.SELF_INFO.value:
             self_info = {}

@@ -253,9 +253,12 @@ class CommandHandler:
         return await self.send(b"\x25" \
                 + int(pin).to_bytes(4, 'little'), [EventType.OK, EventType.ERROR])
                 
-    async def get_contacts(self) -> Event:
+    async def get_contacts(self, lastmod=0) -> Event:
         logger.debug("Getting contacts")
-        return await self.send(b"\x04", [EventType.CONTACTS, EventType.ERROR])
+        data=b"\x04"
+        if lastmod > 0:
+            data = data + lastmod.to_bytes(4, 'little')
+        return await self.send(data, [EventType.CONTACTS, EventType.ERROR])
         
     async def reset_path(self, key: DestinationType) -> Event:
         key_bytes = _validate_destination(key, prefix_length=32)
