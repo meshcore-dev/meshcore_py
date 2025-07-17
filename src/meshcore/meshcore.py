@@ -48,6 +48,7 @@ class MeshCore:
         self._self_info = {}
         self._time = 0
         self._lastmod = 0
+        self._auto_update_contacts = False
         
         # Set up event subscriptions to track data
         self._setup_data_tracking()
@@ -180,7 +181,12 @@ class MeshCore:
     def _setup_data_tracking(self):
         """Set up event subscriptions to track data internally"""
         async def _update_contacts(event):
-            self._contacts.update(event.payload)
+            #self._contacts.update(event.payload)
+            for c in event.payload.values():
+                if c["public_key"] in self._contacts:
+                    self._contacts[c["public_key"]].update(c)
+                else:
+                    self._contacts[c["public_key"]]=c
             if "lastmod" in event.attributes :
                 self._lastmod = event.attributes['lastmod']
             self._contacts_dirty = False
@@ -191,6 +197,8 @@ class MeshCore:
 
         async def _contact_change(event):
             self._contacts_dirty = True
+            if self._auto_update_contacts:
+                await self.ensure_contacts(follow=True)
             
         async def _update_self_info(event):
             self._self_info = event.payload
@@ -217,6 +225,15 @@ class MeshCore:
         """Get wether contact list is in sync"""
         return self._contacts_dirty
         
+    @property
+    def auto_update_contacts(self):
+        """Get wether contact list is in sync"""
+        return self._auto_update_contacts
+
+    @auto_update_contacts.setter
+    def auto_update_contacts(self, value):
+        self._auto_update_contacts = value
+
     @property
     def self_info(self):
         """Get device self info"""
