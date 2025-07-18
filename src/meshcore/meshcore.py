@@ -17,7 +17,7 @@ class MeshCore:
     """
     Interface to a MeshCore device
     """
-    def __init__(self, cx, debug=False, default_timeout=None, auto_reconnect=False, max_reconnect_attempts=3):
+    def __init__(self, cx, debug=False, only_error=False, default_timeout=None, auto_reconnect=False, max_reconnect_attempts=3):
         # Wrap connection with ConnectionManager
         self.dispatcher = EventDispatcher()
         self.connection_manager = ConnectionManager(
@@ -31,6 +31,8 @@ class MeshCore:
         # Set up logger
         if debug:
             logger.setLevel(logging.DEBUG)
+        elif only_error:
+            logger.setLevel(logging.ERROR)
         else:
             logger.setLevel(logging.INFO)
         
@@ -59,29 +61,29 @@ class MeshCore:
         cx.set_disconnect_callback(self.connection_manager.handle_disconnect)
     
     @classmethod
-    async def create_tcp(cls, host: str, port: int, debug: bool = False, default_timeout=None, 
+    async def create_tcp(cls, host: str, port: int, debug: bool = False, only_error:bool = False, default_timeout=None, 
                         auto_reconnect: bool = False, max_reconnect_attempts: int = 3) -> 'MeshCore':
         """Create and connect a MeshCore instance using TCP connection"""        
         connection = TCPConnection(host, port)
         
-        mc = cls(connection, debug=debug, default_timeout=default_timeout,
+        mc = cls(connection, debug=debug, only_error=only_error, default_timeout=default_timeout,
                 auto_reconnect=auto_reconnect, max_reconnect_attempts=max_reconnect_attempts)
         await mc.connect()
         return mc
     
     @classmethod
-    async def create_serial(cls, port: str, baudrate: int = 115200, debug: bool = False, default_timeout=None,
+    async def create_serial(cls, port: str, baudrate: int = 115200, debug: bool = False, only_error:bool=False, default_timeout=None,
                            auto_reconnect: bool = False, max_reconnect_attempts: int = 3, cx_dly:float = 0.1) -> 'MeshCore':
         """Create and connect a MeshCore instance using serial connection"""
         connection = SerialConnection(port, baudrate, cx_dly=cx_dly)
         
-        mc = cls(connection, debug=debug, default_timeout=default_timeout,
+        mc = cls(connection, debug=debug, only_error=only_error, default_timeout=default_timeout,
                 auto_reconnect=auto_reconnect, max_reconnect_attempts=max_reconnect_attempts)
         await mc.connect()
         return mc
     
     @classmethod
-    async def create_ble(cls, address: Optional[str] = None, debug: bool = False, default_timeout=None,
+    async def create_ble(cls, address: Optional[str] = None, debug: bool = False, only_error:bool=False, default_timeout=None,
                         auto_reconnect: bool = False, max_reconnect_attempts: int = 3) -> 'MeshCore':
         """Create and connect a MeshCore instance using BLE connection
         
@@ -90,7 +92,7 @@ class MeshCore:
         
         connection = BLEConnection(address)
         
-        mc = cls(connection, debug=debug, default_timeout=default_timeout,
+        mc = cls(connection, debug=debug, only_error=only_error, default_timeout=default_timeout,
                 auto_reconnect=auto_reconnect, max_reconnect_attempts=max_reconnect_attempts)
         await mc.connect()
         return mc
