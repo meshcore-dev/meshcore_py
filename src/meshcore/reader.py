@@ -56,7 +56,7 @@ class MessageReader:
             if plen == -1:
                 plen = 0
             c["out_path"] = data[36:36+plen].hex()
-            c["adv_name"] = data[100:132].decode().replace("\0","")
+            c["adv_name"] = data[100:132].decode('utf-8', 'ignore').replace("\0","")
             c["last_advert"] = int.from_bytes(data[132:136], byteorder='little')
             c["adv_lat"] = int.from_bytes(data[136:140], byteorder='little',signed=True)/1e6
             c["adv_lon"] = int.from_bytes(data[140:144], byteorder='little',signed=True)/1e6
@@ -91,7 +91,7 @@ class MessageReader:
             self_info["radio_bw"] = int.from_bytes(data[52:56], byteorder='little') / 1000
             self_info["radio_sf"] = data[56]
             self_info["radio_cr"] = data[57]
-            self_info["name"] = data[58:].decode()
+            self_info["name"] = data[58:].decode('utf-8', 'ignore')
             await self.dispatcher.dispatch(Event(EventType.SELF_INFO, self_info))
             
         elif packet_type_value == PacketType.MSG_SENT.value:
@@ -116,9 +116,9 @@ class MessageReader:
             res["sender_timestamp"] = int.from_bytes(data[9:13], byteorder='little')
             if data[8] == 2:
                 res["signature"] = data[13:17].hex()
-                res["text"] = data[17:].decode()
+                res["text"] = data[17:].decode('utf-8', 'ignore')
             else:
-                res["text"] = data[13:].decode()
+                res["text"] = data[13:].decode('utf-8', 'ignore')
                 
             attributes = {
                 "pubkey_prefix": res["pubkey_prefix"],
@@ -139,9 +139,9 @@ class MessageReader:
             res["sender_timestamp"] = int.from_bytes(data[12:16], byteorder='little')
             if data[11] == 2:
                 res["signature"] = data[16:20].hex()
-                res["text"] = data[20:].decode()
+                res["text"] = data[20:].decode('utf-8', 'ignore')
             else:
-                res["text"] = data[16:].decode()
+                res["text"] = data[16:].decode('utf-8', 'ignore')
                 
             attributes = {
                 "pubkey_prefix": res["pubkey_prefix"],
@@ -157,7 +157,7 @@ class MessageReader:
             res["path_len"] = data[2]
             res["txt_type"] = data[3]
             res["sender_timestamp"] = int.from_bytes(data[4:8], byteorder='little')
-            res["text"] = data[8:].decode()
+            res["text"] = data[8:].decode('utf-8', 'ignore')
             
             attributes = {
                 "channel_idx": res["channel_idx"],
@@ -174,7 +174,7 @@ class MessageReader:
             res["path_len"] = data[5]
             res["txt_type"] = data[6]
             res["sender_timestamp"] = int.from_bytes(data[7:11], byteorder='little')
-            res["text"] = data[11:].decode()
+            res["text"] = data[11:].decode('utf-8', 'ignore')
             
             attributes = {
                 "channel_idx": res["channel_idx"],
@@ -212,15 +212,15 @@ class MessageReader:
                 res["max_contacts"] = data[2] * 2
                 res["max_channels"] = data[3]
                 res["ble_pin"] = int.from_bytes(data[4:8], byteorder='little')
-                res["fw_build"] = data[8:20].decode().replace("\0","")
-                res["model"] = data[20:60].decode().replace("\0","")
-                res["ver"] = data[60:80].decode().replace("\0","")
+                res["fw_build"] = data[8:20].decode('utf-8', 'ignore').replace("\0","")
+                res["model"] = data[20:60].decode('utf-8', 'ignore').replace("\0","")
+                res["ver"] = data[60:80].decode('utf-8', 'ignore').replace("\0","")
             await self.dispatcher.dispatch(Event(EventType.DEVICE_INFO, res))
             
         elif packet_type_value == PacketType.CUSTOM_VARS.value:
             logger.debug(f"received custom vars response: {data.hex()}")
             res = {}
-            rawdata = data[1:].decode()
+            rawdata = data[1:].decode('utf-8', 'ignore')
             if not rawdata == "" :
                 pairs = rawdata.split(",")
                 for p in pairs :
@@ -238,9 +238,9 @@ class MessageReader:
             name_bytes = data[2:34]
             null_pos = name_bytes.find(0)
             if null_pos >= 0:
-                res["channel_name"] = name_bytes[:null_pos].decode('utf-8')
+                res["channel_name"] = name_bytes[:null_pos].decode('utf-8', 'ignore')
             else:
-                res["channel_name"] = name_bytes.decode('utf-8')
+                res["channel_name"] = name_bytes.decode('utf-8', 'ignore')
                 
             res["channel_secret"] = data[34:50]
             await self.dispatcher.dispatch(Event(EventType.CHANNEL_INFO, res, res))   
