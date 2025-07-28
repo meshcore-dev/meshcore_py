@@ -333,7 +333,7 @@ class CommandHandler:
     async def change_contact_flags (self, contact, flags) -> Event:
         return await self.update_contact(contact, flags=flags)
 
-    async def get_msg(self, timeout: Optional[float] = 1) -> Event:
+    async def get_msg(self, timeout: Optional[float] = None) -> Event:
         logger.debug("Requesting pending messages")
         return await self.send(b"\x0A", [EventType.CONTACT_MSG_RECV, EventType.CHANNEL_MSG_RECV, EventType.ERROR, EventType.NO_MORE_MSGS], timeout)
         
