@@ -399,6 +399,12 @@ class CommandHandler:
         logger.debug(f"Binary request to {dst_bytes.hex()}")
         data = b"\x32" + dst_bytes + bin_data
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
+
+    async def send_path_discovery(self, dst: DestinationType) -> Event :
+        dst_bytes = _validate_destination(dst, prefix_length=32)
+        logger.debug(f"Path discovery request for {dst_bytes.hex()}")
+        data = b"\x34\x00" + dst_bytes
+        return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
         
     async def get_self_telemetry(self) -> Event :
         logger.debug(f"Getting self telemetry")

@@ -461,6 +461,23 @@ class MessageReader:
 
             await self.dispatcher.dispatch(Event(EventType.BINARY_RESPONSE, res, attributes))
 
+        elif packet_type_value == PacketType.PATH_DISCOVERY_RESPONSE.value:
+            logger.debug(f"Received path discovery response: {data.hex()}")
+            res = {}
+            res["pubkey_pre"] = data[2:8].hex()
+            opl = data[8]
+            res["out_path_len"] = opl
+            res["out_path"] = data[9:9+opl].hex()
+            ipl = data[9+opl]
+            res["in_path_len"] = ipl
+            res["in_path"] = data[10+opl:10+opl+ipl].hex()
+
+            attributes = {
+                "pubkey_pre" : res["pubkey_pre"]
+            }
+
+            await self.dispatcher.dispatch(Event(EventType.PATH_RESPONSE, res, attributes))
+
         else:
             logger.debug(f"Unhandled data received {data}")
             logger.debug(f"Unhandled packet type: {packet_type_value}")

@@ -37,6 +37,7 @@ class EventType(Enum):
     BINARY_RESPONSE = "binary_response"
     CUSTOM_VARS = "custom_vars"
     CHANNEL_INFO = "channel_info"
+    PATH_RESPONSE = "path_response"
     
     # Command response types
     OK = "command_ok"
