@@ -330,6 +330,7 @@ class MessageReader:
             res["last_snr"] = int.from_bytes(data[50:52], byteorder='little', signed=True) / 4
             res["direct_dups"] = int.from_bytes(data[52:54], byteorder='little')
             res["flood_dups"] = int.from_bytes(data[54:56], byteorder='little')
+            res["rx_airtime"] = int.from_bytes(data[56:60], byteorder='little')
 
             data_hex = data[8:].hex()
             logger.debug(f"Status response: {data_hex}")
