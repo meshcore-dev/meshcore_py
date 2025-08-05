@@ -1,11 +1,23 @@
+"""A library for communicating with meshcore devices."""
 import logging
+
+from .ble_cx import BLEConnection
+from .connection_manager import ConnectionManager
+from .events import EventType
+from .meshcore import MeshCore
+from .serial_cx import SerialConnection
+from .tcp_cx import TCPConnection
 
 # Setup default logger
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-from meshcore.events import EventType
-from meshcore.meshcore import MeshCore, logger
-from meshcore.connection_manager import ConnectionManager
-from meshcore.tcp_cx import TCPConnection
-from meshcore.ble_cx import BLEConnection
-from meshcore.serial_cx import SerialConnection
+__all__ = [
+    "BLEConnection",
+    "ConnectionManager",
+    "EventType",
+    "MeshCore",
+    "SerialConnection",
+    "TCPConnection",
+    "logger",
+]

@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 # Packet prefixes for the protocol
 class PacketType(Enum):
     OK = 0
@@ -26,7 +27,7 @@ class PacketType(Enum):
     CUSTOM_VARS = 21
     BINARY_REQ = 50
     FACTORY_RESET = 51
-    
+
     # Push notifications
     ADVERTISEMENT = 0x80
     PATH_UPDATE = 0x81

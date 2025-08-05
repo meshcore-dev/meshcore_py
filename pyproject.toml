@@ -21,7 +21,7 @@ license-files = ["LICEN[CS]E*"]
 dependencies = [ "bleak", "pyserial-asyncio", "pycayennelpp" ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-asyncio"]
+dev = ["pytest", "pytest-asyncio", "black", "ruff"]
 
 [project.urls]
 Homepage = "https://github.com/fdlamotte/meshcore_py"
