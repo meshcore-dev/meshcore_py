@@ -44,7 +44,7 @@ class TestBLEConnection(unittest.TestCase):
         asyncio.run(ble_conn.send(data_to_send))
 
         # Assert
-        ble_conn.rx_char.write_gatt_char.assert_called_once_with(ble_conn.rx_char, data_to_send, response=False)
+        ble_conn.rx_char.write_gatt_char.assert_called_once_with(ble_conn.rx_char, data_to_send, response=True)
 
     def _get_mock_bleak_client(self):
         """
