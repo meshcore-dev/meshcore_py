@@ -83,14 +83,19 @@ class MeshCore:
         return mc
     
     @classmethod
-    async def create_ble(cls, address: Optional[str] = None, debug: bool = False, only_error:bool=False, default_timeout=None,
+    async def create_ble(cls, address: Optional[str] = None, client=None, debug: bool = False, only_error:bool=False, default_timeout=None,
                         auto_reconnect: bool = False, max_reconnect_attempts: int = 3) -> 'MeshCore':
-        """Create and connect a MeshCore instance using BLE connection
-        
-        If address is None, it will scan for and connect to the first available MeshCore device.
+        """
+        Create and connect a MeshCore instance using BLE connection.
+
+        Args:
+            address (str, optional): The Bluetooth address of the device.
+            client (BleakClient, optional): An existing BleakClient instance to use.
+                                            If provided, 'address' is ignored for connection
+                                            but can be used for identification.
         """
         
-        connection = BLEConnection(address)
+        connection = BLEConnection(address=address, client=client)
         
         mc = cls(connection, debug=debug, only_error=only_error, default_timeout=default_timeout,
                 auto_reconnect=auto_reconnect, max_reconnect_attempts=max_reconnect_attempts)

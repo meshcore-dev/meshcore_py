@@ -18,40 +18,55 @@ UART_RX_CHAR_UUID = "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
 UART_TX_CHAR_UUID = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 
 class BLEConnection:
-    def __init__(self, address):
-        """ Constructor : specify address """
+    def __init__(self, address=None, client=None):
+        """
+        Constructor: specify address or an existing BleakClient.
+        
+        Args:
+            address (str, optional): The Bluetooth address of the device.
+            client (BleakClient, optional): An existing BleakClient instance.
+        """
         self.address = address
         self._user_provided_address = address
-        self.client = None
+        self.client = client
         self.rx_char = None
         self._disconnect_callback = None
 
     async def connect(self):
         """
-        Connects to the device
+        Connects to the device.
 
-        Returns : the address used for connection
+        If a BleakClient was provided to the constructor, it uses that.
+        Otherwise, it will scan or connect based on the provided address.
+
+        Returns:
+            The address used for connection, or None on failure.
         """
-        logger.debug(f"Connecting existing connection: {self.client} with address {self.address}")
-        def match_meshcore_device(_: BLEDevice, adv: AdvertisementData):
-            """ Filter to mach MeshCore devices """
-            if not adv.local_name is None\
-                    and adv.local_name.startswith("MeshCore")\
-                    and (self.address is None or self.address in adv.local_name) :
-                return True
-            return False
+        logger.debug(f"Connecting with client: {self.client}, address: {self.address}")
 
-        if self.address is None or self.address == "" or len(self.address.split(":")) != 6:
-            scanner = BleakScanner()
-            logger.info("Scanning for devices")
-            device = await scanner.find_device_by_filter(match_meshcore_device)
-            if device is None:
-                return None
-            logger.info(f"Found device : {device}")
-            self.client = BleakClient(device, disconnected_callback=self.handle_disconnect)
-            self.address = self.client.address
+        if self.client:
+            logger.debug("Using pre-configured BleakClient.")
+            # If a client is already provided, ensure its disconnect callback is set
+            self.client._disconnected_callback = self.handle_disconnect
         else:
-            self.client = BleakClient(self.address, disconnected_callback=self.handle_disconnect)
+            def match_meshcore_device(_: BLEDevice, adv: AdvertisementData):
+                """Filter to match MeshCore devices."""
+                if adv.local_name and adv.local_name.startswith("MeshCore"):
+                    if self.address is None or self.address in adv.local_name:
+                        return True
+                return False
+
+            if self.address is None or ":" not in self.address:
+                logger.info("Scanning for devices...")
+                device = await BleakScanner.find_device_by_filter(match_meshcore_device)
+                if device is None:
+                    logger.warning("No MeshCore device found during scan.")
+                    return None
+                logger.info(f"Found device: {device}")
+                self.client = BleakClient(device, disconnected_callback=self.handle_disconnect)
+                self.address = self.client.address
+            else:
+                self.client = BleakClient(self.address, disconnected_callback=self.handle_disconnect)
 
         try:
             await self.client.connect()
