@@ -8,9 +8,9 @@ from meshcore.ble_cx import (
     UART_RX_CHAR_UUID,
 )
 
-
 class TestBLEConnection(unittest.TestCase):
     @patch("meshcore.ble_cx.BleakClient")
+
     def test_ble_connection_and_disconnection(self, mock_bleak_client):
         """
         Tests the BLEConnection class for connecting and disconnecting from a BLE device.
@@ -34,6 +34,7 @@ class TestBLEConnection(unittest.TestCase):
         mock_client_instance.disconnect.assert_called_once()
 
     @patch("meshcore.ble_cx.BleakClient")
+
     def test_send_data(self, mock_bleak_client):
         """
         Tests the send method of the BLEConnection class.
@@ -65,17 +66,15 @@ class TestBLEConnection(unittest.TestCase):
         mock_client.start_notify = AsyncMock()
         mock_client.write_gatt_char = AsyncMock()
         mock_client.is_connected = True
-
         mock_service = MagicMock()
         mock_char = MagicMock()
         mock_char.uuid = UART_RX_CHAR_UUID
-        mock_char.write_gatt_char = mock_client.write_gatt_char
-
+        mock_char.write_gatt_char = mock_client.write_gatt_char 
         mock_service.get_characteristic.return_value = mock_char
         mock_client.services.get_service.return_value = mock_service
 
         return mock_client
 
+if __name__ == '__main__':
 
-if __name__ == "__main__":
     unittest.main()

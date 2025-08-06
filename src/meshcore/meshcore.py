@@ -132,6 +132,7 @@ class MeshCore:
         auto_reconnect: bool = False,
         max_reconnect_attempts: int = 3,
     ) -> "MeshCore":
+
         """
         Create and connect a MeshCore instance using BLE connection.
 
@@ -141,7 +142,6 @@ class MeshCore:
                                             If provided, 'address' is ignored for connection
                                             but can be used for identification.
         """
-
         connection = BLEConnection(address=address, client=client)
 
         mc = cls(
@@ -152,6 +152,7 @@ class MeshCore:
             auto_reconnect=auto_reconnect,
             max_reconnect_attempts=max_reconnect_attempts,
         )
+
         await mc.connect()
         return mc
 
