@@ -58,11 +58,13 @@ class BLEConnection:
             self.client = BleakClient(self.device, disconnected_callback=self.handle_disconnect)
         else:
 
-            def match_meshcore_device(_: BLEDevice, adv: AdvertisementData):
+            def match_meshcore_device(d: BLEDevice, adv: AdvertisementData):
                 """Filter to match MeshCore devices."""
                 if adv.local_name and adv.local_name.startswith("MeshCore"):
                     if self.address is None or self.address in adv.local_name:
                         return True
+                if d and d.address == self.address:
+                    return True
                 return False
 
             if self.address is None or ":" not in self.address:
