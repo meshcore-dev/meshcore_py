@@ -20,6 +20,7 @@ class SerialConnection:
         self.inframe = b""
         self._disconnect_callback = None
         self.cx_dly = cx_dly
+        self._connected_event = asyncio.Event()
 
     class MCSerialClientProtocol(asyncio.Protocol):
         def __init__(self, cx):
@@ -30,12 +31,16 @@ class SerialConnection:
             logger.debug('port opened')
             if isinstance(transport, serial_asyncio.SerialTransport) and transport.serial:
                 transport.serial.rts = False  # You can manipulate Serial object via transport
+            # Signal that connection is established
+            self.cx._connected_event.set()
     
         def data_received(self, data):
             self.cx.handle_rx(data)    
     
         def connection_lost(self, exc):
             logger.debug('Serial port closed')
+            # Clear the connected event
+            self.cx._connected_event.clear()
             if self.cx._disconnect_callback:
                 asyncio.create_task(self.cx._disconnect_callback("serial_disconnect"))
     
@@ -49,12 +54,16 @@ class SerialConnection:
         """
         Connects to the device
         """
+        # Clear any previous connection state
+        self._connected_event.clear()
+        
         loop = asyncio.get_running_loop()
         await serial_asyncio.create_serial_connection(
                 loop, lambda: self.MCSerialClientProtocol(self), 
                 self.port, baudrate=self.baudrate)
 
-        await asyncio.sleep(self.cx_dly) # wait for cx to establish
+        # Wait for the actual connection to be established
+        await self._connected_event.wait()
         logger.info("Serial Connection started")
         return self.port
 
@@ -99,6 +108,8 @@ class SerialConnection:
         if self.transport:
             self.transport.close()
             self.transport = None
+            # Clear the connected event
+            self._connected_event.clear()
             logger.debug("Serial Connection closed")
             
     def set_disconnect_callback(self, callback):
