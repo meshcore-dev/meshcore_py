@@ -20,7 +20,7 @@ UART_TX_CHAR_UUID = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 
 
 class BLEConnection:
-    def __init__(self, address=None, client=None):
+    def __init__(self, address=None, device=None, client=None):
         """
         Constructor: specify address or an existing BleakClient.
 
@@ -31,6 +31,7 @@ class BLEConnection:
         self.address = address
         self._user_provided_address = address
         self.client = client
+        self.device = device
         self.rx_char = None
         self._disconnect_callback = None
 
@@ -44,7 +45,7 @@ class BLEConnection:
         Returns:
             The address used for connection, or None on failure.
         """
-        logger.debug(f"Connecting with client: {self.client}, address: {self.address}")
+        logger.debug(f"Connecting with client: {self.client}, address: {self.address}, device: {self.device}")
 
         if self.client:
             logger.debug("Using pre-configured BleakClient.")
@@ -52,6 +53,9 @@ class BLEConnection:
             assert isinstance(self.client, BleakClient)
             self.client.set_disconnected_callback(self.handle_disconnect)
             self.address = self.client.address
+        elif self.device:
+            logger.debug("Directly using a passed device.")
+            self.client = BleakClient(self.device, disconnected_callback=self.handle_disconnect)
         else:
 
             def match_meshcore_device(_: BLEDevice, adv: AdvertisementData):
@@ -73,6 +77,7 @@ class BLEConnection:
                 )
                 self.address = self.client.address
             else:
+                logger.debug("Connecting using provided address")
                 self.client = BleakClient(
                     self.address, disconnected_callback=self.handle_disconnect
                 )

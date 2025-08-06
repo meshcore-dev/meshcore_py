@@ -126,6 +126,7 @@ class MeshCore:
         cls,
         address: Optional[str] = None,
         client=None,
+        device=None,
         debug: bool = False,
         only_error: bool = False,
         default_timeout=None,
@@ -142,7 +143,7 @@ class MeshCore:
                                             If provided, 'address' is ignored for connection
                                             but can be used for identification.
         """
-        connection = BLEConnection(address=address, client=client)
+        connection = BLEConnection(address=address, client=client, device=device)
 
         mc = cls(
             connection,
