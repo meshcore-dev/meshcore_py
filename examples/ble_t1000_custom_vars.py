@@ -4,7 +4,7 @@ import asyncio
 from meshcore import MeshCore
 from meshcore import BLEConnection
 
-ADDRESS = "T1000_S" # node ble adress or name
+ADDRESS = "Meshcore-lora-py-tester" # node ble adress or name
 
 async def main () :
     con  = BLEConnection(ADDRESS)

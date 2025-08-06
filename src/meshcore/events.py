@@ -1,4 +1,5 @@
 from enum import Enum
+import inspect
 import logging
 from math import log
 from typing import Any, Dict, Optional, Callable, List, Union
@@ -133,6 +134,7 @@ class EventDispatcher:
         while self.running:
             event = await self.queue.get()
             logger.debug(f"Dispatching event: {event.type}, {event.payload}, {event.attributes}")
+            
             for subscription in self.subscriptions.copy():
                 # Check if event type matches
                 if subscription.event_type is None or subscription.event_type == event.type:
@@ -142,14 +144,23 @@ class EventDispatcher:
                         if not all(event.attributes.get(key) == value 
                                 for key, value in subscription.attribute_filters.items()):
                             continue
-                    try:
-                        result = subscription.callback(event.clone())
-                        if asyncio.iscoroutine(result):
-                            await result
-                    except Exception as e:
-                        print(f"Error in event handler: {e}")
+                    
+                    # Fire and forget - don't await!
+                    asyncio.create_task(self._execute_callback(subscription.callback, event.clone()))
                         
             self.queue.task_done()
+
+    async def _execute_callback(self, callback, event):
+        """Execute a callback with proper error handling"""
+        try:
+            if asyncio.iscoroutinefunction(callback):
+                await callback(event)
+            else:
+                result = callback(event)
+                if inspect.iscoroutine(result):
+                    await result
+        except Exception as e:
+            logger.error(f"Error in event handler for {event.type}: {e}", exc_info=True)
             
     async def start(self):
         if not self.running:
