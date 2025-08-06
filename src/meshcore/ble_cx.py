@@ -31,7 +31,9 @@ class BLEConnection:
         self.address = address
         self._user_provided_address = address
         self.client = client
+        self._user_provided_client = client
         self.device = device
+        self._user_provided_device = device
         self.rx_char = None
         self._disconnect_callback = None
 
@@ -107,9 +109,11 @@ class BLEConnection:
         logger.debug(
             f"BLE device disconnected: {client.address} (is_connected: {client.is_connected})"
         )
-        # Reset the address we found to what user specified
+        # Reset the address/client/device we found to what user specified
         # this allows to reconnect to the same device
         self.address = self._user_provided_address
+        self.client = self._user_provided_client
+        self.device = self._user_provided_device
 
         if self._disconnect_callback:
             asyncio.create_task(self._disconnect_callback("ble_disconnect"))
