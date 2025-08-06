@@ -31,7 +31,6 @@ class SerialConnection:
             logger.debug('port opened')
             if isinstance(transport, serial_asyncio.SerialTransport) and transport.serial:
                 transport.serial.rts = False  # You can manipulate Serial object via transport
-            # Signal that connection is established
             self.cx._connected_event.set()
     
         def data_received(self, data):
@@ -39,7 +38,6 @@ class SerialConnection:
     
         def connection_lost(self, exc):
             logger.debug('Serial port closed')
-            # Clear the connected event
             self.cx._connected_event.clear()
             if self.cx._disconnect_callback:
                 asyncio.create_task(self.cx._disconnect_callback("serial_disconnect"))
@@ -54,7 +52,6 @@ class SerialConnection:
         """
         Connects to the device
         """
-        # Clear any previous connection state
         self._connected_event.clear()
         
         loop = asyncio.get_running_loop()
@@ -62,7 +59,6 @@ class SerialConnection:
                 loop, lambda: self.MCSerialClientProtocol(self), 
                 self.port, baudrate=self.baudrate)
 
-        # Wait for the actual connection to be established
         await self._connected_event.wait()
         logger.info("Serial Connection started")
         return self.port
@@ -108,7 +104,6 @@ class SerialConnection:
         if self.transport:
             self.transport.close()
             self.transport = None
-            # Clear the connected event
             self._connected_event.clear()
             logger.debug("Serial Connection closed")
             

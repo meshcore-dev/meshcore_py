@@ -145,7 +145,7 @@ class EventDispatcher:
                                 for key, value in subscription.attribute_filters.items()):
                             continue
                     
-                    # Fire and forget - don't await!
+                    # Fire the call back asychronously
                     asyncio.create_task(self._execute_callback(subscription.callback, event.clone()))
                         
             self.queue.task_done()
