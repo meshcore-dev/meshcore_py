@@ -20,13 +20,15 @@ UART_TX_CHAR_UUID = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 
 
 class BLEConnection:
-    def __init__(self, address=None, device=None, client=None):
+    def __init__(self, address=None, device=None, client=None, disconnect_callback=None):
         """
         Constructor: specify address or an existing BleakClient.
 
         Args:
             address (str, optional): The Bluetooth address of the device.
+            device (BLEDevice, optional): A BLEDevice instance.
             client (BleakClient, optional): An existing BleakClient instance.
+            disconnect_callback (callable, optional): Callback function to handle disconnections.
         """
         self.address = address
         self._user_provided_address = address
@@ -35,7 +37,8 @@ class BLEConnection:
         self.device = device
         self._user_provided_device = device
         self.rx_char = None
-        self._disconnect_callback = None
+        self._disconnect_callback = disconnect_callback
+        self.reader = None  # Initialize reader to None
 
     async def connect(self):
         """
@@ -122,6 +125,11 @@ class BLEConnection:
     def set_disconnect_callback(self, callback):
         """Set callback to handle disconnections."""
         self._disconnect_callback = callback
+        
+    # Maintain compatibility with both naming conventions
+    def set_disconnected_callback(self, callback):
+        """Alias for set_disconnect_callback to maintain compatibility."""
+        self.set_disconnect_callback(callback)
 
     def set_reader(self, reader):
         self.reader = reader

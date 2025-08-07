@@ -65,10 +65,11 @@ class MeshCore:
         # Set up event subscriptions to track data
         self._setup_data_tracking()
 
-        self.connection_manager.set_reader(self._reader)
-
-        # Set up disconnect callback
-        cx.set_disconnect_callback(self.connection_manager.handle_disconnect)
+        # Set reader on the connection if it exists
+        if cx:
+            self.connection_manager.set_reader(self._reader)
+            # If we're using the old pattern (not from create_ble), set disconnect callback
+            cx.set_disconnect_callback(self.connection_manager.handle_disconnect)
 
     @classmethod
     async def create_tcp(
@@ -142,18 +143,32 @@ class MeshCore:
             client (BleakClient, optional): An existing BleakClient instance to use.
                                             If provided, 'address' is ignored for connection
                                             but can be used for identification.
+            device (BLEDevice, optional): A BLEDevice instance to use.
         """
-        connection = BLEConnection(address=address, client=client, device=device)
-
+        # Create a MeshCore instance without connecting yet
         mc = cls(
-            connection,
+            None,  # We'll set the connection after creating the instance
             debug=debug,
             only_error=only_error,
             default_timeout=default_timeout,
             auto_reconnect=auto_reconnect,
             max_reconnect_attempts=max_reconnect_attempts,
         )
-
+        
+        # Create the BLEConnection with the disconnect callback already set
+        connection = BLEConnection(
+            address=address, 
+            client=client, 
+            device=device, 
+            disconnect_callback=mc.connection_manager.handle_disconnect
+        )
+        
+        # Set the connection in the connection manager
+        mc.connection_manager._set_connection(connection)
+        
+        # Set the reader on the connection
+        mc.connection_manager.set_reader(mc._reader)
+        
         await mc.connect()
         return mc
 

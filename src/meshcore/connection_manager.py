@@ -35,7 +35,7 @@ class ConnectionManager:
 
     def __init__(
         self,
-        connection: ConnectionProtocol,
+        connection: Optional[ConnectionProtocol] = None,
         event_dispatcher=None,
         auto_reconnect: bool = False,
         max_reconnect_attempts: int = 3,
@@ -49,6 +49,10 @@ class ConnectionManager:
         self._is_connected = False
         self._reconnect_task = None
         self._disconnect_callback: Optional[Callable] = None
+        
+    def _set_connection(self, connection: ConnectionProtocol):
+        """Set the connection instance. Used internally for dependency injection."""
+        self.connection = connection
 
     def set_disconnect_callback(self, callback: Callable):
         """Set a callback to be called when disconnection is detected."""
