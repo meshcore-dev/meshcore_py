@@ -52,6 +52,10 @@ class BLEConnection:
         if self.client:
             logger.debug("Using pre-configured BleakClient.")
             assert isinstance(self.client, BleakClient)
+            if client.is_connected :
+                logger.error("Client is already connected !!! weird")
+                self.address = self.client.address
+                return self.address
             self.address = self.client.address
             # If a client is provided it surely does not have disconnect callback
             # so recreate it as set_disconnected_callback can't be used anymore ...
