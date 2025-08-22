@@ -10,7 +10,7 @@ from .messaging import MessagingCommands
 
 
 class CommandHandler(
-    DeviceCommands, ContactCommands, MessagingCommands, BinaryCommandHandler
+    BinaryCommandHandler, DeviceCommands, ContactCommands, MessagingCommands
 ):
     pass
 

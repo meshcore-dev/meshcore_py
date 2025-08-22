@@ -1,4 +1,5 @@
 import pytest
+import pytest_asyncio
 import asyncio
 from unittest.mock import MagicMock, AsyncMock
 from meshcore.commands import CommandHandler
@@ -23,17 +24,23 @@ def mock_dispatcher():
     return dispatcher
 
 
-@pytest.fixture
-def command_handler(mock_connection, mock_dispatcher):
+@pytest_asyncio.fixture
+async def command_handler(mock_connection, mock_dispatcher):
     handler = CommandHandler()
 
     async def sender(data):
         await mock_connection.send(data)
 
     handler._sender_func = sender
-
     handler.dispatcher = mock_dispatcher
-    return handler
+    
+    # Start the queue processor for tests
+    await handler.start_queue_processor()
+    
+    yield handler
+    
+    # Clean up after tests
+    await handler.stop_queue_processor()
 
 
 # Test helper

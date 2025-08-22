@@ -141,6 +141,7 @@ class CommandHandlerBase:
         if not self.dispatcher:
             raise RuntimeError("Dispatcher not set, cannot send commands")
 
+        # Use the provided timeout or fall back to default_timeout
         timeout = timeout if timeout is not None else self.default_timeout
 
         if self._sender_func:
@@ -151,11 +152,13 @@ class CommandHandlerBase:
 
         if expected_events:
             try:
+                # Convert single event to list if needed
                 if not isinstance(expected_events, list):
                     expected_events = [expected_events]
 
                 logger.debug(f"Waiting for events {expected_events}, timeout={timeout}")
 
+                # Create futures for all expected events
                 futures = []
                 for event_type in expected_events:
                     future = asyncio.create_task(
@@ -163,18 +166,22 @@ class CommandHandlerBase:
                     )
                     futures.append(future)
 
+                # Wait for the first event to complete or all to timeout
                 done, pending = await asyncio.wait(
                     futures, timeout=timeout, return_when=asyncio.FIRST_COMPLETED
                 )
 
+                # Cancel all pending futures
                 for future in pending:
                     future.cancel()
 
+                # Check if any future completed successfully
                 for future in done:
                     event = await future
                     if event:
                         return event
 
+                # Create an error event when no event is received
                 return Event(EventType.ERROR, {"reason": "no_event_received"})
             except asyncio.TimeoutError:
                 logger.debug(f"Command timed out {data}")
@@ -182,6 +189,7 @@ class CommandHandlerBase:
             except Exception as e:
                 logger.debug(f"Command error: {e}")
                 return Event(EventType.ERROR, {"error": str(e)})
+        # For commands that don't expect events, return a success event
         return Event(EventType.OK, {})
 
     async def start_queue_processor(self):

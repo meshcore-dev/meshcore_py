@@ -1,10 +1,8 @@
 import logging
 from enum import Enum
 import json
-from mailbox import Message
 
 from meshcore.commands.messaging import MessagingCommands
-from .base import CommandHandlerBase
 from ..events import EventType
 from cayennelpp import LppFrame, LppData
 from cayennelpp.lpp_type import LppType
