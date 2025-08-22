@@ -162,6 +162,10 @@ class MeshCore:
         result = await self.connection_manager.connect()
         if result is None:
             raise ConnectionError("Failed to connect to device")
+        
+        # Start the command queue processor after successful connection
+        await self.commands.start_queue_processor()
+        
         return await self.commands.send_appstart()
 
     async def disconnect(self):
@@ -172,6 +176,9 @@ class MeshCore:
         # Stop auto message fetching if it's running
         if hasattr(self, "_auto_fetch_subscription") and self._auto_fetch_subscription:
             await self.stop_auto_message_fetching()
+
+        # Stop the command queue processor
+        await self.commands.stop_queue_processor()
 
         # Disconnect the connection object
         await self.connection_manager.disconnect()

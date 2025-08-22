@@ -1,6 +1,9 @@
 import logging
 from enum import Enum
 import json
+from mailbox import Message
+
+from meshcore.commands.messaging import MessagingCommands
 from .base import CommandHandlerBase
 from ..events import EventType
 from cayennelpp import LppFrame, LppData
@@ -38,6 +41,9 @@ def lpp_parse_mma(buf):
         i = i + 1
         type = buf[i]
         lpp_type = LppType.get_lpp_type(type)
+        if lpp_type is None:
+            logger.error(f"Unknown LPP type: {type}")
+            return None
         size = lpp_type.size
         i = i + 1
         min = lpp_format_val(lpp_type, lpp_type.decode(buf[i : i + size]))
@@ -70,7 +76,7 @@ def parse_acl(buf):
     return res
 
 
-class BinaryCommandHandler(CommandHandlerBase):
+class BinaryCommandHandler(MessagingCommands):
     """Helper functions to handle binary requests through binary commands"""
 
     async def req_binary(self, contact, request, timeout=0):
@@ -84,6 +90,9 @@ class BinaryCommandHandler(CommandHandlerBase):
             timeout = (
                 res.payload["suggested_timeout"] / 800 if timeout == 0 else timeout
             )
+            if self.dispatcher is None:
+                logger.error("No dispatcher set, cannot wait for response")
+                return None
             res2 = await self.dispatcher.wait_for_event(
                 EventType.BINARY_RESPONSE,
                 attribute_filters={"tag": exp_tag},
