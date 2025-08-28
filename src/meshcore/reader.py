@@ -481,6 +481,7 @@ class MessageReader:
 
             attributes = {
                 "raw": buf.hex(),
+                "pubkey_prefix": res["pubkey_pre"],
             }
 
             await self.dispatcher.dispatch(
