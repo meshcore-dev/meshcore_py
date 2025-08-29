@@ -1,17 +1,14 @@
 import logging
-from mailbox import Message
 
 from meshcore.commands.messaging import MessagingCommands
-from .base import CommandHandlerBase
 from ..events import EventType
-from ..binary_parsing import BinaryReqType, lpp_parse, lpp_parse_mma, parse_acl
+from ..binary_parsing import BinaryReqType
 
 logger = logging.getLogger("meshcore")
 
 
 class BinaryCommandHandler(MessagingCommands):
     """Helper functions to handle binary requests through binary commands"""
-
 
     async def req_status(self, contact, timeout=0):
         res = await self.send_binary_req(contact, BinaryReqType.STATUS.value.to_bytes(1, "little"))

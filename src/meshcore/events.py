@@ -1,4 +1,3 @@
-from collections.abc import Coroutine
 from enum import Enum
 import inspect
 import logging
@@ -116,7 +115,7 @@ class EventDispatcher:
     def subscribe(
         self,
         event_type: Union[EventType, None],
-        callback: Callable[[Event], Coroutine[Any, Any, None]],
+        callback: Callable[[Event], Union[None, asyncio.Future]],
         attribute_filters: Optional[Dict[str, Any]] = None,
     ) -> Subscription:
         """
@@ -229,7 +228,7 @@ class EventDispatcher:
         """
         future = asyncio.Future()
 
-        async def event_handler(event: Event):
+        def event_handler(event: Event):
             if not future.done():
                 future.set_result(event)
 
