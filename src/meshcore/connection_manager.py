@@ -21,7 +21,7 @@ class ConnectionProtocol(Protocol):
         """Disconnect from the device/server."""
         ...
 
-    async def send(self, data) -> Any:
+    async def send(self, data):
         """Send data through the connection."""
         ...
 
