@@ -3,6 +3,7 @@ import json
 from typing import Any, Dict
 from .events import Event, EventType, EventDispatcher
 from .packets import PacketType
+from .binary_parsing import BinaryReqType, lpp_parse, lpp_parse_mma, parse_acl
 from cayennelpp import LppFrame, LppData
 from meshcore.lpp_json_encoder import lpp_json_encoder
 
@@ -497,9 +498,105 @@ class MessageReader:
 
             attributes = {"tag": res["tag"]}
 
+            # Always dispatch the generic BINARY_RESPONSE event first
             await self.dispatcher.dispatch(
                 Event(EventType.BINARY_RESPONSE, res, attributes)
             )
+
+            # Parse the request type from the response data and dispatch specific events
+            response_data = data[6:]
+            if response_data:  # Check if there's response data
+                request_type = response_data[0]
+                
+                if request_type == BinaryReqType.STATUS.value:
+                    # Parse as status response - use same parsing as STATUS_RESPONSE
+                    if len(response_data) >= 53:  # Minimum size for status data
+                        status_res = {}
+                        status_res["pubkey_pre"] = data[2:8].hex()  # Use pubkey from tag area
+                        status_data = response_data[1:]  # Skip the request type byte
+                        
+                        status_res["bat"] = int.from_bytes(status_data[0:2], byteorder="little")
+                        status_res["tx_queue_len"] = int.from_bytes(status_data[2:4], byteorder="little")
+                        status_res["noise_floor"] = int.from_bytes(status_data[4:6], byteorder="little", signed=True)
+                        status_res["last_rssi"] = int.from_bytes(status_data[6:8], byteorder="little", signed=True)
+                        status_res["nb_recv"] = int.from_bytes(status_data[8:12], byteorder="little", signed=False)
+                        status_res["nb_sent"] = int.from_bytes(status_data[12:16], byteorder="little", signed=False)
+                        status_res["airtime"] = int.from_bytes(status_data[16:20], byteorder="little")
+                        status_res["uptime"] = int.from_bytes(status_data[20:24], byteorder="little")
+                        status_res["sent_flood"] = int.from_bytes(status_data[24:28], byteorder="little")
+                        status_res["sent_direct"] = int.from_bytes(status_data[28:32], byteorder="little")
+                        status_res["recv_flood"] = int.from_bytes(status_data[32:36], byteorder="little")
+                        status_res["recv_direct"] = int.from_bytes(status_data[36:40], byteorder="little")
+                        status_res["full_evts"] = int.from_bytes(status_data[40:42], byteorder="little")
+                        status_res["last_snr"] = int.from_bytes(status_data[42:44], byteorder="little", signed=True) / 4
+                        status_res["direct_dups"] = int.from_bytes(status_data[44:46], byteorder="little")
+                        status_res["flood_dups"] = int.from_bytes(status_data[46:48], byteorder="little")
+                        status_res["rx_airtime"] = int.from_bytes(status_data[48:52], byteorder="little")
+                        
+                        status_attributes = {"pubkey_prefix": status_res["pubkey_pre"]}
+                        await self.dispatcher.dispatch(
+                            Event(EventType.STATUS_RESPONSE, status_res, status_attributes)
+                        )
+                
+                elif request_type == BinaryReqType.TELEMETRY.value:
+                    # Parse as telemetry response
+                    try:
+                        telemetry_data = response_data[1:]  # Skip the request type byte
+                        lpp = lpp_parse(telemetry_data)
+                        
+                        telem_res = {
+                            "pubkey_pre": data[2:8].hex(),
+                            "lpp": lpp
+                        }
+                        
+                        telem_attributes = {
+                            "raw": telemetry_data.hex(),
+                            "pubkey_prefix": telem_res["pubkey_pre"]
+                        }
+                        
+                        await self.dispatcher.dispatch(
+                            Event(EventType.TELEMETRY_RESPONSE, telem_res, telem_attributes)
+                        )
+                    except Exception as e:
+                        logger.error(f"Error parsing binary telemetry response: {e}")
+                
+                elif request_type == BinaryReqType.MMA.value:
+                    # Parse as MMA response
+                    try:
+                        mma_data = response_data[5:]  # Skip request type + 4 bytes header
+                        mma_result = lpp_parse_mma(mma_data)
+                        
+                        mma_res = {
+                            "pubkey_pre": data[2:8].hex(),
+                            "mma_data": mma_result
+                        }
+                        
+                        mma_attributes = {"pubkey_prefix": mma_res["pubkey_pre"]}
+                        
+                        await self.dispatcher.dispatch(
+                            Event(EventType.MMA_RESPONSE, mma_res, mma_attributes)
+                        )
+                    except Exception as e:
+                        logger.error(f"Error parsing binary MMA response: {e}")
+                
+                elif request_type == BinaryReqType.ACL.value:
+                    # Parse as ACL response
+                    try:
+                        acl_data = response_data[1:]  # Skip the request type byte
+                        acl_result = parse_acl(acl_data)
+                        
+                        acl_res = {
+                            "pubkey_pre": data[2:8].hex(),
+                            "acl_data": acl_result
+                        }
+                        
+                        acl_attributes = {"pubkey_prefix": acl_res["pubkey_pre"]}
+                        
+                        await self.dispatcher.dispatch(
+                            Event(EventType.ACL_RESPONSE, acl_res, acl_attributes)
+                        )
+                    except Exception as e:
+                        logger.error(f"Error parsing binary ACL response: {e}")
 
         elif packet_type_value == PacketType.PATH_DISCOVERY_RESPONSE.value:
             logger.debug(f"Received path discovery response: {data.hex()}")
