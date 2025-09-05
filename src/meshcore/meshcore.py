@@ -37,6 +37,7 @@ class MeshCore:
 
         self._reader = MessageReader(self.dispatcher)
         self.commands = CommandHandler(default_timeout=default_timeout)
+        self.commands.set_contact_getter_by_prefix(self.get_contact_by_key_prefix)
 
         # Set up logger
         if debug:

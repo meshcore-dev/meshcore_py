@@ -76,6 +76,10 @@ class CommandHandlerBase:
     def set_dispatcher(self, dispatcher: EventDispatcher) -> None:
         self.dispatcher = dispatcher
 
+    def set_contact_getter_by_prefix(self, func: Callable[[str], Optional[Dict[str,Any]]]
+        )-> None:
+        self._get_contact_by_prefix = func
+
     async def send(
         self,
         data: bytes,

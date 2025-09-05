@@ -79,11 +79,14 @@ class MessagingCommands(CommandHandlerBase):
         )
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
 
-    async def send_msg_reliable(
-        self, contact, msg: str, timestamp: Optional[int] = None,
+    async def send_msg_with_retry (
+        self, dst: DestinationType, msg: str, timestamp: Optional[int] = None,
         max_attempts=3, flood_after=2, timeout=0
     ) -> Event:
         
+        dst_bytes = _validate_destination(dst)
+        contact = self._get_contact_by_prefix(dst_bytes.hex())
+
         attempts = 0
         res = None
         while attempts < max_attempts and res is None:
@@ -101,8 +104,7 @@ class MessagingCommands(CommandHandlerBase):
                 
             result = await self.send_msg(contact, msg, timestamp, attempt=attempts)
             if result.type == EventType.ERROR:
-                print(f"⚠️ Failed to send message: {result.payload}")
-                return None
+                logger.error(f"⚠️ Failed to send message: {result.payload}")
 
             exp_ack = result.payload["expected_ack"].hex()
             timeout = result.payload["suggested_timeout"] / 1000 * 1.2 if timeout==0 else timeout
