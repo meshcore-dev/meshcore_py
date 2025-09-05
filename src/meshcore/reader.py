@@ -1,8 +1,10 @@
 import logging
 import json
+import time
 from typing import Any, Dict
 from .events import Event, EventType, EventDispatcher
-from .packets import PacketType
+from .packets import BinaryReqType, PacketType
+from .parsing import lpp_parse, lpp_parse_mma, parse_acl, parse_status
 from cayennelpp import LppFrame, LppData
 from meshcore.lpp_json_encoder import lpp_json_encoder
 
@@ -16,7 +18,35 @@ class MessageReader:
         # before events are dispatched
         self.contacts = {}  # Temporary storage during contact list building
         self.contact_nb = 0  # Used for contact processing
+        
+        # Track pending binary requests by tag for proper response parsing
+        self.pending_binary_requests: Dict[str, Dict[str, Any]] = {}  # tag -> {request_type, expires_at}
 
+    def register_binary_request(self, prefix: str, tag: str, request_type: BinaryReqType, timeout_seconds: float):
+        """Register a pending binary request for proper response parsing"""
+        # Clean up expired requests before adding new one
+        self.cleanup_expired_requests()
+        
+        expires_at = time.time() + timeout_seconds
+        self.pending_binary_requests[tag] = {
+            "request_type": request_type,
+            "pubkey_prefix": prefix,
+            "expires_at": expires_at
+        }
+        logger.debug(f"Registered binary request: tag={tag}, type={request_type}, expires in {timeout_seconds}s")
+
+    def cleanup_expired_requests(self):
+        """Remove expired binary requests"""
+        current_time = time.time()
+        expired_tags = [
+            tag for tag, info in self.pending_binary_requests.items()
+            if current_time > info["expires_at"]
+        ]
+        
+        for tag in expired_tags:
+            logger.debug(f"Cleaning up expired binary request: tag={tag}")
+            del self.pending_binary_requests[tag]
+    
     async def handle_rx(self, data: bytearray):
         packet_type_value = data[0]
         logger.debug(f"Received data: {data.hex()}")
@@ -330,36 +360,13 @@ class MessageReader:
             )
 
         elif packet_type_value == PacketType.STATUS_RESPONSE.value:
-            res = {}
-            res["pubkey_pre"] = data[2:8].hex()
-            res["bat"] = int.from_bytes(data[8:10], byteorder="little")
-            res["tx_queue_len"] = int.from_bytes(data[10:12], byteorder="little")
-            res["noise_floor"] = int.from_bytes(
-                data[12:14], byteorder="little", signed=True
-            )
-            res["last_rssi"] = int.from_bytes(
-                data[14:16], byteorder="little", signed=True
-            )
-            res["nb_recv"] = int.from_bytes(
-                data[16:20], byteorder="little", signed=False
-            )
-            res["nb_sent"] = int.from_bytes(
-                data[20:24], byteorder="little", signed=False
-            )
-            res["airtime"] = int.from_bytes(data[24:28], byteorder="little")
-            res["uptime"] = int.from_bytes(data[28:32], byteorder="little")
-            res["sent_flood"] = int.from_bytes(data[32:36], byteorder="little")
-            res["sent_direct"] = int.from_bytes(data[36:40], byteorder="little")
-            res["recv_flood"] = int.from_bytes(data[40:44], byteorder="little")
-            res["recv_direct"] = int.from_bytes(data[44:48], byteorder="little")
-            res["full_evts"] = int.from_bytes(data[48:50], byteorder="little")
-            res["last_snr"] = (
-                int.from_bytes(data[50:52], byteorder="little", signed=True) / 4
-            )
-            res["direct_dups"] = int.from_bytes(data[52:54], byteorder="little")
-            res["flood_dups"] = int.from_bytes(data[54:56], byteorder="little")
-            res["rx_airtime"] = int.from_bytes(data[56:60], byteorder="little")
+            res = parse_status(data, offset=8)
+            data_hex = data[8:].hex()
+            logger.debug(f"Status response: {data_hex}")
 
+            attributes = {
+                "pubkey_prefix": res["pubkey_pre"],
+            }
             data_hex = data[8:].hex()
             logger.debug(f"Status response: {data_hex}")
 
@@ -490,16 +497,60 @@ class MessageReader:
 
         elif packet_type_value == PacketType.BINARY_RESPONSE.value:
             logger.debug(f"Received binary data: {data.hex()}")
-            res = {}
-
-            res["tag"] = data[2:6].hex()
-            res["data"] = data[6:].hex()
-
-            attributes = {"tag": res["tag"]}
-
+            tag = data[2:6].hex()
+            response_data = data[6:]
+            
+            # Always dispatch generic BINARY_RESPONSE
+            binary_res = {"tag": tag, "data": response_data.hex()}
             await self.dispatcher.dispatch(
-                Event(EventType.BINARY_RESPONSE, res, attributes)
+                Event(EventType.BINARY_RESPONSE, binary_res, {"tag": tag})
             )
+            
+            # Check for tracked request type and dispatch specific response
+            if tag in self.pending_binary_requests:
+                request_type = self.pending_binary_requests[tag]["request_type"]
+                pubkey_prefix = self.pending_binary_requests[tag]["pubkey_prefix"]
+                del self.pending_binary_requests[tag]
+                logger.debug(f"Processing binary response for tag {tag}, type {request_type}, pubkey_prefix {pubkey_prefix}")
+                
+                if request_type == BinaryReqType.STATUS and len(response_data) >= 52:
+                    res = {}
+                    res = parse_status(response_data, pubkey_prefix=pubkey_prefix)
+                    await self.dispatcher.dispatch(
+                        Event(EventType.STATUS_RESPONSE, res, {"pubkey_prefix": res["pubkey_pre"], "tag": tag})
+                    )
+                
+                elif request_type == BinaryReqType.TELEMETRY:
+                    try:
+                        lpp = lpp_parse(response_data)
+                        telem_res = {"tag": tag, "lpp": lpp, "pubkey_prefix": pubkey_prefix}
+                        await self.dispatcher.dispatch(
+                            Event(EventType.TELEMETRY_RESPONSE, telem_res, telem_res)
+                        )
+                    except Exception as e:
+                        logger.error(f"Error parsing binary telemetry response: {e}")
+                
+                elif request_type == BinaryReqType.MMA:
+                    try:
+                        mma_result = lpp_parse_mma(response_data[4:])  # Skip 4-byte header
+                        mma_res = {"tag": tag, "mma_data": mma_result, "pubkey_prefix": pubkey_prefix}
+                        await self.dispatcher.dispatch(
+                            Event(EventType.MMA_RESPONSE, mma_res, mma_res)
+                        )
+                    except Exception as e:
+                        logger.error(f"Error parsing binary MMA response: {e}")
+                
+                elif request_type == BinaryReqType.ACL:
+                    try:
+                        acl_result = parse_acl(response_data)
+                        acl_res = {"tag": tag, "acl_data": acl_result, "pubkey_prefix": pubkey_prefix}
+                        await self.dispatcher.dispatch(
+                            Event(EventType.ACL_RESPONSE, acl_res, {"tag": tag, "pubkey_prefix": pubkey_prefix})
+                        )
+                    except Exception as e:
+                        logger.error(f"Error parsing binary ACL response: {e}")
+            else:
+                logger.debug(f"No tracked request found for binary response tag {tag}")
 
         elif packet_type_value == PacketType.PATH_DISCOVERY_RESPONSE.value:
             logger.debug(f"Received path discovery response: {data.hex()}")

@@ -399,6 +399,182 @@ async def channel_handler(event):
 meshcore.subscribe(EventType.CHANNEL_MSG_RECV, channel_handler)
 ```
 
+## API Reference
+
+### Event Types
+
+All events in MeshCore are represented by the `EventType` enum. These events are dispatched by the library and can be subscribed to:
+
+| Event Type | String Value | Description | Typical Payload |
+|------------|-------------|-------------|-----------------|
+| **Device & Status Events** |||
+| `SELF_INFO` | `"self_info"` | Device's own information after appstart | Device configuration, public key, coordinates |
+| `DEVICE_INFO` | `"device_info"` | Device capabilities and firmware info | Firmware version, model, max contacts/channels |
+| `BATTERY` | `"battery_info"` | Battery level and storage info | Battery level, used/total storage |
+| `CURRENT_TIME` | `"time_update"` | Device time response | Current timestamp |
+| `STATUS_RESPONSE` | `"status_response"` | Device status statistics | Battery, TX queue, noise floor, packet counts |
+| `CUSTOM_VARS` | `"custom_vars"` | Custom variable responses | Key-value pairs of custom variables |
+| **Contact Events** |||
+| `CONTACTS` | `"contacts"` | Contact list response | Dictionary of contacts by public key |
+| `NEW_CONTACT` | `"new_contact"` | New contact discovered | Contact information |
+| `CONTACT_URI` | `"contact_uri"` | Contact export URI | Shareable contact URI |
+| **Messaging Events** |||
+| `CONTACT_MSG_RECV` | `"contact_message"` | Direct message received | Message text, sender prefix, timestamp |
+| `CHANNEL_MSG_RECV` | `"channel_message"` | Channel message received | Message text, channel index, timestamp |
+| `MSG_SENT` | `"message_sent"` | Message send confirmation | Expected ACK code, suggested timeout |
+| `NO_MORE_MSGS` | `"no_more_messages"` | No pending messages | Empty payload |
+| `MESSAGES_WAITING` | `"messages_waiting"` | Messages available notification | Empty payload |
+| **Network Events** |||
+| `ADVERTISEMENT` | `"advertisement"` | Node advertisement detected | Public key of advertising node |
+| `PATH_UPDATE` | `"path_update"` | Routing path update | Public key and path information |
+| `ACK` | `"acknowledgement"` | Message acknowledgment | ACK code |
+| `PATH_RESPONSE` | `"path_response"` | Path discovery response | Inbound/outbound path data |
+| `TRACE_DATA` | `"trace_data"` | Route trace information | Path with SNR data for each hop |
+| **Telemetry Events** |||
+| `TELEMETRY_RESPONSE` | `"telemetry_response"` | Telemetry data response | LPP-formatted sensor data |
+| `MMA_RESPONSE` | `"mma_response"` | Memory Management Area data | Min/max/avg telemetry over time range |
+| `ACL_RESPONSE` | `"acl_response"` | Access Control List data | List of keys and permissions |
+| **Channel Events** |||
+| `CHANNEL_INFO` | `"channel_info"` | Channel configuration | Channel name, secret, index |
+| **Raw Data Events** |||
+| `RAW_DATA` | `"raw_data"` | Raw radio data | SNR, RSSI, payload hex |
+| `RX_LOG_DATA` | `"rx_log_data"` | RF log data | SNR, RSSI, raw payload |
+| `LOG_DATA` | `"log_data"` | Generic log data | Various log information |
+| **Binary Protocol Events** |||
+| `BINARY_RESPONSE` | `"binary_response"` | Generic binary response | Tag and hex data |
+| **Authentication Events** |||
+| `LOGIN_SUCCESS` | `"login_success"` | Successful login | Permissions, admin status, pubkey prefix |
+| `LOGIN_FAILED` | `"login_failed"` | Failed login attempt | Pubkey prefix |
+| **Command Response Events** |||
+| `OK` | `"command_ok"` | Command successful | Success confirmation, optional value |
+| `ERROR` | `"command_error"` | Command failed | Error reason or code |
+| **Connection Events** |||
+| `CONNECTED` | `"connected"` | Connection established | Connection details, reconnection status |
+| `DISCONNECTED` | `"disconnected"` | Connection lost | Disconnection reason |
+
+### Available Commands
+
+All commands are async methods that return `Event` objects. Commands are organized into functional groups:
+
+#### Device Commands (`meshcore.commands.*`)
+
+| Command | Parameters | Returns | Description |
+|---------|------------|---------|-------------|
+| **Device Information** ||||
+| `send_appstart()` | None | `SELF_INFO` | Get device self-information and configuration |
+| `send_device_query()` | None | `DEVICE_INFO` | Query device capabilities and firmware info |
+| `get_bat()` | None | `BATTERY` | Get battery level and storage information |
+| `get_time()` | None | `CURRENT_TIME` | Get current device time |
+| `get_self_telemetry()` | None | `TELEMETRY_RESPONSE` | Get device's own telemetry data |
+| `get_custom_vars()` | None | `CUSTOM_VARS` | Retrieve all custom variables |
+| **Device Configuration** ||||
+| `set_name(name)` | `name: str` | `OK` | Set device name/identifier |
+| `set_coords(lat, lon)` | `lat: float, lon: float` | `OK` | Set device GPS coordinates |
+| `set_time(val)` | `val: int` | `OK` | Set device time (Unix timestamp) |
+| `set_tx_power(val)` | `val: int` | `OK` | Set radio transmission power level |
+| `set_devicepin(pin)` | `pin: int` | `OK` | Set device PIN for security |
+| `set_custom_var(key, value)` | `key: str, value: str` | `OK` | Set custom variable |
+| **Radio Configuration** ||||
+| `set_radio(freq, bw, sf, cr)` | `freq: float, bw: float, sf: int, cr: int` | `OK` | Configure radio (freq MHz, bandwidth kHz, spreading factor, coding rate 5-8) |
+| `set_tuning(rx_dly, af)` | `rx_dly: int, af: int` | `OK` | Set radio tuning parameters |
+| **Telemetry Configuration** ||||
+| `set_telemetry_mode_base(mode)` | `mode: int` | `OK` | Set base telemetry mode |
+| `set_telemetry_mode_loc(mode)` | `mode: int` | `OK` | Set location telemetry mode |
+| `set_telemetry_mode_env(mode)` | `mode: int` | `OK` | Set environmental telemetry mode |
+| `set_manual_add_contacts(enabled)` | `enabled: bool` | `OK` | Enable/disable manual contact addition |
+| `set_advert_loc_policy(policy)` | `policy: int` | `OK` | Set location advertisement policy |
+| **Channel Management** ||||
+| `get_channel(channel_idx)` | `channel_idx: int` | `CHANNEL_INFO` | Get channel configuration |
+| `set_channel(channel_idx, name, secret)` | `channel_idx: int, name: str, secret: bytes` | `OK` | Configure channel (secret must be 16 bytes) |
+| **Device Actions** ||||
+| `send_advert(flood=False)` | `flood: bool` | `OK` | Send advertisement (optionally flood network) |
+| `reboot()` | None | None | Reboot device (no response expected) |
+
+#### Contact Commands (`meshcore.commands.*`)
+
+| Command | Parameters | Returns | Description |
+|---------|------------|---------|-------------|
+| **Contact Management** ||||
+| `get_contacts(lastmod=0)` | `lastmod: int` | `CONTACTS` | Get contact list (filter by last modification time) |
+| `add_contact(contact)` | `contact: dict` | `OK` | Add new contact to device |
+| `update_contact(contact, path, flags)` | `contact: dict, path: bytes, flags: int` | `OK` | Update existing contact |
+| `remove_contact(key)` | `key: str/bytes` | `OK` | Remove contact by public key |
+| **Contact Operations** ||||
+| `reset_path(key)` | `key: str/bytes` | `OK` | Reset routing path for contact |
+| `share_contact(key)` | `key: str/bytes` | `OK` | Share contact with network |
+| `export_contact(key=None)` | `key: str/bytes/None` | `CONTACT_URI` | Export contact as URI (None exports node) |
+| `import_contact(card_data)` | `card_data: bytes` | `OK` | Import contact from card data |
+| **Contact Modification** ||||
+| `change_contact_path(contact, path)` | `contact: dict, path: bytes` | `OK` | Change routing path for contact |
+| `change_contact_flags(contact, flags)` | `contact: dict, flags: int` | `OK` | Change contact flags/settings |
+
+#### Messaging Commands (`meshcore.commands.*`)
+
+| Command | Parameters | Returns | Description |
+|---------|------------|---------|-------------|
+| **Message Handling** ||||
+| `get_msg(timeout=None)` | `timeout: float` | `CONTACT_MSG_RECV/CHANNEL_MSG_RECV/NO_MORE_MSGS` | Get next pending message |
+| `send_msg(dst, msg, timestamp=None)` | `dst: contact/str/bytes, msg: str, timestamp: int` | `MSG_SENT` | Send direct message |
+| `send_cmd(dst, cmd, timestamp=None)` | `dst: contact/str/bytes, cmd: str, timestamp: int` | `MSG_SENT` | Send command message |
+| `send_chan_msg(chan, msg, timestamp=None)` | `chan: int, msg: str, timestamp: int` | `MSG_SENT` | Send channel message |
+| **Authentication** ||||
+| `send_login(dst, pwd)` | `dst: contact/str/bytes, pwd: str` | `MSG_SENT` | Send login request |
+| `send_logout(dst)` | `dst: contact/str/bytes` | `MSG_SENT` | Send logout request |
+| **Information Requests** ||||
+| `send_statusreq(dst)` | `dst: contact/str/bytes` | `MSG_SENT` | Request status from contact |
+| `send_telemetry_req(dst)` | `dst: contact/str/bytes` | `MSG_SENT` | Request telemetry from contact |
+| **Advanced Messaging** ||||
+| `send_binary_req(dst, bin_data)` | `dst: contact/str/bytes, bin_data: bytes` | `MSG_SENT` | Send binary data request |
+| `send_path_discovery(dst)` | `dst: contact/str/bytes` | `MSG_SENT` | Initiate path discovery |
+| `send_trace(auth_code, tag, flags, path=None)` | `auth_code: int, tag: int, flags: int, path: list` | `MSG_SENT` | Send route trace packet |
+
+#### Binary Protocol Commands (`meshcore.commands.*`)
+
+| Command | Parameters | Returns | Description |
+|---------|------------|---------|-------------|
+| `req_status(contact, timeout=0)` | `contact: dict, timeout: float` | `STATUS_RESPONSE` | Get detailed status via binary protocol |
+| `req_telemetry(contact, timeout=0)` | `contact: dict, timeout: float` | `TELEMETRY_RESPONSE` | Get telemetry via binary protocol |
+| `req_mma(contact, start, end, timeout=0)` | `contact: dict, start: int, end: int, timeout: float` | `MMA_RESPONSE` | Get historical telemetry data |
+| `req_acl(contact, timeout=0)` | `contact: dict, timeout: float` | `ACL_RESPONSE` | Get access control list |
+
+### Helper Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `get_contact_by_name(name)` | `dict/None` | Find contact by advertisement name |
+| `get_contact_by_key_prefix(prefix)` | `dict/None` | Find contact by partial public key |
+| `is_connected` | `bool` | Check if device is currently connected |
+| `subscribe(event_type, callback, filters=None)` | `Subscription` | Subscribe to events with optional filtering |
+| `unsubscribe(subscription)` | None | Remove event subscription |
+| `wait_for_event(event_type, filters=None, timeout=None)` | `Event/None` | Wait for specific event |
+
+### Event Filtering
+
+Events can be filtered by their attributes when subscribing:
+
+```python
+# Filter by public key prefix
+meshcore.subscribe(
+    EventType.CONTACT_MSG_RECV,
+    handler,
+    attribute_filters={"pubkey_prefix": "a1b2c3d4e5f6"}
+)
+
+# Filter by channel index
+meshcore.subscribe(
+    EventType.CHANNEL_MSG_RECV,
+    handler,
+    attribute_filters={"channel_idx": 0}
+)
+
+# Filter acknowledgments by code
+meshcore.subscribe(
+    EventType.ACK,
+    handler,
+    attribute_filters={"code": "12345678"}
+)
+```
+
 ## Examples in the Repo
 
 Check the `examples/` directory for more:

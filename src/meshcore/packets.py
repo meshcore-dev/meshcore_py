@@ -1,5 +1,11 @@
 from enum import Enum
 
+class BinaryReqType(Enum):
+    STATUS = 0x01
+    KEEP_ALIVE = 0x02
+    TELEMETRY = 0x03
+    MMA = 0x04
+    ACL = 0x05
 
 # Packet prefixes for the protocol
 class PacketType(Enum):

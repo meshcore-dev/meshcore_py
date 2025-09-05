@@ -3,6 +3,8 @@ import logging
 import random
 from typing import Any, Callable, Coroutine, Dict, List, Optional, Union
 
+from meshcore.packets import BinaryReqType
+
 from ..events import Event, EventDispatcher, EventType
 from ..reader import MessageReader
 
@@ -144,3 +146,24 @@ class CommandHandlerBase:
                 return Event(EventType.ERROR, {"error": str(e)})
         # For commands that don't expect events, return a success event
         return Event(EventType.OK, {})
+
+    # attached at base because its a common method
+    async def send_binary_req(self, dst: DestinationType, request_type: BinaryReqType, data: Optional[bytes] = None, timeout=None) -> Event:
+        dst_bytes = _validate_destination(dst, prefix_length=32)
+        pubkey_prefix = _validate_destination(dst, prefix_length=6)
+        logger.debug(f"Binary request to {dst_bytes.hex()}")
+        data = b"\x32" + dst_bytes + request_type.value.to_bytes(1, "little", signed=False) + (data if data else b"")
+
+        result = await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
+        
+        # Register the request with the reader if we have both reader and request_type
+        if (result.type == EventType.MSG_SENT and 
+            self._reader is not None and 
+            request_type is not None):
+            
+            exp_tag = result.payload["expected_ack"].hex()
+            # Use provided timeout or fallback to suggested timeout (with 5s default)
+            actual_timeout = timeout if timeout is not None and timeout > 0 else result.payload.get("suggested_timeout", 4000) / 800.0
+            self._reader.register_binary_request(pubkey_prefix.hex(), exp_tag, request_type, actual_timeout)
+
+        return result
