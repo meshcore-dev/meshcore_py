@@ -81,28 +81,36 @@ class MessagingCommands(CommandHandlerBase):
 
     async def send_msg_with_retry (
         self, dst: DestinationType, msg: str, timestamp: Optional[int] = None,
-        max_attempts=3, flood_after=2, timeout=0
+        max_attempts=3, max_flood_attempts=2, flood_after=2, timeout=0
     ) -> Event:
         
         dst_bytes = _validate_destination(dst)
         contact = self._get_contact_by_prefix(dst_bytes.hex())
 
         attempts = 0
+        flood_attempts = 0
+        if not contact is None :
+            flood = contact["out_path_len"] == -1
+        else:
+            flood = False 
         res = None
-        while attempts < max_attempts and res is None:
+        while attempts < max_attempts and res is None \
+                    and (not flood or flood_attempts < max_flood_attempts):
             if attempts == flood_after : # change path to flood
                 logger.info("Resetting path")
-                rp_res = await self.reset_path(contact)
+                rp_res = await self.reset_path(dst)
                 if rp_res.type == EventType.ERROR:
                     logger.error(f"Couldn't reset path {rp_res} continuing ...")
                 else:
-                    contact["out_path"] = ""
-                    contact["out_path_len"] = -1
+                    flood = True
+                    if not contact is None:
+                        contact["out_path"] = ""
+                        contact["out_path_len"] = -1
 
             if attempts > 0:
                 logger.info(f"Retry sending msg: {attempts + 1}")
                 
-            result = await self.send_msg(contact, msg, timestamp, attempt=attempts)
+            result = await self.send_msg(dst, msg, timestamp, attempt=attempts)
             if result.type == EventType.ERROR:
                 logger.error(f"⚠️ Failed to send message: {result.payload}")
 
@@ -113,6 +121,8 @@ class MessagingCommands(CommandHandlerBase):
                         timeout=timeout)
 
             attempts = attempts + 1
+            if flood :
+                flood_attempts = flood_attempts + 1
     
         return None if res is None else result
 
