@@ -117,11 +117,10 @@ class BinaryCommandHandler(CommandHandlerBase):
         if self.dispatcher is None:
             return None
             
-        # Listen for ACL_RESPONSE event with matching pubkey
-        contact_pubkey_prefix = contact["public_key"][0:12]
+        # Listen for ACL_RESPONSE event with matching tag
         acl_event = await self.dispatcher.wait_for_event(
             EventType.ACL_RESPONSE,
-            attribute_filters={"pubkey_prefix": contact_pubkey_prefix},
+            attribute_filters={"tag": res.payload["expected_ack"].hex()},
             timeout=timeout,
         )
         
