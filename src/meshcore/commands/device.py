@@ -1,4 +1,5 @@
 import logging
+from hashlib import sha256
 from typing import Optional
 
 from ..events import Event, EventType
@@ -184,13 +185,16 @@ class DeviceCommands(CommandHandlerBase):
         return await self.send(data, [EventType.CHANNEL_INFO, EventType.ERROR])
 
     async def set_channel(
-        self, channel_idx: int, channel_name: str, channel_secret: bytes
+        self, channel_idx: int, channel_name: str, channel_secret: bytes = None
     ) -> Event:
         logger.debug(f"Setting channel {channel_idx}: name={channel_name}")
 
         # Pad channel name to 32 bytes
         name_bytes = channel_name.encode("utf-8")[:32]
         name_bytes = name_bytes.ljust(32, b"\x00")
+
+        if channel_name.startswith("#") or channel_secret is None: # auto name => key calculated from hash
+            channel_secret = sha256(channel_name.encode("utf-8")).digest()[0:16]
 
         # Ensure channel secret is exactly 16 bytes
         if len(channel_secret) != 16:
