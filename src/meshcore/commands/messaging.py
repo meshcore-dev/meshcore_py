@@ -81,7 +81,7 @@ class MessagingCommands(CommandHandlerBase):
 
     async def send_msg_with_retry (
         self, dst: DestinationType, msg: str, timestamp: Optional[int] = None,
-        max_attempts=3, max_flood_attempts=2, flood_after=2, timeout=0
+        max_attempts=3, max_flood_attempts=2, flood_after=2, timeout=0, min_timeout=0
     ) -> Event:
         
         dst_bytes = _validate_destination(dst)
@@ -116,6 +116,7 @@ class MessagingCommands(CommandHandlerBase):
 
             exp_ack = result.payload["expected_ack"].hex()
             timeout = result.payload["suggested_timeout"] / 1000 * 1.2 if timeout==0 else timeout
+            timeout = timeout if timeout > min_timeout else min_timeout
             res = await self.dispatcher.wait_for_event(EventType.ACK, 
                         attribute_filters={"code": exp_ack}, 
                         timeout=timeout)
