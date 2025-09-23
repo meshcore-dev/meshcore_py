@@ -128,6 +128,7 @@ class MeshCore:
         address: Optional[str] = None,
         client=None,
         device=None,
+        pin: Optional[str] = None,
         debug: bool = False,
         only_error: bool = False,
         default_timeout=None,
@@ -143,8 +144,10 @@ class MeshCore:
             client (BleakClient, optional): An existing BleakClient instance to use.
                                             If provided, 'address' is ignored for connection
                                             but can be used for identification.
+            device (BLEDevice, optional): A BLEDevice instance to use for connection.
+            pin (str, optional): PIN for BLE pairing authentication.
         """
-        connection = BLEConnection(address=address, client=client, device=device)
+        connection = BLEConnection(address=address, client=client, device=device, pin=pin)
 
         mc = cls(
             connection,

@@ -107,9 +107,35 @@ meshcore = await MeshCore.create_serial("/dev/ttyUSB0", 115200, debug=True)
 # BLE connection (scans for devices if address not provided)
 meshcore = await MeshCore.create_ble("12:34:56:78:90:AB")
 
+# BLE connection with PIN pairing for enhanced security
+meshcore = await MeshCore.create_ble("12:34:56:78:90:AB", pin="123456")
+
 # TCP connection
 meshcore = await MeshCore.create_tcp("192.168.1.100", 4000)
 ```
+
+#### BLE PIN Pairing
+
+For enhanced security, MeshCore supports BLE PIN pairing. This requires the device to be configured with a PIN and the client to provide the matching PIN during connection:
+
+```python
+# First configure the device PIN (if not already set)
+meshcore = await MeshCore.create_ble("12:34:56:78:90:AB")
+await meshcore.commands.set_devicepin(123456)
+
+# Then connect with PIN pairing
+meshcore = await MeshCore.create_ble("12:34:56:78:90:AB", pin="123456")
+```
+
+**PIN Pairing Features:**
+- Automatic pairing initiation when PIN is provided
+- Graceful fallback if pairing fails (connection continues if device is already paired)
+- Compatible with all BLE connection methods (address, scanning, pre-configured client)
+- Logging of pairing success/failure for debugging
+
+**Note:** BLE pairing behavior may vary by platform:
+- **Linux/Windows**: PIN pairing is fully supported
+- **macOS**: Pairing may be handled automatically by the system UI
 
 #### Auto-Reconnect and Connection Events
 
@@ -582,5 +608,6 @@ Check the `examples/` directory for more:
 - `pubsub_example.py`: Event subscription system with auto-fetching
 - `serial_infos.py`: Quick device info retrieval
 - `serial_msg.py`: Message sending and receiving
+- `ble_pin_pairing_example.py`: BLE connection with PIN pairing
 - `ble_t1000_infos.py`: BLE connections
 
