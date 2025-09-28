@@ -20,13 +20,15 @@ UART_TX_CHAR_UUID = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 
 
 class BLEConnection:
-    def __init__(self, address=None, device=None, client=None):
+    def __init__(self, address=None, device=None, client=None, pin=None):
         """
         Constructor: specify address or an existing BleakClient.
 
         Args:
             address (str, optional): The Bluetooth address of the device.
+            device (BLEDevice, optional): A BLEDevice instance.
             client (BleakClient, optional): An existing BleakClient instance.
+            pin (str, optional): PIN for BLE pairing authentication.
         """
         self.address = address
         self._user_provided_address = address
@@ -34,6 +36,7 @@ class BLEConnection:
         self._user_provided_client = client
         self.device = device
         self._user_provided_device = device
+        self.pin = pin
         self.rx_char = None
         self._disconnect_callback = None
 
@@ -93,6 +96,18 @@ class BLEConnection:
 
         try:
             await self.client.connect()
+            
+            # Perform pairing if PIN is provided
+            if self.pin is not None:
+                logger.debug(f"Attempting BLE pairing with PIN")
+                try:
+                    await self.client.pair()
+                    logger.info("BLE pairing successful")
+                except Exception as e:
+                    logger.warning(f"BLE pairing failed: {e}")
+                    # Don't fail the connection if pairing fails, as the device
+                    # might already be paired or not require pairing
+                    
         except BleakDeviceNotFoundError:
             return None
         except TimeoutError:
