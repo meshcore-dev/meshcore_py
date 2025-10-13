@@ -603,33 +603,6 @@ meshcore.subscribe(
 )
 ```
 
-## Private Key Export Example
-
-Export your device's private key over BLE (requires PIN pairing and supported firmware):
-
-```python
-import asyncio
-from meshcore import MeshCore, EventType
-
-async def main():
-    # Connect to device over BLE with PIN authentication
-    meshcore = await MeshCore.create_ble(address="12:34:56:78:90:AB", pin="123456")
-
-    # Export the private key
-    result = await meshcore.commands.export_private_key()
-
-    if result.type == EventType.PRIVATE_KEY:
-        private_key = result.payload["private_key"]  # 64 bytes
-        print(f"Private key: {private_key.hex()}")
-    elif result.type == EventType.DISABLED:
-        print("Private key export is disabled on this device.")
-
-    await meshcore.disconnect()
-
-asyncio.run(main())
-```
-
-
 ## Examples in the Repo
 
 Check the `examples/` directory for more:
