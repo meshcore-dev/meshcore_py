@@ -41,6 +41,8 @@ class EventType(Enum):
     CUSTOM_VARS = "custom_vars"
     CHANNEL_INFO = "channel_info"
     PATH_RESPONSE = "path_response"
+    PRIVATE_KEY = "private_key"
+    DISABLED = "disabled"
 
     # Command response types
     OK = "command_ok"
