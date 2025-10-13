@@ -515,6 +515,8 @@ All commands are async methods that return `Event` objects. Commands are organiz
 | **Device Actions** ||||
 | `send_advert(flood=False)` | `flood: bool` | `OK` | Send advertisement (optionally flood network) |
 | `reboot()` | None | None | Reboot device (no response expected) |
+| **Security** ||||
+| `export_private_key()` | None | `PRIVATE_KEY/DISABLED` | Export device private key (requires PIN auth & enabled firmware) |
 
 #### Contact Commands (`meshcore.commands.*`)
 
@@ -609,5 +611,6 @@ Check the `examples/` directory for more:
 - `serial_infos.py`: Quick device info retrieval
 - `serial_msg.py`: Message sending and receiving
 - `ble_pin_pairing_example.py`: BLE connection with PIN pairing
+- `ble_private_key_export.py`: BLE private key export with PIN authentication
 - `ble_t1000_infos.py`: BLE connections
 

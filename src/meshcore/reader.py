@@ -569,6 +569,20 @@ class MessageReader:
                 Event(EventType.PATH_RESPONSE, res, attributes)
             )
 
+        elif packet_type_value == PacketType.PRIVATE_KEY.value:
+            logger.debug(f"Received private key response: {data.hex()}")
+            if len(data) >= 65:  # 1 byte response code + 64 bytes private key
+                private_key = data[1:65]  # Extract 64-byte private key
+                res = {"private_key": private_key}
+                await self.dispatcher.dispatch(Event(EventType.PRIVATE_KEY, res))
+            else:
+                logger.error(f"Invalid private key response length: {len(data)}")
+
+        elif packet_type_value == PacketType.DISABLED.value:
+            logger.debug("Received disabled response")
+            res = {"reason": "private_key_export_disabled"}
+            await self.dispatcher.dispatch(Event(EventType.DISABLED, res))
+
         else:
             logger.debug(f"Unhandled data received {data}")
             logger.debug(f"Unhandled packet type: {packet_type_value}")

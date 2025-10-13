@@ -202,3 +202,7 @@ class DeviceCommands(CommandHandlerBase):
 
         data = b"\x20" + channel_idx.to_bytes(1, "little") + name_bytes + channel_secret
         return await self.send(data, [EventType.OK, EventType.ERROR])
+
+    async def export_private_key(self) -> Event:
+        logger.debug("Requesting private key export")
+        return await self.send(b"\x17", [EventType.PRIVATE_KEY, EventType.DISABLED, EventType.ERROR])
