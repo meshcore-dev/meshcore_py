@@ -464,6 +464,5 @@ class MeshCore:
         """Ensure contacts are fetched"""
         if not self._contacts or (follow and self._contacts_dirty):
             await self.commands.get_contacts(lastmod=self._lastmod)
-            await self.wait_for_event(EventType.CONTACTS, timeout=30) # contact list can be huge
             return True
         return False

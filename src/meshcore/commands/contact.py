@@ -13,7 +13,7 @@ class ContactCommands(CommandHandlerBase):
         data = b"\x04"
         if lastmod > 0:
             data = data + lastmod.to_bytes(4, "little")
-        return await self.send(data, [EventType.CONTACTS, EventType.ERROR])
+        return await self.send(data, [EventType.CONTACTS, EventType.ERROR], timeout=30)
 
     async def reset_path(self, key: DestinationType) -> Event:
         key_bytes = _validate_destination(key, prefix_length=32)
