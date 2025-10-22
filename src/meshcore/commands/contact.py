@@ -8,12 +8,35 @@ logger = logging.getLogger("meshcore")
 
 
 class ContactCommands(CommandHandlerBase):
-    async def get_contacts(self, lastmod=0) -> Event:
+    async def get_contacts(self, lastmod=0, anim=False) -> Event:
         logger.debug("Getting contacts")
         data = b"\x04"
         if lastmod > 0:
             data = data + lastmod.to_bytes(4, "little")
-        return await self.send(data, [EventType.CONTACTS, EventType.ERROR], timeout=30)
+        if anim:
+            print("Fetching contacts ", end="", flush=True)
+        # wait first event
+        res = await self.send(data)
+        while True:
+            # wait next event
+            res = await self.wait_for_events(
+                [EventType.NEXT_CONTACT, EventType.CONTACTS, EventType.ERROR],
+                timeout=5)
+            if res is None: # Timeout 
+                if anim:
+                    print(" Timeout")
+                return res
+            if res.type == EventType.ERROR:
+                if anim:
+                    print(" Error")
+                return res
+            elif res.type == EventType.CONTACTS:
+                if anim:
+                    print(" Done")
+                return res
+            elif res.type == EventType.NEXT_CONTACT:
+                if anim:
+                    print(".", end="", flush=True)
 
     async def reset_path(self, key: DestinationType) -> Event:
         key_bytes = _validate_destination(key, prefix_length=32)

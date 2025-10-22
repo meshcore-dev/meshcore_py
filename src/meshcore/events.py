@@ -21,6 +21,7 @@ class EventType(Enum):
     DEVICE_INFO = "device_info"
     MSG_SENT = "message_sent"
     NEW_CONTACT = "new_contact"
+    NEXT_CONTACT = "next_contact"
 
     # Push notifications
     ADVERTISEMENT = "advertisement"

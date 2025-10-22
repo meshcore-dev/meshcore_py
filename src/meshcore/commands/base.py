@@ -80,6 +80,53 @@ class CommandHandlerBase:
         )-> None:
         self._get_contact_by_prefix = func
 
+    async def wait_for_events(
+        self,
+        expected_events: Optional[Union[EventType, List[EventType]]] = None,
+        timeout: Optional[float] = None,
+    ) -> Event:
+        try:
+            # Convert single event to list if needed
+            if not isinstance(expected_events, list):
+                expected_events = [expected_events]
+
+            logger.debug(f"Waiting for events {expected_events}, timeout={timeout}")
+
+            # Create futures for all expected events
+            futures = []
+            for event_type in expected_events:
+                future = asyncio.create_task(
+                    self.dispatcher.wait_for_event(event_type, {}, timeout)
+                )
+                futures.append(future)
+
+            # Wait for the first event to complete or all to timeout
+            done, pending = await asyncio.wait(
+                futures, timeout=timeout, return_when=asyncio.FIRST_COMPLETED
+            )
+
+            # Cancel all pending futures
+            for future in pending:
+                future.cancel()
+
+            # Check if any future completed successfully
+            for future in done:
+                event = await future
+                if event:
+                    return event
+
+            # Create an error event when no event is received
+            return Event(EventType.ERROR, {"reason": "no_event_received"})
+        except asyncio.TimeoutError:
+            logger.debug(f"Command timed out {data}")
+            return Event(EventType.ERROR, {"reason": "timeout"})
+        except Exception as e:
+            logger.debug(f"Command error: {e}")
+            return Event(EventType.ERROR, {"error": str(e)})
+
+        return Event(EventType.ERROR, {})
+
+
     async def send(
         self,
         data: bytes,
@@ -110,45 +157,9 @@ class CommandHandlerBase:
             await self._sender_func(data)
 
         if expected_events:
-            try:
-                # Convert single event to list if needed
-                if not isinstance(expected_events, list):
-                    expected_events = [expected_events]
-
-                logger.debug(f"Waiting for events {expected_events}, timeout={timeout}")
-
-                # Create futures for all expected events
-                futures = []
-                for event_type in expected_events:
-                    future = asyncio.create_task(
-                        self.dispatcher.wait_for_event(event_type, {}, timeout)
-                    )
-                    futures.append(future)
-
-                # Wait for the first event to complete or all to timeout
-                done, pending = await asyncio.wait(
-                    futures, timeout=timeout, return_when=asyncio.FIRST_COMPLETED
-                )
-
-                # Cancel all pending futures
-                for future in pending:
-                    future.cancel()
-
-                # Check if any future completed successfully
-                for future in done:
-                    event = await future
-                    if event:
-                        return event
-
-                # Create an error event when no event is received
-                return Event(EventType.ERROR, {"reason": "no_event_received"})
-            except asyncio.TimeoutError:
-                logger.debug(f"Command timed out {data}")
-                return Event(EventType.ERROR, {"reason": "timeout"})
-            except Exception as e:
-                logger.debug(f"Command error: {e}")
-                return Event(EventType.ERROR, {"error": str(e)})
         # For commands that don't expect events, return a success event
+            return await self.wait_for_events(expected_events, timeout)
+
         return Event(EventType.OK, {})
 
     # attached at base because its a common method

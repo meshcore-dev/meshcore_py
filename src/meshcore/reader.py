@@ -99,6 +99,7 @@ class MessageReader:
             if packet_type_value == PacketType.PUSH_CODE_NEW_ADVERT.value:
                 await self.dispatcher.dispatch(Event(EventType.NEW_CONTACT, c))
             else:
+                await self.dispatcher.dispatch(Event(EventType.NEXT_CONTACT, c))
                 self.contacts[c["public_key"]] = c
 
         elif packet_type_value == PacketType.CONTACT_END.value:
