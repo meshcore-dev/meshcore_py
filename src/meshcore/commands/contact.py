@@ -1,7 +1,8 @@
 import logging
+import asyncio
 from typing import Optional
 
-from ..events import Event, EventType
+from ..events import Event, EventDispatcher, EventType
 from .base import CommandHandlerBase, DestinationType, _validate_destination
 
 logger = logging.getLogger("meshcore")
@@ -17,26 +18,65 @@ class ContactCommands(CommandHandlerBase):
             print("Fetching contacts ", end="", flush=True)
         # wait first event
         res = await self.send(data)
-        while True:
-            # wait next event
-            res = await self.wait_for_events(
-                [EventType.NEXT_CONTACT, EventType.CONTACTS, EventType.ERROR],
-                timeout=5)
-            if res is None: # Timeout 
-                if anim:
+        timeout = 5
+        # Inline wait for events to continue waiting for CONTACTS event 
+        # while receiving NEXT_CONTACTs (or it might be missed over serial)
+        try:
+            # Create futures for all expected events
+            futures = []
+            for event_type in [EventType.ERROR, EventType.NEXT_CONTACT, EventType.CONTACTS] :
+                future = asyncio.create_task(
+                    self.dispatcher.wait_for_event(event_type, {}, timeout)
+                )
+                futures.append(future)
+
+            while True:
+    
+                # Wait for the first event to complete or all to timeout
+                done, pending = await asyncio.wait(
+                    futures, timeout=timeout, return_when=asyncio.FIRST_COMPLETED
+                )
+    
+                # Check if any future completed successfully
+                if len(done) == 0:
                     print(" Timeout")
-                return res
-            if res.type == EventType.ERROR:
-                if anim:
-                    print(" Error")
-                return res
-            elif res.type == EventType.CONTACTS:
-                if anim:
-                    print(" Done")
-                return res
-            elif res.type == EventType.NEXT_CONTACT:
-                if anim:
-                    print(".", end="", flush=True)
+                    for future in pending: # cancel all futures
+                        future.cancel()
+                    return None
+
+                for future in done:
+                    event = await future
+
+                    if event:
+                        if event.type == EventType.NEXT_CONTACT:
+                            if anim:
+                                print(".", end="", flush=True)
+                        else: # Done or Error ... cancel pending and return
+                            if anim:
+                                print(" Done" if event.type == EventType.CONTACTS else " Error")
+                            for future in pending:
+                                future.cancel()
+                            return event
+
+                futures = []
+                for future in pending: # put back pending
+                    futures.append(future)
+
+                future = asyncio.create_task( # and recreate NEXT_CONTACT
+                        self.dispatcher.wait_for_event(EventType.NEXT_CONTACT, {}, timeout)
+                    )
+                futures.append(future)
+    
+        except asyncio.TimeoutError:
+            logger.debug(f"Timeout receiving contacts")
+            if anim:
+                print(" Timeout")
+            return None
+        except Exception as e:
+            logger.debug(f"Command error: {e}")
+            if anim:
+                print(" Error")
+            return Event(EventType.ERROR, {"error": str(e)})
 
     async def reset_path(self, key: DestinationType) -> Event:
         key_bytes = _validate_destination(key, prefix_length=32)
