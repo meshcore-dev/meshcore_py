@@ -19,6 +19,7 @@ class ContactCommands(CommandHandlerBase):
         # wait first event
         res = await self.send(data)
         timeout = 5
+        contact_nb = 0
         # Inline wait for events to continue waiting for CONTACTS event 
         # while receiving NEXT_CONTACTs (or it might be missed over serial)
         try:
@@ -26,7 +27,7 @@ class ContactCommands(CommandHandlerBase):
             futures = []
             for event_type in [EventType.ERROR, EventType.NEXT_CONTACT, EventType.CONTACTS] :
                 future = asyncio.create_task(
-                    self.dispatcher.wait_for_event(event_type, {}, timeout)
+                    self.dispatcher.wait_for_event(event_type, {}, timeout=timeout)
                 )
                 futures.append(future)
 
@@ -50,10 +51,14 @@ class ContactCommands(CommandHandlerBase):
                     if event:
                         if event.type == EventType.NEXT_CONTACT:
                             if anim:
+                                contact_nb = contact_nb+1
                                 print(".", end="", flush=True)
                         else: # Done or Error ... cancel pending and return
                             if anim:
-                                print(" Done" if event.type == EventType.CONTACTS else " Error")
+                                if event.type == EventType.CONTACTS:
+                                    print ((len(event.payload)-contact_nb)*"." + " Done")
+                                else : 
+                                    print(" Error")
                             for future in pending:
                                 future.cancel()
                             return event
