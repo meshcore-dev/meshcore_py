@@ -9,17 +9,17 @@ logger = logging.getLogger("meshcore")
 
 
 class ContactCommands(CommandHandlerBase):
-    async def get_contacts(self, lastmod=0, anim=False) -> Event:
+    async def get_contacts_async(self, lastmod=0) :
         logger.debug("Getting contacts")
         data = b"\x04"
         if lastmod > 0:
             data = data + lastmod.to_bytes(4, "little")
-        if anim:
-            print("Fetching contacts ", end="", flush=True)
         # wait first event
-        res = await self.send(data)
-        timeout = 5
-        contact_nb = 0
+        await self.send(data)
+
+    async def get_contacts(self, lastmod=0, timeout=5) -> Event:
+        await self.get_contacts_async(lastmod)
+
         # Inline wait for events to continue waiting for CONTACTS event 
         # while receiving NEXT_CONTACTs (or it might be missed over serial)
         try:
@@ -40,30 +40,20 @@ class ContactCommands(CommandHandlerBase):
     
                 # Check if any future completed successfully
                 if len(done) == 0:
-                    print(" Timeout")
+                    logger.debug("Timeout while getting contacts")
                     for future in pending: # cancel all futures
                         future.cancel()
                     return None
 
                 for future in done:
                     event = await future
-
-                    if event:
-                        if event.type == EventType.NEXT_CONTACT:
-                            if anim:
-                                contact_nb = contact_nb+1
-                                print(".", end="", flush=True)
-                        else: # Done or Error ... cancel pending and return
-                            if anim:
-                                if event.type == EventType.CONTACTS:
-                                    print ((len(event.payload)-contact_nb)*"." + " Done")
-                                else : 
-                                    print(" Error")
-                            for future in pending:
-                                future.cancel()
-                            return event
+                    if event is None or event.type != EventType.NEXT_CONTACT:
+                        for future in pending:
+                            future.cancel()
+                        return event
 
                 futures = []
+
                 for future in pending: # put back pending
                     futures.append(future)
 
@@ -74,13 +64,9 @@ class ContactCommands(CommandHandlerBase):
     
         except asyncio.TimeoutError:
             logger.debug(f"Timeout receiving contacts")
-            if anim:
-                print(" Timeout")
             return None
         except Exception as e:
             logger.debug(f"Command error: {e}")
-            if anim:
-                print(" Error")
             return Event(EventType.ERROR, {"error": str(e)})
 
     async def reset_path(self, key: DestinationType) -> Event:
