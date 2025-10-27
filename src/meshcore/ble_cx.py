@@ -113,7 +113,12 @@ class BLEConnection:
         except TimeoutError:
             return None
 
-        await self.client.start_notify(UART_TX_CHAR_UUID, self.handle_rx)
+        try:
+            await self.client.start_notify(UART_TX_CHAR_UUID, self.handle_rx)
+        except AttributeError :
+            logger.info("Connection is not established, need to restart it")
+            logger.debug("in ble_cx.connect()")
+            return None
 
         nus = self.client.services.get_service(UART_SERVICE_UUID)
         if nus is None:

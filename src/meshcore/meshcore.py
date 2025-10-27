@@ -165,6 +165,7 @@ class MeshCore:
         await self.dispatcher.start()
         result = await self.connection_manager.connect()
         if result is None:
+            await self.dispatcher.stop()
             raise ConnectionError("Failed to connect to device")
         return await self.commands.send_appstart()
 
