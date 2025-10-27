@@ -18,7 +18,6 @@ UART_SERVICE_UUID = "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
 UART_RX_CHAR_UUID = "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
 UART_TX_CHAR_UUID = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 
-
 class BLEConnection:
     def __init__(self, address=None, device=None, client=None, pin=None):
         """
@@ -116,6 +115,8 @@ class BLEConnection:
         try:
             await self.client.start_notify(UART_TX_CHAR_UUID, self.handle_rx)
         except AttributeError :
+            if self.client :
+                await self.client.disconnect()
             logger.info("Connection is not established, need to restart it")
             logger.debug("in ble_cx.connect()")
             return None
