@@ -152,7 +152,7 @@ class DeviceCommands(CommandHandlerBase):
         infos["adv_loc_policy"] = advert_loc_policy
         return await self.set_other_params_from_infos(infos)
 
-    async def set_multi_ack(self, multi_acks: int) -> Event:
+    async def set_multi_acks(self, multi_acks: int) -> Event:
         infos = (await self.send_appstart()).payload
         infos["multi_acks"] = multi_acks
         return await self.set_other_params_from_infos(infos)
