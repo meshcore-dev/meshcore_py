@@ -123,6 +123,7 @@ class MessageReader:
             self_info["adv_lon"] = (
                 int.from_bytes(data[40:44], byteorder="little", signed=True) / 1e6
             )
+            self_info["multi_acks"] = data[44]
             self_info["adv_loc_policy"] = data[45]
             self_info["telemetry_mode_env"] = (data[46] >> 4) & 0b11
             self_info["telemetry_mode_loc"] = (data[46] >> 2) & 0b11

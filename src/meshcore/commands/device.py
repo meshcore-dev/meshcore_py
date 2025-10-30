@@ -87,14 +87,18 @@ class DeviceCommands(CommandHandlerBase):
             [EventType.OK, EventType.ERROR],
         )
 
+    # the old set_other_params function has been replaced in
+    # favour of set_other_params_from_infos to be more generic
+    # stays here for backward compatibility but does not support
+    # multi_acks for instance
     async def set_other_params(
-        self,
-        manual_add_contacts: bool,
-        telemetry_mode_base: int,
-        telemetry_mode_loc: int,
-        telemetry_mode_env: int,
-        advert_loc_policy: int,
-    ) -> Event:
+            self,
+            manual_add_contacts: bool,
+            telemetry_mode_base: int,
+            telemetry_mode_loc: int,
+            telemetry_mode_env: int,
+            advert_loc_policy: int,
+        ) -> Event:
         telemetry_mode = (
             (telemetry_mode_base & 0b11)
             | ((telemetry_mode_loc & 0b11) << 2)
@@ -108,55 +112,50 @@ class DeviceCommands(CommandHandlerBase):
         )
         return await self.send(data, [EventType.OK, EventType.ERROR])
 
+    async def set_other_params_from_infos(self, infos) -> Event:
+        telemetry_mode = (
+            (infos["telemetry_mode_base"] & 0b11)
+            | ((infos["telemetry_mode_loc"] & 0b11) << 2)
+            | ((infos["telemetry_mode_env"] & 0b11) << 4)
+        )
+        data = (
+            b"\x26"
+            + infos["manual_add_contacts"].to_bytes(1)
+            + telemetry_mode.to_bytes(1)
+            + infos["adv_loc_policy"].to_bytes(1)
+            + infos["multi_acks"].to_bytes(1)
+        )
+        return await self.send(data, [EventType.OK, EventType.ERROR])
+
     async def set_telemetry_mode_base(self, telemetry_mode_base: int) -> Event:
         infos = (await self.send_appstart()).payload
-        return await self.set_other_params(
-            infos["manual_add_contacts"],
-            telemetry_mode_base,
-            infos["telemetry_mode_loc"],
-            infos["telemetry_mode_env"],
-            infos["adv_loc_policy"],
-        )
+        infos["telemetry_mode_base"] = telemetry_mode_base
+        return await self.set_other_params_from_infos(infos)
 
     async def set_telemetry_mode_loc(self, telemetry_mode_loc: int) -> Event:
         infos = (await self.send_appstart()).payload
-        return await self.set_other_params(
-            infos["manual_add_contacts"],
-            infos["telemetry_mode_base"],
-            telemetry_mode_loc,
-            infos["telemetry_mode_env"],
-            infos["adv_loc_policy"],
-        )
+        infos["telemetry_mode_loc"] = telemetry_mode_loc
+        return await self.set_other_params_from_infos(infos)
 
     async def set_telemetry_mode_env(self, telemetry_mode_env: int) -> Event:
         infos = (await self.send_appstart()).payload
-        return await self.set_other_params(
-            infos["manual_add_contacts"],
-            infos["telemetry_mode_base"],
-            infos["telemetry_mode_loc"],
-            telemetry_mode_env,
-            infos["adv_loc_policy"],
-        )
+        infos["telemetry_mode_env"] = telemetry_mode_env
+        return await self.set_other_params_from_infos(infos)
 
     async def set_manual_add_contacts(self, manual_add_contacts: bool) -> Event:
         infos = (await self.send_appstart()).payload
-        return await self.set_other_params(
-            manual_add_contacts,
-            infos["telemetry_mode_base"],
-            infos["telemetry_mode_loc"],
-            infos["telemetry_mode_env"],
-            infos["adv_loc_policy"],
-        )
+        infos["manual_add_contacts"] = manual_add_contacts
+        return await self.set_other_params_from_infos(infos)
 
     async def set_advert_loc_policy(self, advert_loc_policy: int) -> Event:
         infos = (await self.send_appstart()).payload
-        return await self.set_other_params(
-            infos["manual_add_contacts"],
-            infos["telemetry_mode_base"],
-            infos["telemetry_mode_loc"],
-            infos["telemetry_mode_env"],
-            advert_loc_policy,
-        )
+        infos["adv_loc_policy"] = advert_loc_policy
+        return await self.set_other_params_from_infos(infos)
+
+    async def set_multi_ack(self, multi_acks: int) -> Event:
+        infos = (await self.send_appstart()).payload
+        infos["multi_acks"] = multi_acks
+        return await self.set_other_params_from_infos(infos)
 
     async def set_devicepin(self, pin: int) -> Event:
         logger.debug(f"Setting device PIN to: {pin}")
