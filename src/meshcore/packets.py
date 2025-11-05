@@ -33,6 +33,8 @@ class PacketType(Enum):
     CUSTOM_VARS = 21
     BINARY_REQ = 50
     FACTORY_RESET = 51
+    PATH_DISCOVERY = 52
+    SET_FLOOD_SCOPE = 54
 
     # Push notifications
     ADVERTISEMENT = 0x80

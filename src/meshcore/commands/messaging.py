@@ -1,8 +1,10 @@
 import logging
 import random
 from typing import Optional, Union
+from hashlib import sha256
 
 from ..events import Event, EventType
+from ..packets import PacketType
 from .base import CommandHandlerBase, DestinationType, _validate_destination
 
 logger = logging.getLogger("meshcore")
@@ -209,3 +211,20 @@ class MessagingCommands(CommandHandlerBase):
                 return Event(EventType.ERROR, {"reason": "unsupported_path_type"})
 
         return await self.send(cmd_data, [EventType.MSG_SENT, EventType.ERROR])
+
+    async def set_flood_scope(self, scope):
+        if scope.startswith("#"): # an hash
+            logger.debug(f"Setting scope from hash {scope}")
+            scope_key = sha256(scope.encode("utf-8")).digest()[0:16]
+        elif scope == "0" or scope == "None": # disable
+            scope_key = b"\0"*16
+        else: # assume the key has been sent directly
+            scope_key = scope.encode("utf-8")
+
+        logger.debug(f"Setting scope to {scope_key.hex()}")
+
+        cmd_data = bytearray([PacketType.SET_FLOOD_SCOPE.value])
+        cmd_data.extend(b"\0")
+        cmd_data.extend(scope_key)
+
+        return await self.send(cmd_data, [EventType.OK, EventType.ERROR])
