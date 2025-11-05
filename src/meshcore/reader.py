@@ -377,12 +377,7 @@ class MessageReader:
             attributes = {
                 "pubkey_prefix": res["pubkey_pre"],
             }
-            data_hex = data[8:].hex()
-            logger.debug(f"Status response: {data_hex}")
 
-            attributes = {
-                "pubkey_prefix": res["pubkey_pre"],
-            }
             await self.dispatcher.dispatch(
                 Event(EventType.STATUS_RESPONSE, res, attributes)
             )
@@ -395,22 +390,23 @@ class MessageReader:
 
             # First byte is SNR (signed byte, multiplied by 4)
             if len(data) > 1:
-                snr_byte = data[1]
+                snr_byte = dbuf.read(1)[0]
                 # Convert to signed value
                 snr = (snr_byte if snr_byte < 128 else snr_byte - 256) / 4.0
                 log_data["snr"] = snr
 
             # Second byte is RSSI (signed byte)
             if len(data) > 2:
-                rssi_byte = data[2]
+                rssi_byte = dbuf.read(1)[0]
                 # Convert to signed value
                 rssi = rssi_byte if rssi_byte < 128 else rssi_byte - 256
                 log_data["rssi"] = rssi
 
             # Remaining bytes are the raw data payload
             if len(data) > 3:
-                log_data["payload"] = data[3:].hex()
-                log_data["payload_length"] = len(data) - 3
+                payload=dbuf.read()
+                log_data["payload"] = payload.hex()
+                log_data["payload_length"] = len(payload)
 
             attributes = {
                 "pubkey_prefix": log_data["raw_hex"],
@@ -479,8 +475,10 @@ class MessageReader:
             logger.debug(f"Received telemetry data: {data.hex()}")
             res = {}
 
-            res["pubkey_pre"] = data[2:8].hex()
-            buf = data[8:]
+            dbuf.read(1)
+
+            res["pubkey_pre"] = dbuf.read(6).hex()
+            buf = dbuf.read()
 
             """Parse a given byte string and return as a LppFrame object."""
             i = 0
@@ -507,8 +505,9 @@ class MessageReader:
 
         elif packet_type_value == PacketType.BINARY_RESPONSE.value:
             logger.debug(f"Received binary data: {data.hex()}")
-            tag = data[2:6].hex()
-            response_data = data[6:]
+            dbuf.read(1)
+            tag = dbuf.read(4).hex()
+            response_data = dbuf.read()
 
             # Always dispatch generic BINARY_RESPONSE
             binary_res = {"tag": tag, "data": response_data.hex()}
@@ -565,13 +564,14 @@ class MessageReader:
         elif packet_type_value == PacketType.PATH_DISCOVERY_RESPONSE.value:
             logger.debug(f"Received path discovery response: {data.hex()}")
             res = {}
-            res["pubkey_pre"] = data[2:8].hex()
-            opl = data[8]
+            dbuf.read(1)
+            res["pubkey_pre"] = dbuf.read(6).hex()
+            opl = dbuf.read(1)[0]
             res["out_path_len"] = opl
-            res["out_path"] = data[9 : 9 + opl].hex()
-            ipl = data[9 + opl]
+            res["out_path"] = dbuf.read(opl).hex()
+            ipl = dbuf.read(1)[0]
             res["in_path_len"] = ipl
-            res["in_path"] = data[10 + opl : 10 + opl + ipl].hex()
+            res["in_path"] = dbuf.read(ipl).hex()
 
             attributes = {"pubkey_pre": res["pubkey_pre"]}
 
@@ -582,7 +582,7 @@ class MessageReader:
         elif packet_type_value == PacketType.PRIVATE_KEY.value:
             logger.debug(f"Received private key response: {data.hex()}")
             if len(data) >= 65:  # 1 byte response code + 64 bytes private key
-                private_key = data[1:65]  # Extract 64-byte private key
+                private_key = dbuf.read(64)  # Extract 64-byte private key
                 res = {"private_key": private_key}
                 await self.dispatcher.dispatch(Event(EventType.PRIVATE_KEY, res))
             else:
