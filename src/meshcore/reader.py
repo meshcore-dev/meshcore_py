@@ -4,7 +4,7 @@ import time
 import io
 from typing import Any, Dict
 from .events import Event, EventType, EventDispatcher
-from .packets import BinaryReqType, PacketType
+from .packets import BinaryReqType, PacketType, ControlType
 from .parsing import lpp_parse, lpp_parse_mma, parse_acl, parse_status
 from cayennelpp import LppFrame, LppData
 from meshcore.lpp_json_encoder import lpp_json_encoder
@@ -331,8 +331,8 @@ class MessageReader:
 
         elif packet_type_value == PacketType.RAW_DATA.value:
             res = {}
-            res["SNR"] = dbuf.read(1)[0] / 4
-            res["RSSI"] = dbuf.read(1)[0]
+            res["SNR"] = int.from_bytes(dbuf.read(1), byteorder="little", signed=True) / 4
+            res["RSSI"] = int.from_bytes(dbuf.read(1), byteorder="little", signed=True)
             res["payload"] = dbuf.read(4).hex()
             logger.debug("Received raw data")
             print(res)
@@ -592,6 +592,43 @@ class MessageReader:
             logger.debug("Received disabled response")
             res = {"reason": "private_key_export_disabled"}
             await self.dispatcher.dispatch(Event(EventType.DISABLED, res))
+
+        elif packet_type_value == PacketType.CONTROL_DATA.value:
+            logger.debug("Received control data packet")
+            res={}
+            res["SNR"] = int.from_bytes(dbuf.read(1), byteorder="little", signed=True) / 4
+            res["RSSI"] = int.from_bytes(dbuf.read(1), byteorder="little", signed=True)
+            res["path_len"] = dbuf.read(1)[0]
+            payload = dbuf.read()
+            payload_type = payload[0]
+            res["payload_type"] = payload_type
+            res["payload"] = payload
+
+            attributes = {"payload_type": payload_type}
+            await self.dispatcher.dispatch(
+                Event(EventType.CONTROL_DATA, res, attributes)
+            )
+
+            # decode NODE_DISCOVER_RESP
+            if payload_type & 0xF0 == ControlType.NODE_DISCOVER_RESP.value:
+                pbuf = io.BytesIO(payload[1:])
+                ndr = dict(res)
+                del ndr["payload_type"]
+                del ndr["payload"]
+                ndr["node_type"] = payload_type & 0x0F
+                ndr["SNR_in"] = int.from_bytes(pbuf.read(1), byteorder="little", signed=True)/4
+                ndr["tag"] = pbuf.read(4).hex()
+                ndr["pubkey"] = pbuf.read(32).hex()
+
+                attributes = {
+                    "node_type" : ndr["node_type"],
+                    "tag" : ndr["tag"],
+                    "pubkey" : ndr["pubkey"],
+                }
+
+                await self.dispatcher.dispatch(
+                    Event(EventType.DISCOVER_RESPONSE, ndr, attributes)
+                )
 
         else:
             logger.debug(f"Unhandled data received {data}")

@@ -44,6 +44,8 @@ class EventType(Enum):
     PATH_RESPONSE = "path_response"
     PRIVATE_KEY = "private_key"
     DISABLED = "disabled"
+    CONTROL_DATA = "control_data"
+    DISCOVER_RESPONSE = "discover_response"
 
     # Command response types
     OK = "command_ok"

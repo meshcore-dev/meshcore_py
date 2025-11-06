@@ -7,6 +7,10 @@ class BinaryReqType(Enum):
     MMA = 0x04
     ACL = 0x05
 
+class ControlType(Enum):
+    NODE_DISCOVER_REQ = 0x80
+    NODE_DISCOVER_RESP = 0x90
+
 # Packet prefixes for the protocol
 class PacketType(Enum):
     OK = 0
@@ -35,6 +39,7 @@ class PacketType(Enum):
     FACTORY_RESET = 51
     PATH_DISCOVERY = 52
     SET_FLOOD_SCOPE = 54
+    SEND_CONTROL_DATA = 55
 
     # Push notifications
     ADVERTISEMENT = 0x80
@@ -51,3 +56,4 @@ class PacketType(Enum):
     TELEMETRY_RESPONSE = 0x8B
     BINARY_RESPONSE = 0x8C
     PATH_DISCOVERY_RESPONSE = 0x8D
+    CONTROL_DATA = 0x8E

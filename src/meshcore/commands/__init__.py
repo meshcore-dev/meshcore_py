@@ -7,10 +7,15 @@ from .binary import BinaryCommandHandler
 from .contact import ContactCommands
 from .device import DeviceCommands
 from .messaging import MessagingCommands
+from .control_data import ControlDataCommandHandler
 
 
 class CommandHandler(
-    DeviceCommands, ContactCommands, MessagingCommands, BinaryCommandHandler
+    DeviceCommands,
+    ContactCommands,
+    MessagingCommands,
+    BinaryCommandHandler,
+    ControlDataCommandHandler
 ):
     pass
 
