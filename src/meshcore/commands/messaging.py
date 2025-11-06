@@ -216,7 +216,7 @@ class MessagingCommands(CommandHandlerBase):
         if scope.startswith("#"): # an hash
             logger.debug(f"Setting scope from hash {scope}")
             scope_key = sha256(scope.encode("utf-8")).digest()[0:16]
-        elif scope == "0" or scope == "None": # disable
+        elif scope == "0" or scope == "None" or scope == "*" or scope == "": # disable
             scope_key = b"\0"*16
         else: # assume the key has been sent directly
             scope_key = scope.encode("utf-8")
