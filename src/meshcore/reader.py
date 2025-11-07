@@ -618,7 +618,14 @@ class MessageReader:
                 ndr["node_type"] = payload_type & 0x0F
                 ndr["SNR_in"] = int.from_bytes(pbuf.read(1), byteorder="little", signed=True)/4
                 ndr["tag"] = pbuf.read(4).hex()
-                ndr["pubkey"] = pbuf.read(32).hex()
+
+                pubkey = pbuf.read()
+                if len(pubkey) < 32:
+                    pubkey = pubkey[0:8]
+                else:
+                    pubkey = pubkey[0:32]    
+
+                ndr["pubkey"] = pubkey.hex()
 
                 attributes = {
                     "node_type" : ndr["node_type"],

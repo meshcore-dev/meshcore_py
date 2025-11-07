@@ -10,9 +10,9 @@ logger = logging.getLogger("meshcore")
 class ControlDataCommandHandler(CommandHandlerBase):
     """Helper functions to handle binary requests through binary commands"""
 
-    async def send_control_data (self, control_type: ControlType, payload: bytes) -> Event:
+    async def send_control_data (self, control_type: int, payload: bytes) -> Event:
         data = bytearray([PacketType.SEND_CONTROL_DATA.value]) 
-        data.extend(control_type.value.to_bytes(1, "little", signed = False)) 
+        data.extend(control_type.to_bytes(1, "little", signed = False)) 
         data.extend(payload)
 
         result = await self.send(data, [EventType.OK, EventType.ERROR])
@@ -21,6 +21,7 @@ class ControlDataCommandHandler(CommandHandlerBase):
     async def send_node_discover_req (
         self,
         filter: int,
+        prefix_only: bool=True,
         tag: int=None,
         since: int=None
     ) -> Event:
@@ -36,7 +37,11 @@ class ControlDataCommandHandler(CommandHandlerBase):
 
         logger.debug(f"sending node discover req {data.hex()}")
 
-        res = await self.send_control_data(ControlType.NODE_DISCOVER_REQ, data)
+        flags = 0
+        flags = flags | 1 if prefix_only else flags
+
+        res = await self.send_control_data(
+            ControlType.NODE_DISCOVER_REQ.value|flags, data)
 
         if res is None:
             return None
