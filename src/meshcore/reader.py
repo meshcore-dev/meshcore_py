@@ -181,8 +181,8 @@ class MessageReader:
         elif packet_type_value == 16:  # A reply to CMD_SYNC_NEXT_MESSAGE (ver >= 3)
             res = {}
             res["type"] = "PRIV"
-            res["SNR"] = int.from_bytes(dbuf.read(2), byteorder="little", signed=True) / 4
-            dbuf.read(1) # reserved
+            res["SNR"] = int.from_bytes(dbuf.read(1), byteorder="little", signed=True) / 4
+            dbuf.read(2) # reserved
             res["pubkey_prefix"] = dbuf.read(6).hex()
             res["path_len"] = dbuf.read(1)[0]
             txt_type = dbuf.read(1)[0]
@@ -222,8 +222,8 @@ class MessageReader:
         elif packet_type_value == 17:  # A reply to CMD_SYNC_NEXT_MESSAGE (ver >= 3)
             res = {}
             res["type"] = "CHAN"
-            res["SNR"] = int.from_bytes(dbuf.read(2), byteorder="little", signed=True) / 4
-            dbuf.read(1) # reserved
+            res["SNR"] = int.from_bytes(dbuf.read(1), byteorder="little", signed=True) / 4
+            dbuf.read(2) # reserved
             res["channel_idx"] = dbuf.read(1)[0]
             res["path_len"] = dbuf.read(1)[0]
             res["txt_type"] = dbuf.read(1)[0]
