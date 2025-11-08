@@ -285,6 +285,39 @@ class MessageReader:
             logger.debug(f"got custom vars : {res}")
             await self.dispatcher.dispatch(Event(EventType.CUSTOM_VARS, res))
 
+        elif packet_type_value == PacketType.STATS_CORE.value:
+            logger.debug(f"received stats core response: {data.hex()}")
+            rawdata = dbuf.read().decode("utf-8", "ignore")
+            try:
+                res = json.loads(rawdata)
+                logger.debug(f"parsed stats core: {res}")
+                await self.dispatcher.dispatch(Event(EventType.STATS_CORE, res))
+            except json.JSONDecodeError as e:
+                logger.error(f"Error parsing stats core JSON: {e}, raw data: {rawdata}")
+                await self.dispatcher.dispatch(Event(EventType.ERROR, {"reason": f"json_parse_error: {e}"}))
+
+        elif packet_type_value == PacketType.STATS_RADIO.value:
+            logger.debug(f"received stats radio response: {data.hex()}")
+            rawdata = dbuf.read().decode("utf-8", "ignore")
+            try:
+                res = json.loads(rawdata)
+                logger.debug(f"parsed stats radio: {res}")
+                await self.dispatcher.dispatch(Event(EventType.STATS_RADIO, res))
+            except json.JSONDecodeError as e:
+                logger.error(f"Error parsing stats radio JSON: {e}, raw data: {rawdata}")
+                await self.dispatcher.dispatch(Event(EventType.ERROR, {"reason": f"json_parse_error: {e}"}))
+
+        elif packet_type_value == PacketType.STATS_PACKETS.value:
+            logger.debug(f"received stats packets response: {data.hex()}")
+            rawdata = dbuf.read().decode("utf-8", "ignore")
+            try:
+                res = json.loads(rawdata)
+                logger.debug(f"parsed stats packets: {res}")
+                await self.dispatcher.dispatch(Event(EventType.STATS_PACKETS, res))
+            except json.JSONDecodeError as e:
+                logger.error(f"Error parsing stats packets JSON: {e}, raw data: {rawdata}")
+                await self.dispatcher.dispatch(Event(EventType.ERROR, {"reason": f"json_parse_error: {e}"}))
+
         elif packet_type_value == PacketType.CHANNEL_INFO.value:
             logger.debug(f"received channel info response: {data.hex()}")
             res = {}
