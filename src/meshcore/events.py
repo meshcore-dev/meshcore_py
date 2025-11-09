@@ -46,6 +46,7 @@ class EventType(Enum):
     DISABLED = "disabled"
     CONTROL_DATA = "control_data"
     DISCOVER_RESPONSE = "discover_response"
+    NEIGHBOURS_RESPONSE = "neighbours_response"
 
     # Command response types
     OK = "command_ok"

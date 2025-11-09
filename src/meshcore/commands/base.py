@@ -163,7 +163,7 @@ class CommandHandlerBase:
         return Event(EventType.OK, {})
 
     # attached at base because its a common method
-    async def send_binary_req(self, dst: DestinationType, request_type: BinaryReqType, data: Optional[bytes] = None, timeout=None, min_timeout=0) -> Event:
+    async def send_binary_req(self, dst: DestinationType, request_type: BinaryReqType, data: Optional[bytes] = None, context={}, timeout=None, min_timeout=0) -> Event:
         dst_bytes = _validate_destination(dst, prefix_length=32)
         pubkey_prefix = _validate_destination(dst, prefix_length=6)
         logger.debug(f"Binary request to {dst_bytes.hex()}")
@@ -180,6 +180,6 @@ class CommandHandlerBase:
             # Use provided timeout or fallback to suggested timeout (with 5s default)
             actual_timeout = timeout if timeout is not None and timeout > 0 else result.payload.get("suggested_timeout", 4000) / 800.0
             actual_timeout = min_timeout if actual_timeout < min_timeout else actual_timeout
-            self._reader.register_binary_request(pubkey_prefix.hex(), exp_tag, request_type, actual_timeout)
+            self._reader.register_binary_request(pubkey_prefix.hex(), exp_tag, request_type, actual_timeout, context=context)
 
         return result
