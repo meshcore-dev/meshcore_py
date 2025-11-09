@@ -6,6 +6,7 @@ class BinaryReqType(Enum):
     TELEMETRY = 0x03
     MMA = 0x04
     ACL = 0x05
+    NEIGHBORS = 0x06
 
 class ControlType(Enum):
     NODE_DISCOVER_REQ = 0x80

@@ -3,6 +3,7 @@ import logging
 from .base import CommandHandlerBase
 from ..events import EventType
 from ..packets import BinaryReqType
+import struct, secrets
 
 logger = logging.getLogger("meshcore")
 
@@ -67,6 +68,53 @@ class BinaryCommandHandler(CommandHandlerBase):
         )
         
         return telem_event.payload["lpp"] if telem_event else None
+
+    async def req_neighbors_sync(self, contact, count=10):
+        data = (
+            bytes([0,               # request_version = 0
+                count]) +
+            struct.pack("<H", 0) +  # offset = 0 (LE)
+            bytes([0,               # order_by = 0 (newest->oldest)
+                6]) +               # pubkey_prefix_length = 6 Bytes
+            secrets.token_bytes(4)  # 4-Byte random value
+        )
+
+        res = await self.send_binary_req(
+            dst=contact,
+            request_type=BinaryReqType.NEIGHBORS,
+            data=data,
+            timeout=15
+        )
+        if res.type == EventType.ERROR:
+            return None
+
+        if self.dispatcher is None:
+            return None
+        
+        # Listen for BINARY_RESPONSE event
+        telem_event = await self.dispatcher.wait_for_event(
+            EventType.BINARY_RESPONSE,
+            attribute_filters={"tag": res.payload["expected_ack"].hex()},
+            timeout=15,
+        )
+        if telem_event is None:
+            return None
+        data = bytes.fromhex(telem_event.payload["data"])
+        neighbours_count, results_count = struct.unpack_from("<HH", data, 0)
+        off = 4
+        esize = 11
+
+        out = []
+        for _ in range(results_count):
+            if off + 11 > len(data):
+                break
+            prefix = data[off:off+6].hex(); off += 6
+            heard = struct.unpack_from("<I", data, off)[0]; off += 4
+            snr_raw = struct.unpack_from("b", data, off)[0]; off += 1
+            snr = snr_raw / 4.0          # <-- ¼-dB resolution
+            out.append((prefix, heard, snr))
+        
+        return out
 
     async def req_mma(self, contact, timeout=0, min_timeout=0):
         logger.error("*** please consider using req_mma_sync instead of req_mma") 
