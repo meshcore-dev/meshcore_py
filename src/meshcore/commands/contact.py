@@ -124,8 +124,8 @@ class ContactCommands(CommandHandlerBase):
         data = (
             b"\x09"
             + bytes.fromhex(contact["public_key"])
-            + contact["type"].to_bytes(1)
-            + flags.to_bytes(1)
+            + contact["type"].to_bytes(1, "little")
+            + flags.to_bytes(1, "little")
             + out_path_len.to_bytes(1, "little", signed=True)
             + bytes.fromhex(out_path_hex)
             + bytes.fromhex(adv_name_hex)

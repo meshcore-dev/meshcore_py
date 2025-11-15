@@ -106,9 +106,9 @@ class DeviceCommands(CommandHandlerBase):
         )
         data = (
             b"\x26"
-            + manual_add_contacts.to_bytes(1)
-            + telemetry_mode.to_bytes(1)
-            + advert_loc_policy.to_bytes(1)
+            + manual_add_contacts.to_bytes(1, "little")
+            + telemetry_mode.to_bytes(1, "little")
+            + advert_loc_policy.to_bytes(1, "little")
         )
         return await self.send(data, [EventType.OK, EventType.ERROR])
 
@@ -120,10 +120,10 @@ class DeviceCommands(CommandHandlerBase):
         )
         data = (
             b"\x26"
-            + infos["manual_add_contacts"].to_bytes(1)
-            + telemetry_mode.to_bytes(1)
-            + infos["adv_loc_policy"].to_bytes(1)
-            + infos["multi_acks"].to_bytes(1)
+            + infos["manual_add_contacts"].to_bytes(1, "little")
+            + telemetry_mode.to_bytes(1, "little")
+            + infos["adv_loc_policy"].to_bytes(1, "little")
+            + infos["multi_acks"].to_bytes(1, "little")
         )
         return await self.send(data, [EventType.OK, EventType.ERROR])
 
