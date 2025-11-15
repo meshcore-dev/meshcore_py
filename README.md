@@ -462,6 +462,7 @@ All events in MeshCore are represented by the `EventType` enum. These events are
 | `ACL_RESPONSE` | `"acl_response"` | Access Control List data | List of keys and permissions |
 | **Channel Events** |||
 | `CHANNEL_INFO` | `"channel_info"` | Channel configuration | Channel name, secret, index |
+| `CHANNEL_FLAG_NOSTORE` | `"channel_flag_nostore"` | State of no-store channel flag | Flag state |
 | **Raw Data Events** |||
 | `RAW_DATA` | `"raw_data"` | Raw radio data | SNR, RSSI, payload hex |
 | `RX_LOG_DATA` | `"rx_log_data"` | RF log data | SNR, RSSI, raw payload |
@@ -512,6 +513,8 @@ All commands are async methods that return `Event` objects. Commands are organiz
 | **Channel Management** ||||
 | `get_channel(channel_idx)` | `channel_idx: int` | `CHANNEL_INFO` | Get channel configuration |
 | `set_channel(channel_idx, name, secret)` | `channel_idx: int, name: str, secret: bytes` | `OK` | Configure channel (secret must be 16 bytes) |
+| `get_channel_flag_nostore(channel_idx)` | `channel_idx: int` | `CHANNEL_FLAG_NOSTORE` | Get state of channel's no-store flag |
+| `set_channel_flag_nostore(channel_idx, enabled)` | `channel_idx: int, enabled: bool` | `OK` | Set state of channel's no-store flag |
 | **Device Actions** ||||
 | `send_advert(flood=False)` | `flood: bool` | `OK` | Send advertisement (optionally flood network) |
 | `reboot()` | None | None | Reboot device (no response expected) |
