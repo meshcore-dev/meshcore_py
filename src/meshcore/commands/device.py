@@ -205,3 +205,13 @@ class DeviceCommands(CommandHandlerBase):
     async def export_private_key(self) -> Event:
         logger.debug("Requesting private key export")
         return await self.send(b"\x17", [EventType.PRIVATE_KEY, EventType.DISABLED, EventType.ERROR])
+
+    async def get_channel_flag_nostore(self, channel_idx: int) -> Event:
+        logger.debug(f"Getting channel flag nostore for channel {channel_idx}")
+        data = b"\x38" + channel_idx.to_bytes(1, "little")
+        return await self.send(data, [EventType.CHANNEL_FLAG_NOSTORE, EventType.ERROR])
+    
+    async def set_channel_flag_nostore(self, channel_idx: int, no_store: bool) -> Event:
+        logger.debug(f"Setting channel flag nostore for channel {channel_idx} to {no_store}")
+        data = b"\x39" + channel_idx.to_bytes(1, "little") + no_store.to_bytes(1, "little")
+        return await self.send(data, [EventType.OK, EventType.ERROR])
