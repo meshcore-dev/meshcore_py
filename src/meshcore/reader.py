@@ -51,7 +51,11 @@ class MessageReader:
 
     async def handle_rx(self, data: bytearray):
         dbuf = io.BytesIO(data)
-        packet_type_value = dbuf.read(1)[0]
+        try:
+            packet_type_value = dbuf.read(1)[0]
+        except IndexError as e:
+            logger.warning(f"Received empty packet: {e}")
+            return
         logger.debug(f"Received data: {data.hex()}")
 
         # Handle command responses
