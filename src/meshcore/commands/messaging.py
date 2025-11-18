@@ -86,7 +86,12 @@ class MessagingCommands(CommandHandlerBase):
         max_attempts=3, max_flood_attempts=2, flood_after=2, timeout=0, min_timeout=0
     ) -> Event:
         
-        dst_bytes = _validate_destination(dst)
+        try:
+            dst_bytes = _validate_destination(dst, prefix_length=32)
+            # with 32 bytes we can reset to flood
+        except ValueError:
+            # but if we can't, we'll assume we're flood
+            dst_bytes = _validate_destination(dst, prefix_length=6)
         contact = self._get_contact_by_prefix(dst_bytes.hex())
 
         attempts = 0
@@ -94,13 +99,17 @@ class MessagingCommands(CommandHandlerBase):
         if not contact is None :
             flood = contact["out_path_len"] == -1
         else:
-            flood = False 
+            # we can't know if we're flood without fetching all contacts
+            # if we have a full key (meaning we can reset path) consider direct
+            # else consider flood
+            flood = len(dst_bytes) < 32 
+            logger.info(f"send_msg_with_retry: can't determine if flood, assume {flood}")
         res = None
         while attempts < max_attempts and res is None \
                     and (not flood or flood_attempts < max_flood_attempts):
-            if attempts == flood_after : # change path to flood
+            if attempts == flood_after and not flood: # change path to flood
                 logger.info("Resetting path")
-                rp_res = await self.reset_path(dst)
+                rp_res = await self.reset_path(dst_bytes)
                 if rp_res.type == EventType.ERROR:
                     logger.error(f"Couldn't reset path {rp_res} continuing ...")
                 else:
