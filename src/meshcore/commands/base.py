@@ -32,10 +32,14 @@ def _validate_destination(dst: DestinationType, prefix_length: int = 6) -> bytes
     """
     if isinstance(dst, bytes):
         # Already bytes, use directly
+        if len(dst)<prefix_length:
+            raise ValueError(f"Invalid prefix len, expecting {prefix_length}, got {len(dst)}")
         return dst[:prefix_length]
     elif isinstance(dst, str):
         # Hex string, convert to bytes
         try:
+            if len(dst)<2*prefix_length:
+                raise ValueError(f"Invalid prefix len, expecting {prefix_length}, got {len(dst)/2}")
             return bytes.fromhex(dst)[:prefix_length]
         except ValueError:
             raise ValueError(f"Invalid public key hex string: {dst}")
