@@ -98,6 +98,9 @@ class MessagingCommands(CommandHandlerBase):
         flood_attempts = 0
         if not contact is None :
             flood = contact["out_path_len"] == -1
+            if len(dst_bytes) < 32:
+                # if we have a contact, then we can get a 32 bytes key !
+                dst_bytes = _validate_destination(contact, prefix_length=32)
         else:
             # we can't know if we're flood without fetching all contacts
             # if we have a full key (meaning we can reset path) consider direct
