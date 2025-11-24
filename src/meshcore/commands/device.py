@@ -205,3 +205,18 @@ class DeviceCommands(CommandHandlerBase):
     async def export_private_key(self) -> Event:
         logger.debug("Requesting private key export")
         return await self.send(b"\x17", [EventType.PRIVATE_KEY, EventType.DISABLED, EventType.ERROR])
+
+    async def get_stats_core(self) -> Event:
+        logger.debug("Getting core statistics")
+        # CMD_GET_STATS (56) + STATS_TYPE_CORE (0)
+        return await self.send(b"\x38\x00", [EventType.STATS_CORE, EventType.ERROR])
+
+    async def get_stats_radio(self) -> Event:
+        logger.debug("Getting radio statistics")
+        # CMD_GET_STATS (56) + STATS_TYPE_RADIO (1)
+        return await self.send(b"\x38\x01", [EventType.STATS_RADIO, EventType.ERROR])
+
+    async def get_stats_packets(self) -> Event:
+        logger.debug("Getting packet statistics")
+        # CMD_GET_STATS (56) + STATS_TYPE_PACKETS (2)
+        return await self.send(b"\x38\x02", [EventType.STATS_PACKETS, EventType.ERROR])
