@@ -286,7 +286,7 @@ class MessageReader:
             logger.debug(f"got custom vars : {res}")
             await self.dispatcher.dispatch(Event(EventType.CUSTOM_VARS, res))
 
-        elif packet_type_value == PacketType.STATS_CORE.value:  # RESP_CODE_STATS (24)
+        elif packet_type_value == PacketType.STATS.value:  # RESP_CODE_STATS (24)
             logger.debug(f"received stats response: {data.hex()}")
             # RESP_CODE_STATS: All stats responses use code 24 with sub-type byte
             # Byte 0: response_code (24), Byte 1: stats_type (0=core, 1=radio, 2=packets)
