@@ -36,9 +36,7 @@ class PacketType(Enum):
     SIGN_START = 19
     SIGNATURE = 20
     CUSTOM_VARS = 21
-    STATS_CORE = 24
-    STATS_RADIO = 25
-    STATS_PACKETS = 26
+    STATS = 24
     BINARY_REQ = 50
     FACTORY_RESET = 51
     PATH_DISCOVERY = 52
