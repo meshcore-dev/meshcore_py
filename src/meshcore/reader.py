@@ -1,5 +1,6 @@
 import logging
 import json
+import struct
 import time
 import io
 from typing import Any, Dict
@@ -51,7 +52,11 @@ class MessageReader:
 
     async def handle_rx(self, data: bytearray):
         dbuf = io.BytesIO(data)
-        packet_type_value = dbuf.read(1)[0]
+        try:
+            packet_type_value = dbuf.read(1)[0]
+        except IndexError as e:
+            logger.warning(f"Received empty packet: {e}")
+            return
         logger.debug(f"Received data: {data.hex()}")
 
         # Handle command responses
@@ -292,6 +297,87 @@ class MessageReader:
             res["channel_flag_nostore"] = (bool)(dbuf.read(1)[0])
             logger.debug(f"got channel flags : {res}")
             await self.dispatcher.dispatch(Event(EventType.CHANNEL_FLAG_NOSTORE, res))
+
+        elif packet_type_value == PacketType.STATS_CORE.value:  # RESP_CODE_STATS (24)
+            logger.debug(f"received stats response: {data.hex()}")
+            # RESP_CODE_STATS: All stats responses use code 24 with sub-type byte
+            # Byte 0: response_code (24), Byte 1: stats_type (0=core, 1=radio, 2=packets)
+            if len(data) < 2:
+                logger.error(f"Stats response too short: {len(data)} bytes, need at least 2 for header")
+                await self.dispatcher.dispatch(Event(EventType.ERROR, {"reason": "invalid_frame_length"}))
+                return
+            
+            stats_type = data[1]
+            
+            if stats_type == 0:  # STATS_TYPE_CORE
+                # RESP_CODE_STATS + STATS_TYPE_CORE: 11 bytes total
+                # Format: <B B H I H B (response_code, stats_type, battery_mv, uptime_secs, errors, queue_len)
+                if len(data) < 11:
+                    logger.error(f"Stats core response too short: {len(data)} bytes, expected 11")
+                    await self.dispatcher.dispatch(Event(EventType.ERROR, {"reason": "invalid_frame_length"}))
+                else:
+                    try:
+                        battery_mv, uptime_secs, errors, queue_len = struct.unpack('<H I H B', data[2:11])
+                        res = {
+                            'battery_mv': battery_mv,
+                            'uptime_secs': uptime_secs,
+                            'errors': errors,
+                            'queue_len': queue_len
+                        }
+                        logger.debug(f"parsed stats core: {res}")
+                        await self.dispatcher.dispatch(Event(EventType.STATS_CORE, res))
+                    except struct.error as e:
+                        logger.error(f"Error parsing stats core binary frame: {e}, data: {data.hex()}")
+                        await self.dispatcher.dispatch(Event(EventType.ERROR, {"reason": f"binary_parse_error: {e}"}))
+            
+            elif stats_type == 1:  # STATS_TYPE_RADIO
+                # RESP_CODE_STATS + STATS_TYPE_RADIO: 14 bytes total
+                # Format: <B B h b b I I (response_code, stats_type, noise_floor, last_rssi, last_snr, tx_air_secs, rx_air_secs)
+                if len(data) < 14:
+                    logger.error(f"Stats radio response too short: {len(data)} bytes, expected 14")
+                    await self.dispatcher.dispatch(Event(EventType.ERROR, {"reason": "invalid_frame_length"}))
+                else:
+                    try:
+                        noise_floor, last_rssi, last_snr_scaled, tx_air_secs, rx_air_secs = struct.unpack('<h b b I I', data[2:14])
+                        res = {
+                            'noise_floor': noise_floor,
+                            'last_rssi': last_rssi,
+                            'last_snr': last_snr_scaled / 4.0,  # Unscale SNR (was multiplied by 4)
+                            'tx_air_secs': tx_air_secs,
+                            'rx_air_secs': rx_air_secs
+                        }
+                        logger.debug(f"parsed stats radio: {res}")
+                        await self.dispatcher.dispatch(Event(EventType.STATS_RADIO, res))
+                    except struct.error as e:
+                        logger.error(f"Error parsing stats radio binary frame: {e}, data: {data.hex()}")
+                        await self.dispatcher.dispatch(Event(EventType.ERROR, {"reason": f"binary_parse_error: {e}"}))
+            
+            elif stats_type == 2:  # STATS_TYPE_PACKETS
+                # RESP_CODE_STATS + STATS_TYPE_PACKETS: 26 bytes total
+                # Format: <B B I I I I I I (response_code, stats_type, recv, sent, flood_tx, direct_tx, flood_rx, direct_rx)
+                if len(data) < 26:
+                    logger.error(f"Stats packets response too short: {len(data)} bytes, expected 26")
+                    await self.dispatcher.dispatch(Event(EventType.ERROR, {"reason": "invalid_frame_length"}))
+                else:
+                    try:
+                        recv, sent, flood_tx, direct_tx, flood_rx, direct_rx = struct.unpack('<I I I I I I', data[2:26])
+                        res = {
+                            'recv': recv,
+                            'sent': sent,
+                            'flood_tx': flood_tx,
+                            'direct_tx': direct_tx,
+                            'flood_rx': flood_rx,
+                            'direct_rx': direct_rx
+                        }
+                        logger.debug(f"parsed stats packets: {res}")
+                        await self.dispatcher.dispatch(Event(EventType.STATS_PACKETS, res))
+                    except struct.error as e:
+                        logger.error(f"Error parsing stats packets binary frame: {e}, data: {data.hex()}")
+                        await self.dispatcher.dispatch(Event(EventType.ERROR, {"reason": f"binary_parse_error: {e}"}))
+            
+            else:
+                logger.error(f"Unknown stats type: {stats_type}, data: {data.hex()}")
+                await self.dispatcher.dispatch(Event(EventType.ERROR, {"reason": f"unknown_stats_type: {stats_type}"}))
 
         elif packet_type_value == PacketType.CHANNEL_INFO.value:
             logger.debug(f"received channel info response: {data.hex()}")
