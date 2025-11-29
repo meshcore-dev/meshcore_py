@@ -290,6 +290,13 @@ class MessageReader:
                     res[psplit[0]] = psplit[1]
             logger.debug(f"got custom vars : {res}")
             await self.dispatcher.dispatch(Event(EventType.CUSTOM_VARS, res))
+        
+        elif packet_type_value == PacketType.CHANNEL_FLAG_NOSTORE.value:
+            logger.debug(f"received channel flag nostore response: {data.hex()}")
+            res = {}
+            res["channel_flag_nostore"] = (bool)(dbuf.read(1)[0])
+            logger.debug(f"got channel flags : {res}")
+            await self.dispatcher.dispatch(Event(EventType.CHANNEL_FLAG_NOSTORE, res))
 
         elif packet_type_value == PacketType.STATS.value:  # RESP_CODE_STATS (24)
             logger.debug(f"received stats response: {data.hex()}")
