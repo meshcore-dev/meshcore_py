@@ -206,6 +206,11 @@ class DeviceCommands(CommandHandlerBase):
         logger.debug("Requesting private key export")
         return await self.send(b"\x17", [EventType.PRIVATE_KEY, EventType.DISABLED, EventType.ERROR])
 
+    async def import_private_key(self, key) -> Event:
+        logger.debug("Requesting private key import")
+        data = b"\x18" + key
+        return await self.send(data, [EventType.OK, EventType.ERROR])
+
     async def get_stats_core(self) -> Event:
         logger.debug("Getting core statistics")
         # CMD_GET_STATS (56) + STATS_TYPE_CORE (0)
