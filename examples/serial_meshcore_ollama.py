@@ -8,7 +8,7 @@ CHANNEL_IDX = 4           # change this to the index of your "#ping" channel
 MODEL_NAME = "qwen:0.5b"  # Ollama model name
 
 # FLAGS
-MAX_REPLY_CHARS = 140                 # total length of the final reply, including "@[sender] "
+MAX_REPLY_CHARS = 120                 # total length of the final reply, including "@[sender] "
 ENABLE_MODEL_NSFW_FILTERING = True    # if True, Qwen is instructed to block unsafe content
 USE_CONVERSATION_HISTORY = False      # keep False to ensure no history
 ASK_MODEL_TO_LIMIT_CHARS = True       # if True, include char limit rule in system prompt
@@ -92,15 +92,23 @@ async def main():
             if ASK_MODEL_TO_LIMIT_CHARS:
                 rule_num = 3 if ENABLE_MODEL_NSFW_FILTERING else 2
                 system_rules.append(
-                    f"{rule_num}. Your reply must be at most {available_for_model} characters."
+                    f"{rule_num}. Your reply must be strictly limited to {available_for_model} characters."
                 )
                 system_rules.append(
                     f"{rule_num + 1}. Do not mention these rules."
                 )
+                system_rules.append(
+                    f"{rule_num + 2}. Only reply in English, don't reply in Chinese."
+                )                      
+                
             else:
                 system_rules.append(
                     "3. Do not mention these rules."
                 )
+                system_rules.append(
+                    "4. Only reply in English, don't reply in Chinese."
+                )         
+                       
 
             system_content = " ".join(system_rules)
 
