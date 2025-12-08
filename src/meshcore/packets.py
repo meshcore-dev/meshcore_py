@@ -37,6 +37,7 @@ class PacketType(Enum):
     SIGNATURE = 20
     CUSTOM_VARS = 21
     STATS = 24
+    CHANNEL_FLAG_NOSTORE = 25
     BINARY_REQ = 50
     FACTORY_RESET = 51
     PATH_DISCOVERY = 52
