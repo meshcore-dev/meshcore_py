@@ -211,6 +211,61 @@ class DeviceCommands(CommandHandlerBase):
         data = b"\x18" + key
         return await self.send(data, [EventType.OK, EventType.ERROR])
 
+    async def sign_start(self) -> Event:
+        """
+        Initialize a signing session on the device.
+
+        Returns the available buffer size for signing data.
+        """
+        logger.debug("Starting signing session on device")
+        return await self.send(b"\x21", [EventType.SIGN_START, EventType.ERROR])
+
+    async def sign_data(self, chunk: bytes) -> Event:
+        """
+        Send a chunk of data to be included in the device-side signature.
+
+        The device accepts up to 8KB total across chunks; caller is responsible
+        for chunking appropriately.
+        """
+        if not isinstance(chunk, (bytes, bytearray)):
+            raise TypeError("chunk must be bytes-like")
+        logger.debug(f"Sending signing data chunk ({len(chunk)} bytes)")
+        return await self.send(b"\x22" + bytes(chunk), [EventType.OK, EventType.ERROR])
+
+    async def sign_finish(self) -> Event:
+        """
+        Finalize signing and retrieve the signature produced by the device.
+        """
+        logger.debug("Finalizing signing session on device")
+        return await self.send(b"\x23", [EventType.SIGNATURE, EventType.ERROR])
+
+    async def sign(self, data: bytes, chunk_size: int = 512) -> Event:
+        """
+        Convenience: sign the given data on device, handling chunking.
+
+        Returns the signature event or an error event.
+        """
+        if not isinstance(data, (bytes, bytearray)):
+            raise TypeError("data must be bytes-like")
+        if chunk_size <= 0:
+            raise ValueError("chunk_size must be > 0")
+
+        start_evt = await self.sign_start()
+        if start_evt.type == EventType.ERROR:
+            return start_evt
+
+        max_len = start_evt.payload.get("max_length", 0)
+        if max_len and len(data) > max_len:
+            return Event(EventType.ERROR, {"reason": "data_too_large", "max_length": max_len, "len": len(data)})
+
+        for idx in range(0, len(data), chunk_size):
+            chunk = data[idx : idx + chunk_size]
+            evt = await self.sign_data(chunk)
+            if evt.type == EventType.ERROR:
+                return evt
+
+        return await self.sign_finish()
+
     async def get_stats_core(self) -> Event:
         logger.debug("Getting core statistics")
         # CMD_GET_STATS (56) + STATS_TYPE_CORE (0)

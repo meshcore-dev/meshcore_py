@@ -710,6 +710,20 @@ class MessageReader:
             else:
                 logger.error(f"Invalid private key response length: {len(data)}")
 
+        elif packet_type_value == PacketType.SIGN_START.value:
+            logger.debug(f"Received sign start response: {data.hex()}")
+            # Payload: 1 reserved byte, 4-byte max length
+            dbuf.read(1)
+            max_len = int.from_bytes(dbuf.read(4), "little")
+            res = {"max_length": max_len}
+            await self.dispatcher.dispatch(Event(EventType.SIGN_START, res))
+
+        elif packet_type_value == PacketType.SIGNATURE.value:
+            logger.debug(f"Received signature: {data.hex()}")
+            signature = dbuf.read()
+            res = {"signature": signature}
+            await self.dispatcher.dispatch(Event(EventType.SIGNATURE, res))
+
         elif packet_type_value == PacketType.DISABLED.value:
             logger.debug("Received disabled response")
             res = {"reason": "private_key_export_disabled"}
