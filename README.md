@@ -616,6 +616,8 @@ Check the `examples/` directory for more:
 - `pubsub_example.py`: Event subscription system with auto-fetching
 - `serial_infos.py`: Quick device info retrieval
 - `serial_msg.py`: Message sending and receiving
+- `serial_pingbot.py`: Ping bot which can be run on a channel
+- `serial_meshcore_ollama.py`: Simple Ollama to Meshcore gateway, a simple chat box 
 - `ble_pin_pairing_example.py`: BLE connection with PIN pairing
 - `ble_private_key_export.py`: BLE private key export with PIN authentication
 - `ble_t1000_infos.py`: BLE connections
