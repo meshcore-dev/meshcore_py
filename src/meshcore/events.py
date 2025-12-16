@@ -50,6 +50,8 @@ class EventType(Enum):
     CONTROL_DATA = "control_data"
     DISCOVER_RESPONSE = "discover_response"
     NEIGHBOURS_RESPONSE = "neighbours_response"
+    SIGN_START = "sign_start"
+    SIGNATURE = "signature"
 
     # Command response types
     OK = "command_ok"

@@ -122,7 +122,7 @@ class CommandHandlerBase:
             # Create an error event when no event is received
             return Event(EventType.ERROR, {"reason": "no_event_received"})
         except asyncio.TimeoutError:
-            logger.debug(f"Command timed out {data}")
+            logger.debug(f"Command timed out waiting for events {expected_events}")
             return Event(EventType.ERROR, {"reason": "timeout"})
         except Exception as e:
             logger.debug(f"Command error: {e}")

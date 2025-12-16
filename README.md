@@ -468,6 +468,8 @@ All events in MeshCore are represented by the `EventType` enum. These events are
 | `LOG_DATA` | `"log_data"` | Generic log data | Various log information |
 | **Binary Protocol Events** |||
 | `BINARY_RESPONSE` | `"binary_response"` | Generic binary response | Tag and hex data |
+| `SIGN_START` | `"sign_start"` | Start of an on-device signing session | Maximum buffer size (bytes) for data to sign |
+| `SIGNATURE` | `"signature"` | Resulting on-device signature | Raw signature bytes |
 | **Authentication Events** |||
 | `LOGIN_SUCCESS` | `"login_success"` | Successful login | Permissions, admin status, pubkey prefix |
 | `LOGIN_FAILED` | `"login_failed"` | Failed login attempt | Pubkey prefix |
@@ -564,6 +566,9 @@ All commands are async methods that return `Event` objects. Commands are organiz
 | `req_telemetry(contact, timeout=0)` | `contact: dict, timeout: float` | `TELEMETRY_RESPONSE` | Get telemetry via binary protocol |
 | `req_mma(contact, start, end, timeout=0)` | `contact: dict, start: int, end: int, timeout: float` | `MMA_RESPONSE` | Get historical telemetry data |
 | `req_acl(contact, timeout=0)` | `contact: dict, timeout: float` | `ACL_RESPONSE` | Get access control list |
+| `sign_start()` | None | `SIGN_START` | Begin a signing session; returns maximum buffer size for data to sign |
+| `sign_data(chunk)` | `chunk: bytes` | `OK` | Append a data chunk to the current signing session (can be called multiple times) |
+| `sign_finish()` | None | `SIGNATURE` | Finalize signing and return the signature for all accumulated data |
 
 ### Helper Methods
 
@@ -571,6 +576,7 @@ All commands are async methods that return `Event` objects. Commands are organiz
 |--------|---------|-------------|
 | `get_contact_by_name(name)` | `dict/None` | Find contact by advertisement name |
 | `get_contact_by_key_prefix(prefix)` | `dict/None` | Find contact by partial public key |
+| `sign(data, chunk_size=512)` | `Event` (`SIGNATURE`/`ERROR`) | High-level helper to sign arbitrary data on-device, handling chunking for you |
 | `is_connected` | `bool` | Check if device is currently connected |
 | `subscribe(event_type, callback, filters=None)` | `Subscription` | Subscribe to events with optional filtering |
 | `unsubscribe(subscription)` | None | Remove event subscription |

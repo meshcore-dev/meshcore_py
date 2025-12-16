@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from hashlib import sha256
 from typing import Optional
@@ -210,6 +211,67 @@ class DeviceCommands(CommandHandlerBase):
         logger.debug("Requesting private key import")
         data = b"\x18" + key
         return await self.send(data, [EventType.OK, EventType.ERROR])
+
+    async def sign_start(self) -> Event:
+        logger.debug("Starting signing session on device")
+        return await self.send(b"\x21", [EventType.SIGN_START, EventType.ERROR])
+
+    async def sign_data(self, chunk: bytes) -> Event:
+        if not isinstance(chunk, (bytes, bytearray)):
+            raise TypeError("chunk must be bytes-like")
+        logger.debug(f"Sending signing data chunk ({len(chunk)} bytes)")
+        data = b"\x22" + bytes(chunk)
+        result = await self.send(data, [EventType.OK, EventType.ERROR], timeout=5.0)
+        
+        # If we got an error (not just timeout), return it immediately
+        if result.type == EventType.ERROR:
+            # If it's a timeout/no_event, log a warning but continue - the data may have been received
+            if result.payload.get("reason") in ("timeout", "no_event_received"):
+                logger.warning(
+                    f"sign_data OK response not received (timeout), but continuing - "
+                    f"data may have been processed by device"
+                )
+                return Event(EventType.OK, {})
+            # For actual errors (bad state, table full, etc.), return the error
+            return result
+        
+        return result
+
+    async def sign_finish(self, timeout: Optional[float] = None, data_size: int = 0) -> Event:
+        logger.debug("Finalizing signing session on device")
+        if timeout is None:
+            base_timeout = max(self.default_timeout * 3, 15.0)
+            size_bonus = min(data_size / 2048.0, 5.0)
+            timeout = base_timeout + size_bonus
+        logger.debug(f"sign_finish using timeout={timeout:.1f} seconds (data_size={data_size} bytes)")
+        return await self.send(b"\x23", [EventType.SIGNATURE, EventType.ERROR], timeout=timeout)
+
+    async def sign(self, data: bytes, chunk_size: int = 120, timeout: Optional[float] = None) -> Event:
+        if not isinstance(data, (bytes, bytearray)):
+            raise TypeError("data must be bytes-like")
+        if chunk_size <= 0:
+            raise ValueError("chunk_size must be > 0")
+
+        start_evt = await self.sign_start()
+        if start_evt.type == EventType.ERROR:
+            return start_evt
+
+        max_len = start_evt.payload.get("max_length", 0)
+        if max_len and len(data) > max_len:
+            return Event(EventType.ERROR, {"reason": "data_too_large", "max_length": max_len, "len": len(data)})
+
+        for idx in range(0, len(data), chunk_size):
+            chunk = data[idx : idx + chunk_size]
+            chunk_num = (idx // chunk_size) + 1
+            total_chunks = (len(data) + chunk_size - 1) // chunk_size
+            logger.debug(f"Sending chunk {chunk_num}/{total_chunks} ({len(chunk)} bytes)")
+            evt = await self.sign_data(chunk)
+            if evt.type == EventType.ERROR:
+                logger.error(f"Error sending chunk {chunk_num}/{total_chunks}: {evt.payload}")
+                return evt
+            logger.debug(f"Chunk {chunk_num}/{total_chunks} sent successfully")
+
+        return await self.sign_finish(timeout=timeout, data_size=len(data))
 
     async def get_stats_core(self) -> Event:
         logger.debug("Getting core statistics")
