@@ -46,8 +46,8 @@ async def main():
     parser.add_argument(
         "--chunk-size",
         type=int,
-        default=512,
-        help="Chunk size to stream to the device (bytes)",
+        default=120,
+        help="Chunk size to stream to the device (bytes). Default 120 for BLE (frames under 128 bytes work better). For serial/TCP, larger values (e.g., 512) work fine.",
     )
     parser.add_argument(
         "--timeout",
@@ -69,6 +69,10 @@ async def main():
         print("✅ Connected.")
 
         data_bytes = args.data.encode("utf-8")
+        print(f"Data to sign: {len(data_bytes)} bytes")
+        if args.debug:
+            print(f"Data hex (first 100 bytes): {data_bytes[:100].hex()}")
+        
         sig_evt = await meshcore.commands.sign(data_bytes, chunk_size=max(1, args.chunk_size), timeout=args.timeout)
         if sig_evt.type == EventType.ERROR:
             raise RuntimeError(f"sign failed: {sig_evt.payload}")
@@ -78,6 +82,36 @@ async def main():
         hex_sig = signature.hex()
         for line in wrap(hex_sig, 64):
             print(line)
+
+        # Verify signature with device's public key
+        try:
+            from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+            from cryptography.exceptions import InvalidSignature
+            
+            # Get device's public key from self_info
+            self_info = meshcore.self_info
+            if not self_info or "public_key" not in self_info:
+                print("\n⚠️  Could not get device public key for verification")
+            else:
+                pubkey_hex = self_info["public_key"]
+                pubkey_bytes = bytes.fromhex(pubkey_hex)
+                
+                try:
+                    public_key = Ed25519PublicKey.from_public_bytes(pubkey_bytes)
+                    public_key.verify(signature, data_bytes)
+                    print("\n✅ Signature verification: SUCCESS (signature is valid)")
+                except InvalidSignature:
+                    print("\n❌ Signature verification: FAILED (signature is invalid)")
+                    if args.debug:
+                        print(f"   Public key: {pubkey_hex}")
+                        print(f"   Data length: {len(data_bytes)} bytes")
+                        print(f"   Signature length: {len(signature)} bytes")
+                        print(f"   Data (first 50 bytes): {data_bytes[:50].hex()}")
+                except Exception as e:
+                    print(f"\n⚠️  Signature verification error: {e}")
+        except ImportError:
+            print("\n⚠️  cryptography library not available - skipping signature verification")
+            print("   Install with: pip install cryptography")
 
         print("\nSigning flow completed!")
 
