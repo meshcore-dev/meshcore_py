@@ -226,24 +226,71 @@ class DeviceCommands(CommandHandlerBase):
 
         The device accepts up to 8KB total across chunks; caller is responsible
         for chunking appropriately.
+        
+        Note: The device does not send OK responses for sign_data commands.
+        It accumulates data silently and only responds at sign_finish().
+        Errors will still be reported if they occur.
+        
+        This is a fire-and-forget operation.
         """
         if not isinstance(chunk, (bytes, bytearray)):
             raise TypeError("chunk must be bytes-like")
         logger.debug(f"Sending signing data chunk ({len(chunk)} bytes)")
-        return await self.send(b"\x22" + bytes(chunk), [EventType.OK, EventType.ERROR])
+        
+        # The device doesn't send OK for sign_data - it's fire-and-forget until sign_finish.
+        # We send the data and return success immediately. If there's an error,
+        # it will be reported at sign_finish().
+        if not self.dispatcher:
+            raise RuntimeError("Dispatcher not set, cannot send commands")
+        
+        if self._sender_func:
+            logger.debug(
+                f"Sending raw data: {(b'\x22' + bytes(chunk)).hex() if isinstance(chunk, bytes) else chunk}"
+            )
+            await self._sender_func(b"\x22" + bytes(chunk))
+        
+        # Return success immediately - device accumulates data silently
+        return Event(EventType.OK, {})
 
-    async def sign_finish(self) -> Event:
+    async def sign_finish(self, timeout: Optional[float] = None, data_size: int = 0) -> Event:
         """
         Finalize signing and retrieve the signature produced by the device.
+        
+        This operation performs the actual cryptographic signing on the device.
+        The timeout accounts for BLE communication delays and device processing overhead.
+        
+        Args:
+            timeout: Timeout in seconds. If None, uses a calculated default based on
+                    data size and default_timeout (minimum 15 seconds).
+            data_size: Size of data that was signed (in bytes). Used to calculate
+                      appropriate timeout if timeout is None. Defaults to 0.
         """
         logger.debug("Finalizing signing session on device")
-        return await self.send(b"\x23", [EventType.SIGNATURE, EventType.ERROR])
+        # Use a longer default timeout for sign_finish since it performs crypto operations
+        # Ed25519 signing is fast, but we need time for BLE communication and device overhead
+        if timeout is None:
+            # Base timeout: at least 15 seconds, or 3x default (whichever is larger)
+            base_timeout = max(self.default_timeout * 3, 15.0)
+            # Add extra time for very large data (1 second per 2KB, capped at +5 seconds)
+            # This accounts for potential device processing delays with large payloads
+            size_bonus = min(data_size / 2048.0, 5.0)
+            timeout = base_timeout + size_bonus
+        logger.debug(f"sign_finish using timeout={timeout:.1f} seconds (data_size={data_size} bytes)")
+        return await self.send(b"\x23", [EventType.SIGNATURE, EventType.ERROR], timeout=timeout)
 
-    async def sign(self, data: bytes, chunk_size: int = 512) -> Event:
+    async def sign(self, data: bytes, chunk_size: int = 512, timeout: Optional[float] = None) -> Event:
         """
         Convenience: sign the given data on device, handling chunking.
 
-        Returns the signature event or an error event.
+        Args:
+            data: The data to sign
+            chunk_size: Size of chunks to send (default: 512 bytes)
+            timeout: Timeout for sign_finish operation in seconds. If None, uses
+                    a longer default (15 seconds minimum) since cryptographic
+                    operations can take time, especially for larger data like JWT tokens.
+
+        Returns:
+            The signature event or an error event.
         """
         if not isinstance(data, (bytes, bytearray)):
             raise TypeError("data must be bytes-like")
@@ -264,7 +311,7 @@ class DeviceCommands(CommandHandlerBase):
             if evt.type == EventType.ERROR:
                 return evt
 
-        return await self.sign_finish()
+        return await self.sign_finish(timeout=timeout, data_size=len(data))
 
     async def get_stats_core(self) -> Event:
         logger.debug("Getting core statistics")

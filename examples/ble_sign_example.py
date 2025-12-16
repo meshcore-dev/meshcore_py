@@ -50,6 +50,12 @@ async def main():
         help="Chunk size to stream to the device (bytes)",
     )
     parser.add_argument(
+        "--timeout",
+        type=float,
+        default=None,
+        help="Timeout for sign_finish operation in seconds (default: 15s minimum, longer for large data like JWT tokens)",
+    )
+    parser.add_argument(
         "--debug",
         action="store_true",
         help="Enable debug logging",
@@ -63,7 +69,7 @@ async def main():
         print("✅ Connected.")
 
         data_bytes = args.data.encode("utf-8")
-        sig_evt = await meshcore.commands.sign(data_bytes, chunk_size=max(1, args.chunk_size))
+        sig_evt = await meshcore.commands.sign(data_bytes, chunk_size=max(1, args.chunk_size), timeout=args.timeout)
         if sig_evt.type == EventType.ERROR:
             raise RuntimeError(f"sign failed: {sig_evt.payload}")
         signature = sig_evt.payload.get("signature", b"")
