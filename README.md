@@ -519,6 +519,13 @@ All commands are async methods that return `Event` objects. Commands are organiz
 | `reboot()` | None | None | Reboot device (no response expected) |
 | **Security** ||||
 | `export_private_key()` | None | `PRIVATE_KEY/DISABLED` | Export device private key (requires PIN auth & enabled firmware) |
+| `import_private_key(key)` | `key: bytes` | `OK` | Import private key to device |
+| **Statistics** ||||
+| `get_stats_core()` | None | `STATS_CORE` | Get core statistics (voltage, uptime, errors, queue length) |
+| `get_stats_radio()` | None | `STATS_RADIO` | Get radio statistics (noise floor, last RSSI/SNR, tx/rx time stats) |
+| `get_stats_packets()` | None | `STATS_PACKETS` | Get packet statistics (rx/tx totals, breakdown by flood vs. direct) |
+| **Advanced Configuration** ||||
+| `set_multi_acks(multi_acks)` | `multi_acks: int` | `OK` | Set multi-acks mode (experimental ack repeats) |
 
 #### Contact Commands (`meshcore.commands.*`)
 
@@ -557,6 +564,9 @@ All commands are async methods that return `Event` objects. Commands are organiz
 | `send_binary_req(dst, bin_data)` | `dst: contact/str/bytes, bin_data: bytes` | `MSG_SENT` | Send binary data request |
 | `send_path_discovery(dst)` | `dst: contact/str/bytes` | `MSG_SENT` | Initiate path discovery |
 | `send_trace(auth_code, tag, flags, path=None)` | `auth_code: int, tag: int, flags: int, path: list` | `MSG_SENT` | Send route trace packet |
+| **Message Retry & Scope** ||||
+| `send_msg_with_retry(dst, msg, ...)` | `dst, msg, timestamp, max_attempts, max_flood_attempts, flood_after, timeout, min_timeout` | `MSG_SENT/None` | Send message with automatic retry and ACK waiting |
+| `set_flood_scope(scope)` | `scope: str` | `OK` | Set flood scope (hash like "#name", "0"/""/"*" to disable, or raw key) |
 
 #### Binary Protocol Commands (`meshcore.commands.*`)
 
