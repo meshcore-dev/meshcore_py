@@ -318,3 +318,26 @@ async def test_set_channel(command_handler, mock_connection):
 async def test_set_channel_invalid_secret_length(command_handler):
     with pytest.raises(ValueError, match="Channel secret must be exactly 16 bytes"):
         await command_handler.set_channel(1, "Test", b"tooshort")
+
+
+async def test_send_chan_msg_with_str_timestamp(command_handler, mock_connection):
+    ts = 1620000000
+    await command_handler.send_chan_msg(3, "world", timestamp=ts)
+    data = mock_connection.send.call_args[0][0]
+    assert data.startswith(b"\x03\x00\x03")
+    assert b"world" in data
+    assert data[3:7] == ts.to_bytes(4, "little")
+
+async def test_send_chan_msg_with_bytes_timestamp(command_handler, mock_connection):
+    ts = 1620000000
+    await command_handler.send_chan_msg(3, "world", timestamp=ts.to_bytes(4, "little"))
+    data = mock_connection.send.call_args[0][0]
+    assert data.startswith(b"\x03\x00\x03")
+    assert b"world" in data
+    assert data[3:7] == ts.to_bytes(4, "little")
+
+async def test_send_chan_msg_with_invalid_timestamp(command_handler, mock_connection):
+    result = await command_handler.send_chan_msg(3, "world", timestamp=b"00")
+
+    assert result.type == EventType.ERROR
+    assert result.payload["reason"] == "invalid_timestamp_format"
