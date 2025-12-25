@@ -141,17 +141,27 @@ class MessagingCommands(CommandHandlerBase):
     
         return None if res is None else result
 
-    async def send_chan_msg(self, chan, msg, timestamp=None) -> Event:
+    async def send_chan_msg(self, chan: int, msg: str, timestamp: Optional[int|bytes] = None) -> Event:
         logger.debug(f"Sending channel message to channel {chan}: {msg}")
 
-        # Default to current time if timestamp not provided
         if timestamp is None:
+            # Default to current time if timestamp not provided
             import time
-
-            timestamp = int(time.time()).to_bytes(4, "little")
+            timestamp_bytes = int(time.time()).to_bytes(4, "little")
+        elif isinstance(timestamp, int):
+            timestamp_bytes = timestamp.to_bytes(4, "little")
+        elif isinstance(timestamp, bytes) and len(timestamp) == 4:
+            # expected bytes format
+            timestamp_bytes = timestamp
+        else:
+            if isinstance(timestamp, bytes):
+                logger.error(f"Invalid timestamp format: got bytes of length {len(timestamp)} but expected bytes of length 4")
+            else:
+                logger.error(f"Invalid timestamp format: got {type(timestamp)} but expected int or 4 bytes")
+            return Event(EventType.ERROR, {"reason": "invalid_timestamp_format"})
 
         data = (
-            b"\x03\x00" + chan.to_bytes(1, "little") + timestamp + msg.encode("utf-8")
+            b"\x03\x00" + chan.to_bytes(1, "little") + timestamp_bytes + msg.encode("utf-8")
         )
         return await self.send(data, [EventType.OK, EventType.ERROR])
 
