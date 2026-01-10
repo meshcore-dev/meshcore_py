@@ -33,6 +33,11 @@ FIELDS_TO_SEND = [
     "Size",
 ]
 
+BLOCKED_STATUSES = [
+    "Under Control",
+    "Safe",
+]
+
 logging.basicConfig(level=logging.INFO)
 _LOGGER = logging.getLogger("serial_rssbot")
 
@@ -168,13 +173,41 @@ def build_filtered_message(item: dict[str, str]) -> str | None:
     fields = extract_fields(item.get("raw_description") or "")
     if not fields:
         return None
+    
+    status_norm = fields.get("Status", "").strip().lower()
+    blocked_norm = [b.lower() for b in BLOCKED_STATUSES]
+
+    if status_norm in blocked_norm:
+        return None
+
+
+    # if any(b.lower() in status for b in BLOCKED_STATUSES):
+    #     return None    
 
     # Keep order exactly as FIELDS_TO_SEND, skip missing
+    # parts = []
+    # for k in FIELDS_TO_SEND:
+    #     v = fields.get(k)
+    #     if v:
+    #         parts.append(f"{v}")
+
     parts = []
+
+    lat = fields.get("Latitude")
+    lon = fields.get("Longitude")
+
     for k in FIELDS_TO_SEND:
+        if k in ("Latitude", "Longitude"):
+            continue
+
         v = fields.get(k)
         if v:
-            parts.append(f"{v}")
+            parts.append(v)
+
+    # append formatted lat,lon at the end
+    if lat and lon:
+        parts.append(f"{lat},{lon}")
+
 
     if not parts:
         return None
