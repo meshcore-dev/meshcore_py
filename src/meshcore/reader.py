@@ -729,6 +729,69 @@ class MessageReader:
             res = {"reason": "private_key_export_disabled"}
             await self.dispatcher.dispatch(Event(EventType.DISABLED, res))
 
+        elif packet_type_value == PacketType.ADVERT_RESPONSE.value:
+            logger.debug(f"Received advert response: {data.hex()}")
+            # PUSH_CODE_ADVERT_RESPONSE (0x8F) format:
+            # Byte 0: 0x8F (push code)
+            # Bytes 1-4: tag (uint32)
+            # Bytes 5-36: pubkey (32 bytes)
+            # Byte 37: adv_type
+            # Bytes 38-69: node_name (32 bytes)
+            # Bytes 70-73: timestamp (uint32)
+            # Byte 74: flags
+            # [Optional fields based on flags]
+
+            if len(data) < 75:
+                logger.error(f"Advert response too short: {len(data)} bytes, need at least 75")
+                return
+
+            res = {}
+            offset = 1  # Skip push code
+
+            res["tag"] = struct.unpack('<I', data[offset:offset+4])[0]
+            offset += 4
+
+            res["pubkey"] = data[offset:offset+32].hex()
+            offset += 32
+
+            res["adv_type"] = data[offset]
+            offset += 1
+
+            res["node_name"] = data[offset:offset+32].decode('utf-8', errors='replace').rstrip('\x00')
+            offset += 32
+
+            res["timestamp"] = struct.unpack('<I', data[offset:offset+4])[0]
+            offset += 4
+
+            flags = data[offset]
+            res["flags"] = flags
+            offset += 1
+
+            # Parse optional fields based on flags
+            if flags & 0x01:  # has latitude
+                if offset + 4 <= len(data):
+                    lat_i32 = struct.unpack('<i', data[offset:offset+4])[0]
+                    res["latitude"] = lat_i32 / 1e6
+                    offset += 4
+
+            if flags & 0x02:  # has longitude
+                if offset + 4 <= len(data):
+                    lon_i32 = struct.unpack('<i', data[offset:offset+4])[0]
+                    res["longitude"] = lon_i32 / 1e6
+                    offset += 4
+
+            if flags & 0x04:  # has description
+                if offset + 32 <= len(data):
+                    res["node_desc"] = data[offset:offset+32].decode('utf-8', errors='replace').rstrip('\x00')
+                    offset += 32
+
+            attributes = {
+                "tag": res["tag"],
+                "pubkey": res["pubkey"],
+            }
+
+            await self.dispatcher.dispatch(Event(EventType.ADVERT_RESPONSE, res, attributes))
+
         elif packet_type_value == PacketType.CONTROL_DATA.value:
             logger.debug("Received control data packet")
             res={}

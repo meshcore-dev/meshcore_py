@@ -52,6 +52,7 @@ class EventType(Enum):
     NEIGHBOURS_RESPONSE = "neighbours_response"
     SIGN_START = "sign_start"
     SIGNATURE = "signature"
+    ADVERT_RESPONSE = "advert_response"
 
     # Command response types
     OK = "command_ok"
