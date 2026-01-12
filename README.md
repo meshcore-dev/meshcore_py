@@ -627,6 +627,7 @@ Check the `examples/` directory for more:
 - `serial_infos.py`: Quick device info retrieval
 - `serial_msg.py`: Message sending and receiving
 - `serial_pingbot.py`: Ping bot which can be run on a channel
+- `serial_rss_bot.py`: A RSS feed to Meshcore channel example, which broadcasts emergency bushfire warnings in VIC, AU
 - `serial_meshcore_ollama.py`: Simple Ollama to Meshcore gateway, a simple chat box 
 - `ble_pin_pairing_example.py`: BLE connection with PIN pairing
 - `ble_private_key_export.py`: BLE private key export with PIN authentication
