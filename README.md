@@ -553,7 +553,7 @@ All commands are async methods that return `Event` objects. Commands are organiz
 | `get_msg(timeout=None)` | `timeout: float` | `CONTACT_MSG_RECV/CHANNEL_MSG_RECV/NO_MORE_MSGS` | Get next pending message |
 | `send_msg(dst, msg, timestamp=None)` | `dst: contact/str/bytes, msg: str, timestamp: int` | `MSG_SENT` | Send direct message |
 | `send_cmd(dst, cmd, timestamp=None)` | `dst: contact/str/bytes, cmd: str, timestamp: int` | `MSG_SENT` | Send command message |
-| `send_chan_msg(chan, msg, timestamp=None)` | `chan: int, msg: str, timestamp: int` | `MSG_SENT` | Send channel message |
+| `send_chan_msg(chan, msg, timestamp=None)` | `chan: int, msg: str, timestamp: int` | `MSG_OK` | Send channel message |
 | **Authentication** ||||
 | `send_login(dst, pwd)` | `dst: contact/str/bytes, pwd: str` | `MSG_SENT` | Send login request |
 | `send_logout(dst)` | `dst: contact/str/bytes` | `MSG_SENT` | Send logout request |
