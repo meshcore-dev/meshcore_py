@@ -346,10 +346,11 @@ class MessageReader:
                         await self.dispatcher.dispatch(Event(EventType.ERROR, {"reason": f"binary_parse_error: {e}"}))
             
             elif stats_type == 2:  # STATS_TYPE_PACKETS
-                # RESP_CODE_STATS + STATS_TYPE_PACKETS: 26 bytes total
-                # Format: <B B I I I I I I (response_code, stats_type, recv, sent, flood_tx, direct_tx, flood_rx, direct_rx)
+                # RESP_CODE_STATS + STATS_TYPE_PACKETS: 26 bytes (legacy) or 30 bytes (includes recv_errors)
+                # Format: <B B I I I I I I [I] (response_code, stats_type, recv, sent, flood_tx, direct_tx, flood_rx, direct_rx [, recv_errors])
+                logger.debug(f"stats packets payload len={len(data)} (expected 26 or 30)")
                 if len(data) < 26:
-                    logger.error(f"Stats packets response too short: {len(data)} bytes, expected 26")
+                    logger.error(f"Stats packets response too short: {len(data)} bytes, expected 26 or 30")
                     await self.dispatcher.dispatch(Event(EventType.ERROR, {"reason": "invalid_frame_length"}))
                 else:
                     try:
@@ -362,6 +363,11 @@ class MessageReader:
                             'flood_rx': flood_rx,
                             'direct_rx': direct_rx
                         }
+                        if len(data) >= 30:
+                            (recv_errors,) = struct.unpack('<I', data[26:30])
+                            res['recv_errors'] = recv_errors
+                        else:
+                            res['recv_errors'] = None  # legacy 26-byte frame
                         logger.debug(f"parsed stats packets: {res}")
                         await self.dispatcher.dispatch(Event(EventType.STATS_PACKETS, res))
                     except struct.error as e:
