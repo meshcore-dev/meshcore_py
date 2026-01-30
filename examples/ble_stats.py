@@ -53,6 +53,11 @@ async def main():
         else:
             print("📦 Packet Statistics:")
             print(json.dumps(result.payload, indent=2))
+            recv_errors = result.payload.get("recv_errors")
+            if recv_errors is not None:
+                print(f"  Receive/CRC errors (RadioLib): {recv_errors}")
+            else:
+                print("  Receive/CRC errors (RadioLib): not reported (legacy 26-byte frame)")
         print()
 
     except Exception as e:

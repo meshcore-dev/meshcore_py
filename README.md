@@ -523,7 +523,7 @@ All commands are async methods that return `Event` objects. Commands are organiz
 | **Statistics** ||||
 | `get_stats_core()` | None | `STATS_CORE` | Get core statistics (voltage, uptime, errors, queue length) |
 | `get_stats_radio()` | None | `STATS_RADIO` | Get radio statistics (noise floor, last RSSI/SNR, tx/rx time stats) |
-| `get_stats_packets()` | None | `STATS_PACKETS` | Get packet statistics (rx/tx totals, breakdown by flood vs. direct) |
+| `get_stats_packets()` | None | `STATS_PACKETS` | Get packet statistics (rx/tx totals, flood vs. direct, recv_errors when present) |
 | **Advanced Configuration** ||||
 | `set_multi_acks(multi_acks)` | `multi_acks: int` | `OK` | Set multi-acks mode (experimental ack repeats) |
 
