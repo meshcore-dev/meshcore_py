@@ -235,13 +235,20 @@ class MessagingCommands(CommandHandlerBase):
         return await self.send(cmd_data, [EventType.MSG_SENT, EventType.ERROR])
 
     async def set_flood_scope(self, scope):
-        if scope.startswith("#"): # an hash
-            logger.debug(f"Setting scope from hash {scope}")
-            scope_key = sha256(scope.encode("utf-8")).digest()[0:16]
-        elif scope == "0" or scope == "None" or scope == "*" or scope == "": # disable
+
+        if scope is None:
+            logger.debug(f"Resetting scope")
             scope_key = b"\0"*16
-        else: # assume the key has been sent directly
-            scope_key = scope.encode("utf-8")
+        elif isinstance (scope, str):
+            if scope == "0" or scope == "None" or scope == "*" or scope == "": # disable
+                logger.debug(f"Resetting scope")
+                scope_key = b"\0"*16
+            else:
+                logger.debug(f"Setting scope from string {scope}")
+                scope_key = sha256(scope.encode("utf-8")).digest()[0:16]
+        elif isinstance (scope, bytes): # scope has been sent directly as byte
+                logger.debug(f"Directly setting scope to {scope}")
+                scope_key = scope
 
         logger.debug(f"Setting scope to {scope_key.hex()}")
 
