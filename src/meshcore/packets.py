@@ -1,5 +1,10 @@
 from enum import Enum
 
+class AnonReqType(Enum):
+    REGIONS = 0x01
+    OWNER = 0x02
+    BASIC = 0x03 # just remote clock
+
 class BinaryReqType(Enum):
     STATUS = 0x01
     KEEP_ALIVE = 0x02

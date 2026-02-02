@@ -1,10 +1,12 @@
 import asyncio
 import logging
 import random
+import io
 
 from .base import CommandHandlerBase
 from ..events import EventType
 from ..packets import BinaryReqType
+from ..packets import AnonReqType
 
 logger = logging.getLogger("meshcore")
 
@@ -242,3 +244,109 @@ class BinaryCommandHandler(CommandHandlerBase):
             res["neighbours"] += next_res["neighbours"]
 
         return res
+
+    async def req_regions_async(self, contact, timeout=0, min_timeout=0):
+        req = b"\0" # The return path, I currently do nothing with, so direct only
+        return await self.send_anon_req(
+            contact,
+            AnonReqType.REGIONS,
+            data=req,
+            timeout=timeout
+        )
+        
+    async def req_regions_sync(self, contact, timeout=0, min_timeout=0):
+        res = await self.req_regions_async(contact, timeout, min_timeout)
+
+        if res.type == EventType.ERROR:
+            return None
+
+        timeout = res.payload["suggested_timeout"] / 800 if timeout == 0 else timeout
+        timeout = timeout if timeout > min_timeout else min_timeout
+        
+        if self.dispatcher is None:
+            return None
+            
+        region_event = await self.dispatcher.wait_for_event(
+            EventType.BINARY_RESPONSE,
+            attribute_filters={"tag": res.payload["expected_ack"].hex()},
+            timeout=timeout,
+        )
+        
+        if region_event is None:
+            return None
+
+        pkt = bytes().fromhex(region_event.payload["data"])
+        pbuf = io.BytesIO(pkt)
+        tag_again = pbuf.read(4)
+        return pbuf.read().decode("utf-8", "ignore").strip("\x00")
+
+    async def req_owner_async(self, contact, timeout=0, min_timeout=0):
+        req = b"\0"
+        return await self.send_anon_req(
+            contact,
+            AnonReqType.OWNER,
+            data=req,
+            timeout=timeout
+        )
+
+    async def req_owner_sync(self, contact, timeout=0, min_timeout=0):
+
+        res = await self.req_owner_async(contact, timeout, min_timeout)
+
+        if res.type == EventType.ERROR:
+            return None
+
+        timeout = res.payload["suggested_timeout"] / 800 if timeout == 0 else timeout
+        timeout = timeout if timeout > min_timeout else min_timeout
+        
+        if self.dispatcher is None:
+            return None
+            
+        owner_event = await self.dispatcher.wait_for_event(
+            EventType.BINARY_RESPONSE,
+            attribute_filters={"tag": res.payload["expected_ack"].hex()},
+            timeout=timeout,
+        )
+        
+        if owner_event is None:
+            return None
+
+        pkt = bytes().fromhex(owner_event.payload["data"])
+        pbuf = io.BytesIO(pkt)
+        tag_again = pbuf.read(4)
+        strings = pbuf.read().decode("utf-8", "ignore").split("\n", 1)
+
+        return dict(name=strings[0], owner=strings[1].strip("\x00"))
+
+    async def req_basic_async(self, contact, timeout=0, min_timeout=0):
+        req = b"\0"
+        return await self.send_anon_req(
+            contact,
+            AnonReqType.BASIC,
+            data=req,
+            timeout=timeout
+        )
+
+    async def req_basic_sync(self, contact, timeout=0, min_timeout=0):
+
+        res = await self.req_basic_async(contact, timeout, min_timeout)
+
+        if res.type == EventType.ERROR:
+            return None
+
+        timeout = res.payload["suggested_timeout"] / 800 if timeout == 0 else timeout
+        timeout = timeout if timeout > min_timeout else min_timeout
+        
+        if self.dispatcher is None:
+            return None
+            
+        basic_event = await self.dispatcher.wait_for_event(
+            EventType.BINARY_RESPONSE,
+            attribute_filters={"tag": res.payload["expected_ack"].hex()},
+            timeout=timeout,
+        )
+        
+        if basic_event is None:
+            return None
+
+        return basic_event.payload

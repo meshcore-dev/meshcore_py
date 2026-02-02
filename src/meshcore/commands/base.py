@@ -3,7 +3,7 @@ import logging
 import random
 from typing import Any, Callable, Coroutine, Dict, List, Optional, Union
 
-from meshcore.packets import BinaryReqType
+from meshcore.packets import BinaryReqType, AnonReqType
 
 from ..events import Event, EventDispatcher, EventType
 from ..reader import MessageReader
@@ -172,6 +172,27 @@ class CommandHandlerBase:
         pubkey_prefix = _validate_destination(dst, prefix_length=6)
         logger.debug(f"Binary request to {dst_bytes.hex()}")
         data = b"\x32" + dst_bytes + request_type.value.to_bytes(1, "little", signed=False) + (data if data else b"")
+
+        result = await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
+        
+        # Register the request with the reader if we have both reader and request_type
+        if (result.type == EventType.MSG_SENT and 
+            self._reader is not None and 
+            request_type is not None):
+            
+            exp_tag = result.payload["expected_ack"].hex()
+            # Use provided timeout or fallback to suggested timeout (with 5s default)
+            actual_timeout = timeout if timeout is not None and timeout > 0 else result.payload.get("suggested_timeout", 4000) / 800.0
+            actual_timeout = min_timeout if actual_timeout < min_timeout else actual_timeout
+            self._reader.register_binary_request(pubkey_prefix.hex(), exp_tag, request_type, actual_timeout, context=context)
+
+        return result
+
+    async def send_anon_req(self, dst: DestinationType, request_type: AnonReqType, data: Optional[bytes] = None, context={}, timeout=None, min_timeout=0) -> Event:
+        dst_bytes = _validate_destination(dst, prefix_length=32)
+        pubkey_prefix = _validate_destination(dst, prefix_length=6)
+        logger.debug(f"Anon Binary request to {dst_bytes.hex()}")
+        data = b"\x39" + dst_bytes + request_type.value.to_bytes(1, "little", signed=False) + (data if data else b"")
 
         result = await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
         

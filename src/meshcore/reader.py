@@ -597,10 +597,10 @@ class MessageReader:
             )
 
         elif packet_type_value == PacketType.BINARY_RESPONSE.value:
-            logger.debug(f"Received binary data: {data.hex()}")
             dbuf.read(1)
             tag = dbuf.read(4).hex()
             response_data = dbuf.read()
+            logger.debug(f"Received binary data: {data.hex()}, tag {tag}, data {response_data.hex()}")
 
             # Always dispatch generic BINARY_RESPONSE
             binary_res = {"tag": tag, "data": response_data.hex()}
