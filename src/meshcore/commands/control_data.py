@@ -8,7 +8,7 @@ from ..packets import ControlType, PacketType
 logger = logging.getLogger("meshcore")
 
 # Command codes
-CMD_REQUEST_ADVERT = 57  # 0x39
+CMD_REQUEST_ADVERT = 58  # 0x3A
 
 class ControlDataCommandHandler(CommandHandlerBase):
     """Helper functions to handle binary requests through binary commands"""
