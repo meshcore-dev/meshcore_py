@@ -24,7 +24,7 @@ class MessageReader:
         # Track pending binary requests by tag for proper response parsing
         self.pending_binary_requests: Dict[str, Dict[str, Any]] = {}  # tag -> {request_type, expires_at}
 
-    def register_binary_request(self, prefix: str, tag: str, request_type: BinaryReqType, timeout_seconds: float, context={}):
+    def register_binary_request(self, prefix: str, tag: str, request_type: BinaryReqType, timeout_seconds: float, context={}, is_anon=False):
         """Register a pending binary request for proper response parsing"""
         # Clean up expired requests before adding new one
         self.cleanup_expired_requests()
@@ -34,6 +34,7 @@ class MessageReader:
             "request_type": request_type,
             "pubkey_prefix": prefix,
             "expires_at": expires_at,
+            "is_anon": is_anon,
             "context": context # optional info we want to keep from req to resp
         }
         logger.debug(f"Registered binary request: tag={tag}, type={request_type}, expires in {timeout_seconds}s")
@@ -618,80 +619,83 @@ class MessageReader:
             # Check for tracked request type and dispatch specific response
             if tag in self.pending_binary_requests:
                 request_type = self.pending_binary_requests[tag]["request_type"]
+                is_anon = self.pending_binary_requests[tag]["is_anon"]
                 pubkey_prefix = self.pending_binary_requests[tag]["pubkey_prefix"]
                 context = self.pending_binary_requests[tag]["context"]
                 del self.pending_binary_requests[tag]
                 logger.debug(f"Processing binary response for tag {tag}, type {request_type}, pubkey_prefix {pubkey_prefix}")
 
-                if request_type == BinaryReqType.STATUS and len(response_data) >= 52:
-                    res = {}
-                    res = parse_status(response_data, pubkey_prefix=pubkey_prefix)
-                    await self.dispatcher.dispatch(
-                        Event(EventType.STATUS_RESPONSE, res, {"pubkey_prefix": res["pubkey_pre"], "tag": tag})
-                    )
+                if not is_anon:
 
-                elif request_type == BinaryReqType.TELEMETRY:
-                    try:
-                        lpp = lpp_parse(response_data)
-                        telem_res = {"tag": tag, "lpp": lpp, "pubkey_prefix": pubkey_prefix}
+                    if request_type == BinaryReqType.STATUS and len(response_data) >= 52:
+                        res = {}
+                        res = parse_status(response_data, pubkey_prefix=pubkey_prefix)
                         await self.dispatcher.dispatch(
-                            Event(EventType.TELEMETRY_RESPONSE, telem_res, telem_res)
-                        )
-                    except Exception as e:
-                        logger.error(f"Error parsing binary telemetry response: {e}")
-
-                elif request_type == BinaryReqType.MMA:
-                    try:
-                        mma_result = lpp_parse_mma(response_data[4:])  # Skip 4-byte header
-                        mma_res = {"tag": tag, "mma_data": mma_result, "pubkey_prefix": pubkey_prefix}
-                        await self.dispatcher.dispatch(
-                            Event(EventType.MMA_RESPONSE, mma_res, mma_res)
-                        )
-                    except Exception as e:
-                        logger.error(f"Error parsing binary MMA response: {e}")
-
-                elif request_type == BinaryReqType.ACL:
-                    try:
-                        acl_result = parse_acl(response_data)
-                        acl_res = {"tag": tag, "acl_data": acl_result, "pubkey_prefix": pubkey_prefix}
-                        await self.dispatcher.dispatch(
-                            Event(EventType.ACL_RESPONSE, acl_res, {"tag": tag, "pubkey_prefix": pubkey_prefix})
-                        )
-                    except Exception as e:
-                        logger.error(f"Error parsing binary ACL response: {e}")
-
-                elif request_type == BinaryReqType.NEIGHBOURS:
-                    try:
-                        pk_plen = context["pubkey_prefix_length"]
-                        bbuf = io.BytesIO(response_data)
-
-                        res = {
-                            "pubkey_prefix": pubkey_prefix,
-                            "tag": tag
-                        }
-                        res.update(context) # add context in result
-
-                        res["neighbours_count"] = int.from_bytes(bbuf.read(2), "little", signed=True)
-                        results_count = int.from_bytes(bbuf.read(2), "little", signed=True)
-                        res["results_count"] = results_count
-
-                        neighbours_list = []
-
-                        for _ in range (results_count):
-                            neighb = {}
-                            neighb["pubkey"] = bbuf.read(pk_plen).hex()
-                            neighb["secs_ago"] = int.from_bytes(bbuf.read(4), "little", signed=True)
-                            neighb["snr"] = int.from_bytes(bbuf.read(1), "little", signed=True) / 4
-                            neighbours_list.append(neighb)
-
-                        res["neighbours"] = neighbours_list
-
-                        await self.dispatcher.dispatch(
-                            Event(EventType.NEIGHBOURS_RESPONSE, res, {"tag": tag, "pubkey_prefix": pubkey_prefix})
+                            Event(EventType.STATUS_RESPONSE, res, {"pubkey_prefix": res["pubkey_pre"], "tag": tag})
                         )
 
-                    except Exception as e:
-                        logger.error(f"Error parsing binary NEIGHBOURS response: {e}")
+                    elif request_type == BinaryReqType.TELEMETRY :
+                        try:
+                            lpp = lpp_parse(response_data)
+                            telem_res = {"tag": tag, "lpp": lpp, "pubkey_prefix": pubkey_prefix}
+                            await self.dispatcher.dispatch(
+                                Event(EventType.TELEMETRY_RESPONSE, telem_res, telem_res)
+                            )
+                        except Exception as e:
+                            logger.error(f"Error parsing binary telemetry response: {e}")
+    
+                    elif request_type == BinaryReqType.MMA:
+                        try:
+                            mma_result = lpp_parse_mma(response_data[4:])  # Skip 4-byte header
+                            mma_res = {"tag": tag, "mma_data": mma_result, "pubkey_prefix": pubkey_prefix}
+                            await self.dispatcher.dispatch(
+                                Event(EventType.MMA_RESPONSE, mma_res, mma_res)
+                            )
+                        except Exception as e:
+                            logger.error(f"Error parsing binary MMA response: {e}")
+
+                    elif request_type == BinaryReqType.ACL:
+                        try:
+                            acl_result = parse_acl(response_data)
+                            acl_res = {"tag": tag, "acl_data": acl_result, "pubkey_prefix": pubkey_prefix}
+                            await self.dispatcher.dispatch(
+                                Event(EventType.ACL_RESPONSE, acl_res, {"tag": tag, "pubkey_prefix": pubkey_prefix})
+                            )
+                        except Exception as e:
+                            logger.error(f"Error parsing binary ACL response: {e}")
+
+                    elif request_type == BinaryReqType.NEIGHBOURS:
+                        try:
+                            pk_plen = context["pubkey_prefix_length"]
+                            bbuf = io.BytesIO(response_data)
+
+                            res = {
+                                "pubkey_prefix": pubkey_prefix,
+                                "tag": tag
+                            }
+                            res.update(context) # add context in result
+
+                            res["neighbours_count"] = int.from_bytes(bbuf.read(2), "little", signed=True)
+                            results_count = int.from_bytes(bbuf.read(2), "little", signed=True)
+                            res["results_count"] = results_count
+
+                            neighbours_list = []
+
+                            for _ in range (results_count):
+                                neighb = {}
+                                neighb["pubkey"] = bbuf.read(pk_plen).hex()
+                                neighb["secs_ago"] = int.from_bytes(bbuf.read(4), "little", signed=True)
+                                neighb["snr"] = int.from_bytes(bbuf.read(1), "little", signed=True) / 4
+                                neighbours_list.append(neighb)
+
+                            res["neighbours"] = neighbours_list
+
+                            await self.dispatcher.dispatch(
+                                Event(EventType.NEIGHBOURS_RESPONSE, res, {"tag": tag, "pubkey_prefix": pubkey_prefix})
+                            )
+
+                        except Exception as e:
+                            logger.error(f"Error parsing binary NEIGHBOURS response: {e}")
 
             else:
                 logger.debug(f"No tracked request found for binary response tag {tag}")
