@@ -143,3 +143,12 @@ class ContactCommands(CommandHandlerBase):
 
     async def change_contact_flags(self, contact, flags) -> Event:
         return await self.update_contact(contact, flags=flags)
+
+    async def set_autoadd_config(self, flag : int) -> Event:
+        data = b"\x3A" + flag.to_bytes(1, "little", signed=False)
+        return await self.send(data, [EventType.OK, EventType.ERROR])
+
+    async def get_autoadd_config(self) -> Event:
+        data = b"\x3B"
+        return await self.send(data, [EventType.AUTOADD_CONFIG, EventType.ERROR])
+        

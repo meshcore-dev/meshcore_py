@@ -378,6 +378,13 @@ class MessageReader:
                 logger.error(f"Unknown stats type: {stats_type}, data: {data.hex()}")
                 await self.dispatcher.dispatch(Event(EventType.ERROR, {"reason": f"unknown_stats_type: {stats_type}"}))
 
+        elif packet_type_value == PacketType.AUTOADD_CONFIG.value:
+            logger.debug(f"received autoadd config response: {data.hex()}")
+
+            res = {}
+            res["config"] = dbuf.read(1)[0]
+            await self.dispatcher.dispatch(Event(EventType.AUTOADD_CONFIG, res, res))            
+
         elif packet_type_value == PacketType.CHANNEL_INFO.value:
             logger.debug(f"received channel info response: {data.hex()}")
             res = {}
