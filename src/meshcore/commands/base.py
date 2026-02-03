@@ -192,6 +192,18 @@ class CommandHandlerBase:
         dst_bytes = _validate_destination(dst, prefix_length=32)
         pubkey_prefix = _validate_destination(dst, prefix_length=6)
         logger.debug(f"Anon Binary request to {dst_bytes.hex()}")
+
+        contact = self._get_contact_by_prefix(dst_bytes.hex()) # need a contact for return path
+        if contact is None:
+            logger.error("No contact found")
+
+        zero_hop = False
+        if contact["out_path_len"] == -1: 
+            logger.info("No path set trying zero hop")
+            zero_hop = True
+            await self.change_contact_path(contact, "")
+
+        data = contact["out_path_len"].to_bytes(1, "little") + bytes.fromhex(contact["out_path"])[::-1]
         data = b"\x39" + dst_bytes + request_type.value.to_bytes(1, "little", signed=False) + (data if data else b"")
 
         result = await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
@@ -206,5 +218,8 @@ class CommandHandlerBase:
             actual_timeout = timeout if timeout is not None and timeout > 0 else result.payload.get("suggested_timeout", 4000) / 800.0
             actual_timeout = min_timeout if actual_timeout < min_timeout else actual_timeout
             self._reader.register_binary_request(pubkey_prefix.hex(), exp_tag, request_type, actual_timeout, context=context, is_anon=True)
+
+        if zero_hop:
+            await self.reset_path(contact)
 
         return result

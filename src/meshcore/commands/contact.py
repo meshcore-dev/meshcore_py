@@ -71,6 +71,10 @@ class ContactCommands(CommandHandlerBase):
 
     async def reset_path(self, key: DestinationType) -> Event:
         key_bytes = _validate_destination(key, prefix_length=32)
+        contact = self._get_contact_by_prefix(key_bytes.hex()) # need a contact for return path
+        if not contact is None:
+            contact["out_path_len"] = -1
+            contact["out_path"] = ""
         logger.debug(f"Resetting path for contact: {key_bytes.hex()}")
         data = b"\x0d" + key_bytes
         return await self.send(data, [EventType.OK, EventType.ERROR])
