@@ -5,11 +5,19 @@ mccli.py : CLI interface to MeschCore BLE companion app
 import asyncio
 import logging
 
-from bleak import BleakClient, BleakScanner
-from bleak.backends.characteristic import BleakGATTCharacteristic
-from bleak.backends.device import BLEDevice
-from bleak.backends.scanner import AdvertisementData
-from bleak.exc import BleakDeviceNotFoundError
+
+# Make bleak optional - only fail if BLE operations are attempted
+try:
+    from bleak import BleakClient, BleakScanner
+    from bleak.backends.characteristic import BleakGATTCharacteristic
+    from bleak.backends.device import BLEDevice
+    from bleak.backends.scanner import AdvertisementData
+    from bleak.exc import BleakDeviceNotFoundError
+    BLEAK_AVAILABLE = True
+except ImportError:
+    BLEAK_AVAILABLE = False
+    BleakClient = None
+    BleakGATTCharacteristic = None
 
 # Get logger
 logger = logging.getLogger("meshcore")
@@ -29,6 +37,11 @@ class BLEConnection:
             client (BleakClient, optional): An existing BleakClient instance.
             pin (str, optional): PIN for BLE pairing authentication.
         """
+        if not BLEAK_AVAILABLE:
+          raise ImportError(
+              f"BLE requires 'bleak' package to be installed."
+          )
+
         self.address = address
         self._user_provided_address = address
         self.client = client
