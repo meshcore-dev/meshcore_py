@@ -54,6 +54,7 @@ class EventType(Enum):
     SIGN_START = "sign_start"
     SIGNATURE = "signature"
     ADVERT_RESPONSE = "advert_response"
+    ALLOWED_REPEAT_FREQ = "allowed_repeat_freq"
 
     # Command response types
     OK = "command_ok"

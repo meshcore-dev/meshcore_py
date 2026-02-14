@@ -287,3 +287,8 @@ class DeviceCommands(CommandHandlerBase):
         logger.debug("Getting packet statistics")
         # CMD_GET_STATS (56) + STATS_TYPE_PACKETS (2)
         return await self.send(b"\x38\x02", [EventType.STATS_PACKETS, EventType.ERROR])
+
+    async def get_allowed_repeat_freq(self) -> Event:
+        logger.debug("Getting allowed repeat freqs")
+        return await self.send(b"\x3c", [EventType.ALLOWED_REPEAT_FREQ, EventType.ERROR])
+

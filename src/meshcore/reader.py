@@ -607,6 +607,28 @@ class MessageReader:
                 Event(EventType.TELEMETRY_RESPONSE, res, attributes)
             )
 
+        elif packet_type_value == PacketType.ALLOWED_REPEAT_FREQ.value:
+            res = {}
+            freqs = []
+
+            cont = True
+            try:
+                while cont:
+                    min = int.from_bytes(dbuf.read(4), "little", signed=False)
+                    max = int.from_bytes(dbuf.read(4), "little", signed=False)
+                    if min == 0 or max == 0:
+                        cont = False
+                    else:
+                        freqs.append({"min" : min, "max": max})
+            except e:
+                print(e)
+
+            res["freqs"] = freqs
+
+            await self.dispatcher.dispatch(
+                Event(EventType.ALLOWED_REPEAT_FREQ, res)
+            )
+
         elif packet_type_value == PacketType.BINARY_RESPONSE.value:
             dbuf.read(1)
             tag = dbuf.read(4).hex()
