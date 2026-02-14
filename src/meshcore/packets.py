@@ -17,6 +17,61 @@ class ControlType(Enum):
     NODE_DISCOVER_REQ = 0x80
     NODE_DISCOVER_RESP = 0x90
 
+class CommandType(Enum):
+    APP_START = 1
+    SEND_TXT_MSG = 2
+    SEND_CHANNEL_TXT_MSG = 3
+    GET_CONTACTS = 4 # with optional 'since' (for efficient sync)
+    GET_DEVICE_TIME = 5
+    SET_DEVICE_TIME = 6
+    SEND_SELF_ADVERT = 7
+    SET_ADVERT_NAME = 8
+    ADD_UPDATE_CONTACT = 9
+    SYNC_NEXT_MESSAGE = 10
+    SET_RADIO_PARAMS = 11
+    SET_RADIO_TX_POWER = 12
+    RESET_PATH = 13
+    SET_ADVERT_LATLON = 14
+    REMOVE_CONTACT = 15
+    SHARE_CONTACT = 16
+    EXPORT_CONTACT = 17
+    IMPORT_CONTACT = 18
+    REBOOT = 19
+    GET_BATT_AND_STORAGE = 20   # was CMD_GET_BATTERY_VOLTAGE
+    SET_TUNING_PARAMS = 21
+    DEVICE_QEURY = 22
+    EXPORT_PRIVATE_KEY = 23
+    IMPORT_PRIVATE_KEY = 24
+    SEND_RAW_DATA = 25
+    SEND_LOGIN = 26
+    SEND_STATUS_REQ = 27
+    HAS_CONNECTION = 28
+    LOGOUT = 29 # 'Disconnect'
+    GET_CONTACT_BY_KEY = 30
+    GET_CHANNEL = 31
+    SET_CHANNEL = 32
+    SIGN_START = 33
+    SIGN_DATA = 34
+    SIGN_FINISH = 35
+    SEND_TRACE_PATH = 36
+    SET_DEVICE_PIN = 37
+    SET_OTHER_PARAMS = 38
+    SEND_TELEMETRY_REQ = 39  # can deprecate this
+    GET_CUSTOM_VARS = 40
+    SET_CUSTOM_VAR = 41
+    GET_ADVERT_PATH = 42
+    GET_TUNING_PARAMS = 43
+    # NOTE: CMD range 44..49 parked, potentially for WiFi operations
+    BINARY_REQ = 50
+    FACTORY_RESET = 51
+    PATH_DISCOVERY = 52
+    SET_FLOOD_SCOPE = 54
+    SEND_CONTROL_DATA = 55
+    SEND_ANON_REQ = 57
+    SET_AUTOADD_CONFIG = 58
+    GET_AUTOADD_CONFIG = 59
+    GET_ALLOWED_REPEAT_FREQ = 60
+
 # Packet prefixes for the protocol
 class PacketType(Enum):
     OK = 0
@@ -43,11 +98,7 @@ class PacketType(Enum):
     CUSTOM_VARS = 21
     STATS = 24
     AUTOADD_CONFIG = 25
-    BINARY_REQ = 50
-    FACTORY_RESET = 51
-    PATH_DISCOVERY = 52
-    SET_FLOOD_SCOPE = 54
-    SEND_CONTROL_DATA = 55
+    ALLOWED_REPEAT_FREQ = 26
 
     # Push notifications
     ADVERTISEMENT = 0x80

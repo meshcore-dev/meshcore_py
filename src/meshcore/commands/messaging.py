@@ -4,7 +4,7 @@ from typing import Optional, Union
 from hashlib import sha256
 
 from ..events import Event, EventType
-from ..packets import PacketType
+from ..packets import CommandType
 from .base import CommandHandlerBase, DestinationType, _validate_destination
 
 logger = logging.getLogger("meshcore")
@@ -252,7 +252,7 @@ class MessagingCommands(CommandHandlerBase):
 
         logger.debug(f"Setting scope to {scope_key.hex()}")
 
-        cmd_data = bytearray([PacketType.SET_FLOOD_SCOPE.value])
+        cmd_data = bytearray([CommandType.SET_FLOOD_SCOPE.value])
         cmd_data.extend(b"\0")
         cmd_data.extend(scope_key)
 

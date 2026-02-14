@@ -3,7 +3,7 @@ import random
 
 from .base import CommandHandlerBase
 from ..events import EventType, Event
-from ..packets import ControlType, PacketType
+from ..packets import ControlType, CommandType
 
 logger = logging.getLogger("meshcore")
 
@@ -14,7 +14,7 @@ class ControlDataCommandHandler(CommandHandlerBase):
     """Helper functions to handle binary requests through binary commands"""
 
     async def send_control_data (self, control_type: int, payload: bytes) -> Event:
-        data = bytearray([PacketType.SEND_CONTROL_DATA.value]) 
+        data = bytearray([CommandType.SEND_CONTROL_DATA.value]) 
         data.extend(control_type.to_bytes(1, "little", signed = False)) 
         data.extend(payload)
 
