@@ -66,16 +66,16 @@ class DeviceCommands(CommandHandlerBase):
             b"\x0c" + int(val).to_bytes(4, "little"), [EventType.OK, EventType.ERROR]
         )
 
-    async def set_radio(self, freq: float, bw: float, sf: int, cr: int) -> Event:
-        logger.debug(f"Setting radio params: freq={freq}, bw={bw}, sf={sf}, cr={cr}")
-        return await self.send(
-            b"\x0b"
-            + int(float(freq) * 1000).to_bytes(4, "little")
-            + int(float(bw) * 1000).to_bytes(4, "little")
-            + int(sf).to_bytes(1, "little")
-            + int(cr).to_bytes(1, "little"),
-            [EventType.OK, EventType.ERROR],
-        )
+    async def set_radio(self, freq: float, bw: float, sf: int, cr: int, repeat = None) -> Event:
+        logger.debug(f"Setting radio params: freq={freq}, bw={bw}, sf={sf}, cr={cr}, repeat={repeat}")
+        data = b"\x0b" 
+        data += int(float(freq) * 1000).to_bytes(4, "little")
+        data += int(float(bw) * 1000).to_bytes(4, "little")
+        data += int(sf).to_bytes(1, "little")
+        data += int(cr).to_bytes(1, "little")
+        if not repeat is None:
+            data += int(repeat).to_bytes(1,"little")
+        return await self.send(data, [EventType.OK, EventType.ERROR])
 
     async def set_tuning(self, rx_dly: int, af: int) -> Event:
         logger.debug(f"Setting tuning params: rx_dly={rx_dly}, af={af}")

@@ -278,6 +278,9 @@ class MessageReader:
                 res["fw_build"] = dbuf.read(12).decode("utf-8", "ignore").replace("\0", "")
                 res["model"] = dbuf.read(40).decode("utf-8", "ignore").replace("\0", "")
                 res["ver"] = dbuf.read(20).decode("utf-8", "ignore").replace("\0", "")
+                rpt = dbuf.read(1)
+                if len(rpt) > 0:
+                    res["repeat"] = (rpt[0] != 0)
             await self.dispatcher.dispatch(Event(EventType.DEVICE_INFO, res))
 
         elif packet_type_value == PacketType.CUSTOM_VARS.value:
