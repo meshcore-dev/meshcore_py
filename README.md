@@ -495,6 +495,7 @@ All commands are async methods that return `Event` objects. Commands are organiz
 | `get_time()` | None | `CURRENT_TIME` | Get current device time |
 | `get_self_telemetry()` | None | `TELEMETRY_RESPONSE` | Get device's own telemetry data |
 | `get_custom_vars()` | None | `CUSTOM_VARS` | Retrieve all custom variables |
+| `get_allowed_repeat_freq()` | None | `ALLOWED_FREQ` | Retreive allowed repeat freqs from device |
 | **Device Configuration** ||||
 | `set_name(name)` | `name: str` | `OK` | Set device name/identifier |
 | `set_coords(lat, lon)` | `lat: float, lon: float` | `OK` | Set device GPS coordinates |
