@@ -284,6 +284,7 @@ class CommandHandlerBase:
             
             exp_tag = result.payload["expected_ack"].hex()
             # Use provided timeout or fallback to suggested timeout (with 5s default)
+            result.payload["suggested_timeout"] = result.payload.get("suggested_timeout", 4000) * (contact["out_path_len"] + 1) # update timeout from path_len
             actual_timeout = timeout if timeout is not None and timeout > 0 else result.payload.get("suggested_timeout", 4000) / 800.0
             actual_timeout = min_timeout if actual_timeout < min_timeout else actual_timeout
             self._reader.register_binary_request(pubkey_prefix.hex(), exp_tag, request_type, actual_timeout, context=context, is_anon=True)
