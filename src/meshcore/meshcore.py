@@ -93,7 +93,11 @@ class MeshCore:
             auto_reconnect=auto_reconnect,
             max_reconnect_attempts=max_reconnect_attempts,
         )
-        await mc.connect()
+        res = await mc.connect()
+        if res is None:
+            logger.error("No response from meshcore node, disconnecting")
+            await mc.disconnect()
+            return None
         return mc
 
     @classmethod
@@ -119,7 +123,12 @@ class MeshCore:
             auto_reconnect=auto_reconnect,
             max_reconnect_attempts=max_reconnect_attempts,
         )
-        await mc.connect()
+        res = await mc.connect()
+        if res is None:
+            logger.error("No response from meshcore node, disconnecting")
+            logger.error("Are you sure your node is a serial companion ?")
+            await mc.disconnect()
+            return None
         return mc
 
     @classmethod
@@ -158,7 +167,11 @@ class MeshCore:
             max_reconnect_attempts=max_reconnect_attempts,
         )
 
-        await mc.connect()
+        res = await mc.connect()
+        if res is None:
+            logger.error("No response from meshcore node, disconnecting")
+            await mc.disconnect()
+            return None
         return mc
 
     async def connect(self):
@@ -167,7 +180,10 @@ class MeshCore:
         if result is None:
             await self.dispatcher.stop()
             raise ConnectionError("Failed to connect to device")
-        return await self.commands.send_appstart()
+        res = await self.commands.send_appstart()
+        if res is None or res.type == EventType.ERROR:
+            return None
+        return res
 
     async def disconnect(self):
         """Disconnect from the device and clean up resources."""
