@@ -35,6 +35,25 @@ my_lpp_types = {
 
 
 def lpp_format_val(type, val):
+
+    # Fix signed wrap for LPP Current (type 117)
+    if type.type == 117 and len(val) >= 1:
+        v = val[0]
+        # LPP current resolution is typically 0.001 A over uint16 range (0..65.535 A)
+        # Reinterpret values above signed max as negative
+        if v > 32.767:
+            v -= 65.536
+        return round(v, 3)
+
+    # Same for voltage (type 116)
+    if type.type == 116 and len(val) >= 1:
+        v = val[0]
+        # LPP voltage resolution is typically 0.01 V over uint16 range (0..65.535 A)
+        # Reinterpret values above signed max as negative
+        if v > 327.67:
+            v -= 655.36
+        return round(v, 2)
+
     if my_lpp_types[type.type][1] is None:
         return val
 
