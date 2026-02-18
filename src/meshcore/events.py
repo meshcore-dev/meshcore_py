@@ -53,7 +53,6 @@ class EventType(Enum):
     NEIGHBOURS_RESPONSE = "neighbours_response"
     SIGN_START = "sign_start"
     SIGNATURE = "signature"
-    ADVERT_RESPONSE = "advert_response"
     ALLOWED_REPEAT_FREQ = "allowed_repeat_freq"
 
     # Command response types

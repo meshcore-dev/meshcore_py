@@ -7,9 +7,6 @@ from ..packets import ControlType, CommandType
 
 logger = logging.getLogger("meshcore")
 
-# Command codes
-CMD_REQUEST_ADVERT = 57  # 0x39
-
 class ControlDataCommandHandler(CommandHandlerBase):
     """Helper functions to handle binary requests through binary commands"""
 
@@ -52,45 +49,3 @@ class ControlDataCommandHandler(CommandHandlerBase):
             res.payload["tag"] = tag
             return res
 
-    async def request_advert(self, prefix: bytes, path: bytes) -> Event:
-        """
-        Request advertisement from a node via pull-based system.
-
-        Args:
-            prefix: First byte of target node's public key (PATH_HASH_SIZE = 1)
-            path: Path to reach the node (1-64 bytes)
-
-        Returns:
-            Event with type OK on success, ERROR on failure.
-            The actual response arrives asynchronously as ADVERT_RESPONSE event.
-
-        Raises:
-            ValueError: If prefix is not 1 byte or path is empty/too long
-
-        Example:
-            # Get repeater from contacts
-            contacts = (await mc.commands.get_contacts()).payload
-            repeater = next(c for c in contacts.values() if c['adv_type'] == 2)
-
-            # Extract prefix and path
-            prefix = bytes.fromhex(repeater['public_key'])[:1]
-            path = bytes(repeater.get('out_path', [])) or prefix
-
-            # Send request
-            result = await mc.commands.request_advert(prefix, path)
-            if result.type == EventType.ERROR:
-                print(f"Failed: {result.payload}")
-                return
-
-            # Wait for response
-            response = await mc.wait_for_event(EventType.ADVERT_RESPONSE, timeout=30)
-            if response:
-                print(f"Node: {response.payload['node_name']}")
-        """
-        if len(prefix) != 1:
-            raise ValueError("Prefix must be exactly 1 byte (PATH_HASH_SIZE)")
-        if not path or len(path) > 64:
-            raise ValueError("Path must be 1-64 bytes")
-
-        cmd = bytes([CMD_REQUEST_ADVERT]) + prefix + bytes([len(path)]) + path
-        return await self.send(cmd, [EventType.OK, EventType.ERROR])
