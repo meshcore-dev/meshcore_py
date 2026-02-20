@@ -183,8 +183,16 @@ class EventDispatcher:
                         ):
                             continue
                     
-                    # Fire the call back asychronously
-                    asyncio.create_task(self._execute_callback(subscription.callback, event.clone()))
+                    # Call sync callbacks inline so futures are resolved before asyncio.wait()
+                    # returns - avoids the race where create_task schedules the callback after
+                    # the waiter has already timed out with done=set().
+                    if asyncio.iscoroutinefunction(subscription.callback):
+                        asyncio.create_task(self._execute_callback(subscription.callback, event.clone()))
+                    else:
+                        try:
+                            subscription.callback(event.clone())
+                        except Exception as e:
+                            logger.error(f"Error in event handler for {event.type}: {e}", exc_info=True)
                         
             self.queue.task_done()
 
