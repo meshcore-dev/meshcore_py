@@ -110,8 +110,15 @@ class ContactCommands(CommandHandlerBase):
             out_path_hex = contact["out_path"]
             out_path_len = contact["out_path_len"]
         else:
+            path_hash_size = 1
+            res = await self.send_device_query()
+            if not res is None and res.type != EventType.ERROR:
+                if "path_hash_mode" in res.payload:
+                    path_hash_size = res.payload["path_hash_mode"] + 1
+
             out_path_hex = path
-            out_path_len = int(len(path) / 2)
+            out_path_len = int(len(path) / (2 * path_hash_size))
+
             # reflect the change
             contact["out_path"] = out_path_hex
             contact["out_path_len"] = out_path_len
