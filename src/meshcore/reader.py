@@ -270,17 +270,21 @@ class MessageReader:
 
         elif packet_type_value == PacketType.DEVICE_INFO.value:
             res = {}
-            res["fw ver"] = dbuf.read(1)[0]
-            if data[1] >= 3:
+            fw_ver = dbuf.read(1)[0]
+            res["fw ver"] = fw_ver
+            if fw_ver >= 3:
                 res["max_contacts"] = dbuf.read(1)[0] * 2
                 res["max_channels"] = dbuf.read(1)[0]
                 res["ble_pin"] = int.from_bytes(dbuf.read(4), byteorder="little")
                 res["fw_build"] = dbuf.read(12).decode("utf-8", "ignore").replace("\0", "")
                 res["model"] = dbuf.read(40).decode("utf-8", "ignore").replace("\0", "")
                 res["ver"] = dbuf.read(20).decode("utf-8", "ignore").replace("\0", "")
+            if fw_ver >= 9: # has repeater mode
                 rpt = dbuf.read(1)
                 if len(rpt) > 0:
                     res["repeat"] = (rpt[0] != 0)
+            if fw_ver >= 10: # has path_hash_mode
+                res["path_hash_mode"] = dbuf.read(1)[0]
             await self.dispatcher.dispatch(Event(EventType.DEVICE_INFO, res))
 
         elif packet_type_value == PacketType.CUSTOM_VARS.value:

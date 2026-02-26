@@ -292,3 +292,7 @@ class DeviceCommands(CommandHandlerBase):
         logger.debug("Getting allowed repeat freqs")
         return await self.send(b"\x3c", [EventType.ALLOWED_REPEAT_FREQ, EventType.ERROR])
 
+    async def set_path_hash_mode(self, mode: int) -> Event:
+        logger.debug(f"Setting path mode to {mode}")
+        data = b"\x3d\0" + mode.to_bytes(1, "little")
+        return await self.send(data, [EventType.OK, EventType.ERROR])
