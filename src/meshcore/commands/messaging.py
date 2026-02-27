@@ -181,7 +181,7 @@ class MessagingCommands(CommandHandlerBase):
         self,
         auth_code: int = 0,
         tag: Optional[int] = None,
-        flags: int = 0,
+        flags = None,
         path: Optional[Union[str, bytes, bytearray]] = None,
     ) -> Event:
         """
@@ -190,7 +190,8 @@ class MessagingCommands(CommandHandlerBase):
         Args:
             auth_code: 32-bit authentication code (default: 0)
             tag: 32-bit integer to identify this trace (default: random)
-            flags: 8-bit flags field (default: 0)
+            flags: 8-bit flags field (default: None)
+                 lower two bytes set the path hash size (1 << s) => 1, 2, 4 bytes
             path: Optional string with comma-separated hex values representing repeater pubkeys (e.g. "23,5f,3a")
                  or a bytes/bytearray object with the raw path data
 
@@ -203,39 +204,62 @@ class MessagingCommands(CommandHandlerBase):
         if auth_code is None:
             auth_code = random.randint(1, 0xFFFFFFFF)
 
-        logger.debug(
-            f"Sending trace: tag={tag}, auth={auth_code}, flags={flags}, path={path}"
-        )
+        path_hash_len = 1 # default
+        if flags is None:
+            if isinstance(path, str): # get flags from path string
+                path_hash_len = int(len(path.split(",")[0]) / 2)
+                if path_hash_len == 1 :
+                    flags = 0
+                elif path_hash_len == 2 :
+                    flags = 1
+                elif path_hash_len == 4 :
+                    flags = 2
+                elif path_hash_len == 8 :
+                    flags = 3
+                else :
+                    logger.error(f"Invalid path format: {e}")
+                    return Event(EventType.ERROR, {"reason": "invalid_path_format"})
+            else:
+                flags = 0
+        else:
+            path_hash_len = 1 << (flags & 3)
+
+        # Process path if provided
+        path_bytes = bytearray()
+        if path:
+            if isinstance(path, str):
+                # Convert comma-separated hex values to bytes
+                try:
+                    for hex_val in path.split(","):
+                        hex_val = hex_val.strip()
+                        if hex_val == "":
+                            break
+                        elif len(hex_val) != path_hash_len * 2 :
+                           raise(ValueError())
+                        path_bytes.extend(bytes.fromhex(hex_val))
+                except ValueError as e:
+                    logger.error(f"Invalid path format: {e}")
+                    return Event(EventType.ERROR, {"reason": "invalid_path_format"})
+            elif isinstance(path, (bytes, bytearray)):
+                path_bytes = path
+            else:
+                logger.error(f"Unsupported path type: {type(path)}")
+                return Event(EventType.ERROR, {"reason": "unsupported_path_type"})
 
         # Prepare the command packet: CMD(1) + tag(4) + auth_code(4) + flags(1) + [path]
         cmd_data = bytearray([36])  # CMD_SEND_TRACE_PATH
         cmd_data.extend(tag.to_bytes(4, "little"))
         cmd_data.extend(auth_code.to_bytes(4, "little"))
         cmd_data.append(flags)
+        cmd_data.extend(path_bytes)
 
-        # Process path if provided
-        if path:
-            if isinstance(path, str):
-                # Convert comma-separated hex values to bytes
-                try:
-                    path_bytes = bytearray()
-                    for hex_val in path.split(","):
-                        hex_val = hex_val.strip()
-                        path_bytes.append(int(hex_val, 16))
-                    cmd_data.extend(path_bytes)
-                except ValueError as e:
-                    logger.error(f"Invalid path format: {e}")
-                    return Event(EventType.ERROR, {"reason": "invalid_path_format"})
-            elif isinstance(path, (bytes, bytearray)):
-                cmd_data.extend(path)
-            else:
-                logger.error(f"Unsupported path type: {type(path)}")
-                return Event(EventType.ERROR, {"reason": "unsupported_path_type"})
+        logger.debug(
+            f"Sending trace: tag={tag}, auth={auth_code}, flags={flags}, path={path_bytes.hex()}"
+        )
 
         return await self.send(cmd_data, [EventType.MSG_SENT, EventType.ERROR])
 
     async def set_flood_scope(self, scope):
-
         if scope is None:
             logger.debug(f"Resetting scope")
             scope_key = b"\0"*16

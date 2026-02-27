@@ -532,10 +532,14 @@ class MessageReader:
             # According to the source, format is:
             # 0x89, reserved(0), path_len, flags, tag(4), auth(4), path_hashes[], path_snrs[], final_snr
 
-            path_len = data[2]
-            flags = data[3]
-            tag = int.from_bytes(data[4:8], byteorder="little")
-            auth_code = int.from_bytes(data[8:12], byteorder="little")
+            reserved = dbuf.read(1)[0]
+            path_len = dbuf.read(1)[0]
+            flags = dbuf.read(1)[0]
+            tag = int.from_bytes(dbuf.read(4), byteorder="little")
+            auth_code = int.from_bytes(dbuf.read(4), byteorder="little")
+
+            path_hash_len = 1 << (flags&3)
+            path_len = int(path_len / path_hash_len)
 
             # Initialize result
             res["tag"] = tag
@@ -546,26 +550,20 @@ class MessageReader:
             # Process path as array of objects with hash and SNR
             path_nodes = []
 
-            if path_len > 0 and len(data) >= 12 + path_len * 2 + 1:
+            if path_len > 0 and len(data) >= 12 + path_len + (path_len * path_hash_len) + 1:
                 # Extract path with hash and SNR pairs
                 for i in range(path_len):
                     node = {
-                        "hash": f"{data[12+i]:02x}",
-                        # SNR is stored as a signed byte representing SNR * 4
-                        "snr": (
-                            data[12 + path_len + i]
-                            if data[12 + path_len + i] < 128
-                            else data[12 + path_len + i] - 256
-                        )
-                        / 4.0,
+                        "hash": dbuf.read(path_hash_len).hex(),
                     }
                     path_nodes.append(node)
 
+                for n in path_nodes:
+                    node_snr = int.from_bytes(dbuf.read(1), byteorder="little", signed=True)
+                    n["snr"] = node_snr / 4.0
+                    
                 # Add the final node (our device) with its SNR
-                final_snr_byte = data[12 + path_len * 2]
-                final_snr = (
-                    final_snr_byte if final_snr_byte < 128 else final_snr_byte - 256
-                ) / 4.0
+                final_snr = int.from_bytes(dbuf.read(1), byteorder="little", signed=True) / 4.0
                 path_nodes.append({"snr": final_snr})
 
                 res["path"] = path_nodes
