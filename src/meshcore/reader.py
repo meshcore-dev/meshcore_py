@@ -280,7 +280,8 @@ class MessageReader:
                 if len(rpt) > 0:
                     res["repeat"] = (rpt[0] != 0)
             if fw_ver >= 10: # has path_hash_mode
-                res["path_hash_mode"] = dbuf.read(1)[0]
+                path_hash_mode = dbuf.read(1)[0]
+                res["path_hash_mode"] = path_hash_mode
             await self.dispatcher.dispatch(Event(EventType.DEVICE_INFO, res))
 
         elif packet_type_value == PacketType.CUSTOM_VARS.value:
@@ -729,11 +730,17 @@ class MessageReader:
             dbuf.read(1)
             res["pubkey_pre"] = dbuf.read(6).hex()
             opl = dbuf.read(1)[0]
+            opl_hlen = ((opl & 0xc0) >> 6) + 1
+            opl = opl & 0xbf
             res["out_path_len"] = opl
-            res["out_path"] = dbuf.read(opl).hex()
+            res["out_path_hash_len"] = opl_hlen
+            res["out_path"] = dbuf.read(opl*opl_hlen).hex()
             ipl = dbuf.read(1)[0]
+            ipl_hlen = ((ipl & 0xc0) >> 6) + 1
+            ipl = ipl & 0xbf
             res["in_path_len"] = ipl
-            res["in_path"] = dbuf.read(ipl).hex()
+            res["in_path_hash_len"] = ipl_hlen
+            res["in_path"] = dbuf.read(ipl*ipl_hlen).hex()
 
             attributes = {"pubkey_pre": res["pubkey_pre"]}
 
