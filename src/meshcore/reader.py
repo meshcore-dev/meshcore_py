@@ -90,12 +90,8 @@ class MessageReader:
             c["public_key"] = dbuf.read(32).hex()
             c["type"] = dbuf.read(1)[0]
             c["flags"] = dbuf.read(1)[0]
-            plen = int.from_bytes(dbuf.read(1), signed=True, byteorder="little")
-            c["out_path_len"] = plen
-            if plen == -1:
-                plen = 0
-            path = dbuf.read(64)
-            c["out_path"] = path[0:plen].hex()
+            c["out_path_len"] = int.from_bytes(dbuf.read(1), signed=True, byteorder="little")
+            c["out_path"] = dbuf.read(64).replace(b"\0", b"").hex()
             c["adv_name"] = dbuf.read(32).decode("utf-8", "ignore").replace("\0", "")
             c["last_advert"] = int.from_bytes(dbuf.read(4), byteorder="little")
             c["adv_lat"] = (
