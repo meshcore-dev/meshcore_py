@@ -296,3 +296,10 @@ class DeviceCommands(CommandHandlerBase):
         logger.debug(f"Setting path mode to {mode}")
         data = b"\x3d\0" + mode.to_bytes(1, "little")
         return await self.send(data, [EventType.OK, EventType.ERROR])
+
+    async def get_path_hash_mode(self) -> int:
+        res = await self.send_device_query()
+        if not res is None and res.type != EventType.ERROR:
+            if "path_hash_mode" in res.payload:
+                return res.payload["path_hash_mode"]
+        return 0
