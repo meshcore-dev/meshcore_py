@@ -256,7 +256,7 @@ class MessageReader:
             # search for text in log_channels
             txt_hash = int.from_bytes(SHA256.new(text).digest()[0:4], "little", signed=False)
             res["txt_hash"] = txt_hash
-            logged = next((l for l in self.channels_log if l['msg_hash'] == txt_hash), None)
+            logged = next((l for l in self.channels_log if 'msg_hash' in l and l['msg_hash'] == txt_hash), None)
 
             if self.decrypt_channels:
                 if not logged is None:
