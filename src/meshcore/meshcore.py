@@ -360,6 +360,9 @@ class MeshCore:
         """Get pending contacts"""
         return self._pending_contacts
 
+    def set_decrypt_channel_logs(self, v):
+        self._reader.decrypt_channels = v
+
     def pop_pending_contact(self, key: str) -> Optional[Dict[str, Any]]:
         return self._pending_contacts.pop(key, None)
 
