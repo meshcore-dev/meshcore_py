@@ -627,7 +627,7 @@ class MessageReader:
 
                 channel = None
                 for c in self.channels:
-                    if c["channel_hash"] == chan_hash : # validate against MAC
+                    if "channel_hash" in c and c["channel_hash"] == chan_hash : # validate against MAC
                         h = HMAC.new(c["channel_secret"], digestmod=SHA256)
                         h.update(msg)
                         if h.digest()[0:2] == cipher_mac:
