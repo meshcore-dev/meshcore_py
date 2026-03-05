@@ -226,11 +226,12 @@ class MessageReader:
             # search for text in log_channels
             txt_hash = int.from_bytes(SHA256.new(text).digest()[0:4], "little", signed=False)
             if self.decrypt_channels:
-                logged = next((l for l in self.channels_log if 'msg_hash' in l and l['msg_hash'] == txt_hash), None)
+                logged = next((l for l in reversed(self.channels_log) if 'msg_hash' in l and l['msg_hash'] == txt_hash), None)
                 if not logged is None:
                     res["path"] = logged["path"]
                     res["RSSI"] = logged["rssi"]    
                     res["SNR"] = logged["snr"]
+                    res["recv_time"] = logged["recv_time"]
 
             attributes = {
                 "channel_idx": res["channel_idx"],
@@ -256,12 +257,13 @@ class MessageReader:
             # search for text in log_channels
             txt_hash = int.from_bytes(SHA256.new(text).digest()[0:4], "little", signed=False)
             res["txt_hash"] = txt_hash
-            logged = next((l for l in self.channels_log if 'msg_hash' in l and l['msg_hash'] == txt_hash), None)
+            logged = next((l for l in reversed(self.channels_log) if 'msg_hash' in l and l['msg_hash'] == txt_hash), None)
 
             if self.decrypt_channels:
                 if not logged is None:
                     res["path"] = logged["path"]
                     res["RSSI"] = logged["rssi"]    
+                    res["recv_time"] = logged["recv_time"]
 
             attributes = {
                 "channel_idx": res["channel_idx"],
@@ -615,9 +617,6 @@ class MessageReader:
                 log_data["pkt_payload"] = pkt_payload
                 log_data["pkt_hash"] = pkt_hash
 
-                self.channels_log.append(log_data)
-                if len(self.channels_log) > 150:
-                    self.channels_log = self.channels_log[:-100]
 
             if not payload is None and payload_type == 0x05: # flood msg / channel
                 pk_buf = io.BytesIO(pkt_payload)
@@ -647,12 +646,25 @@ class MessageReader:
                 log_data["chan_name"] = chan_name
 
                 if not channel is None and self.decrypt_channels:
-                    aes_key = channel["channel_secret"]
-                    cipher = AES.new(aes_key, AES.MODE_ECB)
-                    message = cipher.decrypt(msg)[5:].strip(b"\0")
-                    msg_hash = int.from_bytes(SHA256.new(message).digest()[0:4], "little", signed=False)
-                    log_data["message"] = message.decode("utf-8", "ignore")
-                    log_data["msg_hash"] = msg_hash
+                    # search for the same packet
+                    logged = next((l for l in reversed(self.channels_log) if 'pkt_hash' in l and l['pkt_hash'] == pkt_hash), None)
+
+                    if logged is None:
+                        # not found: decrypt the text and hash it
+                        aes_key = channel["channel_secret"]
+                        cipher = AES.new(aes_key, AES.MODE_ECB)
+                        message = cipher.decrypt(msg)[5:].strip(b"\0")
+                        msg_hash = int.from_bytes(SHA256.new(message).digest()[0:4], "little", signed=False)
+                        log_data["message"] = message.decode("utf-8", "ignore")
+                        log_data["msg_hash"] = msg_hash
+                    else:
+                        # found: copy
+                        log_data["message"] = logged["message"]
+                        log_data["msg_hash"] = logged["msg_hash"]
+
+                self.channels_log.append(log_data)
+                if len(self.channels_log) > 100:
+                    del self.channels_log[:25]
 
             elif not payload is None and payload_type == 0x04: # Advert
                 pk_buf = io.BytesIO(pkt_payload)
