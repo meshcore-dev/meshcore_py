@@ -99,7 +99,13 @@ class MessageReader:
             c["public_key"] = dbuf.read(32).hex()
             c["type"] = dbuf.read(1)[0]
             c["flags"] = dbuf.read(1)[0]
-            c["out_path_len"] = int.from_bytes(dbuf.read(1), signed=True, byteorder="little")
+            plen = int.from_bytes(dbuf.read(1), signed=False, byteorder="little")
+            if plen == 255: # flood
+                c["out_path_hash_mode"] = -1
+                c["out_path_len"] = -1 # 6 LSB
+            else:
+                c["out_path_hash_mode"] = plen >> 6 
+                c["out_path_len"] = plen & 0x3F # 6 LSB
             c["out_path"] = dbuf.read(64).replace(b"\0", b"").hex()
             c["adv_name"] = dbuf.read(32).decode("utf-8", "ignore").replace("\0", "")
             c["last_advert"] = int.from_bytes(dbuf.read(4), byteorder="little")
@@ -173,7 +179,13 @@ class MessageReader:
             res = {}
             res["type"] = "PRIV"
             res["pubkey_prefix"] = dbuf.read(6).hex()
-            res["path_len"] = dbuf.read(1)[0]
+            plen = dbuf.read(1)[0]
+            if plen == 255 : # direct message
+                res["path_hash_mode"] = -1
+                res["path_len"] = plen
+            else:
+                res["path_hash_mode"] = plen >> 6
+                res["path_len"] = plen & 0x3F
             txt_type = dbuf.read(1)[0]
             res["txt_type"] = txt_type
             res["sender_timestamp"] = int.from_bytes(dbuf.read(4), byteorder="little")
@@ -196,7 +208,13 @@ class MessageReader:
             res["SNR"] = int.from_bytes(dbuf.read(1), byteorder="little", signed=True) / 4
             dbuf.read(2) # reserved
             res["pubkey_prefix"] = dbuf.read(6).hex()
-            res["path_len"] = dbuf.read(1)[0]
+            plen = dbuf.read(1)[0]
+            if plen == 255 : # direct message
+                res["path_hash_mode"] = -1
+                res["path_len"] = plen
+            else:
+                res["path_hash_mode"] = plen >> 6
+                res["path_len"] = plen & 0x3F
             txt_type = dbuf.read(1)[0]
             res["txt_type"] = txt_type
             res["sender_timestamp"] = int.from_bytes(dbuf.read(4), byteorder="little")
@@ -217,7 +235,13 @@ class MessageReader:
             res = {}
             res["type"] = "CHAN"
             res["channel_idx"] = dbuf.read(1)[0]
-            res["path_len"] = dbuf.read(1)[0]
+            plen = dbuf.read(1)[0]
+            if plen == 255 : # direct message
+                res["path_hash_mode"] = -1
+                res["path_len"] = plen
+            else:
+                res["path_hash_mode"] = plen >> 6
+                res["path_len"] = plen & 0x3F
             res["txt_type"] = dbuf.read(1)[0]
             res["sender_timestamp"] = int.from_bytes(dbuf.read(4), byteorder="little", signed=False)
             text = dbuf.read().strip(b"\0")
@@ -249,7 +273,13 @@ class MessageReader:
             res["SNR"] = int.from_bytes(dbuf.read(1), byteorder="little", signed=True) / 4
             dbuf.read(2) # reserved
             res["channel_idx"] = dbuf.read(1)[0]
-            res["path_len"] = dbuf.read(1)[0]
+            plen = dbuf.read(1)[0]
+            if plen == 255 : # direct message
+                res["path_hash_mode"] = -1
+                res["path_len"] = plen
+            else:
+                res["path_hash_mode"] = plen >> 6
+                res["path_len"] = plen & 0x3F
             res["txt_type"] = dbuf.read(1)[0]
             res["sender_timestamp"] = int.from_bytes(dbuf.read(4), byteorder="little", signed=False)
             text = dbuf.read()
