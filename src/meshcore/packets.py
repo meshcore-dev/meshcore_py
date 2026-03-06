@@ -72,6 +72,7 @@ class CommandType(Enum):
     GET_AUTOADD_CONFIG = 59
     GET_ALLOWED_REPEAT_FREQ = 60
     SET_PATH_HASH_MODE = 61
+    SET_LED_PARAMS = 62
 
 # Packet prefixes for the protocol
 class PacketType(Enum):

@@ -158,6 +158,27 @@ class DeviceCommands(CommandHandlerBase):
         infos["multi_acks"] = multi_acks
         return await self.set_other_params_from_infos(infos)
 
+    async def set_led_params(self, led_ble_mode: int, led_status_mode: int) -> Event:
+        logger.debug(f"Setting LED params: ble={led_ble_mode}, status={led_status_mode}")
+        data = (
+            b"\x3e"
+            + int(led_ble_mode).to_bytes(1, "little")
+            + int(led_status_mode).to_bytes(1, "little")
+        )
+        return await self.send(data, [EventType.OK, EventType.ERROR])
+
+    async def set_led_ble_mode(self, mode: int) -> Event:
+        logger.debug(f"Setting LED BLE mode to {mode}")
+        res = await self.send_device_query()
+        current_status = res.payload.get("led_status_mode", 0) if res.type != EventType.ERROR else 0
+        return await self.set_led_params(mode, current_status)
+
+    async def set_led_status_mode(self, mode: int) -> Event:
+        logger.debug(f"Setting LED status mode to {mode}")
+        res = await self.send_device_query()
+        current_ble = res.payload.get("led_ble_mode", 0) if res.type != EventType.ERROR else 0
+        return await self.set_led_params(current_ble, mode)
+
     async def set_devicepin(self, pin: int) -> Event:
         logger.debug(f"Setting device PIN to: {pin}")
         return await self.send(

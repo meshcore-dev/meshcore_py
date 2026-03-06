@@ -346,6 +346,11 @@ class MessageReader:
             if fw_ver >= 10: # has path_hash_mode
                 path_hash_mode = dbuf.read(1)[0]
                 res["path_hash_mode"] = path_hash_mode
+            if fw_ver >= 11: # has LED preferences
+                led_data = dbuf.read(2)
+                if len(led_data) >= 2:
+                    res["led_ble_mode"] = led_data[0]
+                    res["led_status_mode"] = led_data[1]
             await self.dispatcher.dispatch(Event(EventType.DEVICE_INFO, res))
 
         elif packet_type_value == PacketType.CUSTOM_VARS.value:

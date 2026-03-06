@@ -85,5 +85,66 @@ async def test_binary_response():
         else:
             print(f"⚠️ Unknown request type {request_type}, no specific event expected")
 
+@pytest.mark.asyncio
+async def test_device_info_v11_has_led_fields():
+    """Firmware v11+ includes led_ble_mode and led_status_mode in DEVICE_INFO."""
+    mock_dispatcher = MockDispatcher()
+    reader = MessageReader(mock_dispatcher)
+
+    # Build a DEVICE_INFO packet: PacketType.DEVICE_INFO (13) + fw_ver=11 + fields
+    import struct
+    packet = bytearray()
+    packet.append(13)        # RESP_CODE_DEVICE_INFO
+    packet.append(11)        # FIRMWARE_VER_CODE = 11
+    packet.append(25)        # max_contacts / 2
+    packet.append(8)         # max_channels
+    packet += struct.pack("<I", 123456)  # ble_pin
+    packet += b"20250305    "[:12]       # fw_build (12 bytes)
+    packet += b"TestModel".ljust(40, b"\x00")  # model (40 bytes)
+    packet += b"1.0.0".ljust(20, b"\x00")      # ver (20 bytes)
+    packet.append(0)         # repeat (v9+)
+    packet.append(1)         # path_hash_mode (v10+)
+    packet.append(2)         # led_ble_mode (v11+) - LED_BLE_CONN_ONLY
+    packet.append(1)         # led_status_mode (v11+) - LED_STATUS_DISABLED
+
+    await reader.handle_rx(packet)
+
+    device_events = [e for e in mock_dispatcher.dispatched_events if e.type == EventType.DEVICE_INFO]
+    assert len(device_events) == 1
+    info = device_events[0].payload
+    assert info["fw ver"] == 11
+    assert info["led_ble_mode"] == 2
+    assert info["led_status_mode"] == 1
+
+
+@pytest.mark.asyncio
+async def test_device_info_v10_no_led_fields():
+    """Firmware v10 should not have LED fields."""
+    mock_dispatcher = MockDispatcher()
+    reader = MessageReader(mock_dispatcher)
+
+    import struct
+    packet = bytearray()
+    packet.append(13)        # RESP_CODE_DEVICE_INFO
+    packet.append(10)        # FIRMWARE_VER_CODE = 10
+    packet.append(25)        # max_contacts / 2
+    packet.append(8)         # max_channels
+    packet += struct.pack("<I", 0)       # ble_pin
+    packet += b"20250101    "[:12]       # fw_build
+    packet += b"OldModel".ljust(40, b"\x00")
+    packet += b"0.9.0".ljust(20, b"\x00")
+    packet.append(0)         # repeat (v9+)
+    packet.append(0)         # path_hash_mode (v10+)
+
+    await reader.handle_rx(packet)
+
+    device_events = [e for e in mock_dispatcher.dispatched_events if e.type == EventType.DEVICE_INFO]
+    assert len(device_events) == 1
+    info = device_events[0].payload
+    assert info["fw ver"] == 10
+    assert "led_ble_mode" not in info
+    assert "led_status_mode" not in info
+
+
 if __name__ == "__main__":
     asyncio.run(test_binary_response())

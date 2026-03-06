@@ -320,6 +320,31 @@ async def test_set_channel_invalid_secret_length(command_handler):
         await command_handler.set_channel(1, "Test", b"tooshort")
 
 
+async def test_set_led_params(command_handler, mock_connection):
+    """set_led_params sends CMD_SET_LED_PARAMS (0x3e) with both LED mode bytes."""
+    await command_handler.set_led_params(2, 1)
+
+    sent = mock_connection.send.call_args[0][0]
+    assert sent == b"\x3e\x02\x01"
+
+
+async def test_set_other_params_no_led_bytes(command_handler, mock_connection):
+    """set_other_params_from_infos should NOT include LED bytes."""
+    infos = {
+        "manual_add_contacts": 0,
+        "telemetry_mode_base": 0,
+        "telemetry_mode_loc": 0,
+        "telemetry_mode_env": 0,
+        "adv_loc_policy": 0,
+        "multi_acks": 0,
+    }
+    await command_handler.set_other_params_from_infos(infos)
+
+    sent = mock_connection.send.call_args[0][0]
+    assert sent.startswith(b"\x26")
+    assert len(sent) == 5  # cmd(1) + 4 params, no LED bytes
+
+
 async def test_send_chan_msg_with_str_timestamp(command_handler, mock_connection):
     ts = 1620000000
     await command_handler.send_chan_msg(3, "world", timestamp=ts)
