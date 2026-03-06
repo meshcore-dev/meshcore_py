@@ -219,12 +219,12 @@ class MessageReader:
             res["channel_idx"] = dbuf.read(1)[0]
             res["path_len"] = dbuf.read(1)[0]
             res["txt_type"] = dbuf.read(1)[0]
-            res["sender_timestamp"] = int.from_bytes(dbuf.read(4), byteorder="little")
+            res["sender_timestamp"] = int.from_bytes(dbuf.read(4), byteorder="little", signed=False)
             text = dbuf.read().strip(b"\0")
             res["text"] = text.decode("utf-8", "ignore")
 
             # search for text in log_channels
-            txt_hash = int.from_bytes(SHA256.new(text).digest()[0:4], "little", signed=False)
+            txt_hash = int.from_bytes(SHA256.new(res["sender_timestamp"].to_bytes(4, "little", signed=False)+text).digest()[0:4], "little", signed=False)
             if self.decrypt_channels:
                 logged = next((l for l in reversed(self.channels_log) if 'msg_hash' in l and l['msg_hash'] == txt_hash), None)
                 if not logged is None:
@@ -232,6 +232,7 @@ class MessageReader:
                     res["RSSI"] = logged["rssi"]    
                     res["SNR"] = logged["snr"]
                     res["recv_time"] = logged["recv_time"]
+                    res["attempt"] = logged["attempt"]
 
             attributes = {
                 "channel_idx": res["channel_idx"],
@@ -250,12 +251,12 @@ class MessageReader:
             res["channel_idx"] = dbuf.read(1)[0]
             res["path_len"] = dbuf.read(1)[0]
             res["txt_type"] = dbuf.read(1)[0]
-            res["sender_timestamp"] = int.from_bytes(dbuf.read(4), byteorder="little")
+            res["sender_timestamp"] = int.from_bytes(dbuf.read(4), byteorder="little", signed=False)
             text = dbuf.read()
             res["text"] = text.decode("utf-8", "ignore")
 
             # search for text in log_channels
-            txt_hash = int.from_bytes(SHA256.new(text).digest()[0:4], "little", signed=False)
+            txt_hash = int.from_bytes(SHA256.new(res["sender_timestamp"].to_bytes(4, "little", signed=False)+text).digest()[0:4], "little", signed=False)
             res["txt_hash"] = txt_hash
             logged = next((l for l in reversed(self.channels_log) if 'msg_hash' in l and l['msg_hash'] == txt_hash), None)
 
@@ -264,6 +265,7 @@ class MessageReader:
                     res["path"] = logged["path"]
                     res["RSSI"] = logged["rssi"]    
                     res["recv_time"] = logged["recv_time"]
+                    res["attempt"] = logged["attempt"]
 
             attributes = {
                 "channel_idx": res["channel_idx"],
@@ -653,14 +655,24 @@ class MessageReader:
                         # not found: decrypt the text and hash it
                         aes_key = channel["channel_secret"]
                         cipher = AES.new(aes_key, AES.MODE_ECB)
-                        message = cipher.decrypt(msg)[5:].strip(b"\0")
-                        msg_hash = int.from_bytes(SHA256.new(message).digest()[0:4], "little", signed=False)
+                        uncrypted = cipher.decrypt(msg)
+                        timestamp = int.from_bytes(uncrypted[0:4], "little", signed=False)
+                        attempt = uncrypted[4] & 3
+                        txt_type = int.from_bytes(uncrypted[4:4], "little", signed=False) >> 2
+                        message = uncrypted[5:].strip(b"\0")
+                        msg_hash = int.from_bytes(SHA256.new(timestamp.to_bytes(4, "little", signed=False) + message).digest()[0:4], "little", signed=False)
                         log_data["message"] = message.decode("utf-8", "ignore")
                         log_data["msg_hash"] = msg_hash
+                        log_data["sender_timestamp"] = timestamp
+                        log_data["attempt"] = attempt
+                        log_data["txt_type"] = txt_type
                     else:
                         # found: copy
                         log_data["message"] = logged["message"]
                         log_data["msg_hash"] = logged["msg_hash"]
+                        log_data["sender_timestamp"] = logged["sender_timestamp"]
+                        log_data["attempt"] = logged["attempt"]
+                        log_data["txt_type"] = logged["txt_type"]
 
                 self.channels_log.append(log_data)
                 if len(self.channels_log) > 100:
