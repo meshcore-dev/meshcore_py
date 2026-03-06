@@ -29,7 +29,7 @@ class MessageReader:
         # Track pending binary requests by tag for proper response parsing
         self.pending_binary_requests: Dict[str, Dict[str, Any]] = {}  # tag -> {request_type, expires_at}
 
-        self.channels = [{} for _ in range(20)] # keep our own copy of channels, 20 elements by default
+        self.channels = [{} for _ in range(40)] # keep our own copy of channels, 40 elements by default
         self.decrypt_channels = True
         self.channels_log = [] # stores the channel msg events
 
@@ -430,9 +430,8 @@ class MessageReader:
             idx = dbuf.read(1)[0]
             res["channel_idx"] = idx
 
-            if idx >= len(self.channels):
-                self.channels = self.channels.extend(
-                    [{} for _ in range(idx - len(self.channels) + 1)])
+            if len(self.channels) <= idx:
+                self.channels.extend([{} for _ in range(1 + idx - len(self.channels))])
 
             # Channel name is null-terminated, so find the first null byte
             name_bytes = dbuf.read(32)
