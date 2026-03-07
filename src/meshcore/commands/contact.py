@@ -131,7 +131,7 @@ class ContactCommands(CommandHandlerBase):
             out_path_len = int(len(path) / (2 * path_hash_size))
             out_path_hash_mode = path_hash_mode
 
-            logger.debug(f"Setting {contact["adv_name"]} path to {out_path_hex} with mode {out_path_hash_mode}")
+            logger.debug(f"Setting {contact['adv_name']} path to {out_path_hex} with mode {out_path_hash_mode}")
 
             # reflect the change
             contact["out_path_hash_mode"] = path_hash_mode
