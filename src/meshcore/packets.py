@@ -97,6 +97,8 @@ class PacketType(Enum):
     SIGN_START = 19
     SIGNATURE = 20
     CUSTOM_VARS = 21
+    ADVERT_PATH = 22
+    TUNING_PARAMS = 23
     STATS = 24
     AUTOADD_CONFIG = 25
     ALLOWED_REPEAT_FREQ = 26

@@ -23,6 +23,7 @@ class EventType(Enum):
     NEW_CONTACT = "new_contact"
     NEXT_CONTACT = "next_contact"
     AUTOADD_CONFIG = "autoadd_config"
+    ADVERT_PATH = "advert_path"
 
     # Push notifications
     ADVERTISEMENT = "advertisement"

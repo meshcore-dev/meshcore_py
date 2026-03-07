@@ -182,3 +182,9 @@ class ContactCommands(CommandHandlerBase):
     async def get_autoadd_config(self) -> Event:
         data = b"\x3B"
         return await self.send(data, [EventType.AUTOADD_CONFIG, EventType.ERROR])
+
+    async def get_advert_path(self, key: DestinationType) -> Event:
+        key_bytes = _validate_destination(key, prefix_length=32)
+        logger.debug(f"getting advert path for: {key} {key_bytes.hex()}")
+        data = b"\x2a\0" + key_bytes
+        return await self.send(data, [EventType.ADVERT_PATH, EventType.ERROR])

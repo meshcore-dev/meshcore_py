@@ -123,6 +123,20 @@ class MessageReader:
                 await self.dispatcher.dispatch(Event(EventType.NEXT_CONTACT, c))
                 self.contacts[c["public_key"]] = c
 
+        elif packet_type_value == PacketType.ADVERT_PATH.value :
+            r = {}
+            r["timestamp"] = int.from_bytes(dbuf.read(4), "little", signed=False)
+            plen = int.from_bytes(dbuf.read(1), "little", signed=False)
+            if plen == 255: # flood, should not happen
+                r["path_hash_mode"] = -1
+                r["path_len"] = -1
+            else:
+                r["path_hash_mode"] = plen >> 6 # 2 upper bytes
+                r["path_len"] = plen & 0x3F
+            r["path"] = dbuf.read().replace(b"\0", b"").hex()
+
+            await self.dispatcher.dispatch(Event(EventType.ADVERT_PATH, r))
+
         elif packet_type_value == PacketType.CONTACT_END.value:
             lastmod = int.from_bytes(dbuf.read(4), byteorder="little")
             attributes = {
