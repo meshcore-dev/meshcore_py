@@ -80,10 +80,9 @@ class MessageReader:
 
         elif packet_type_value == PacketType.ERROR.value:
             if len(data) > 1:
-                result = {
-                    "error_code": data[1],
-                    "code_string": ErrorMessages[data[1]],
-                }
+                result = { "error_code": data[1], }
+                if data[1] in ErrorMessages:
+                    result["code_string"] = ErrorMessages[data[1]]
             else:
                 result = {}
 
