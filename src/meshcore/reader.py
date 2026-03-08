@@ -4,7 +4,7 @@ import struct
 import time
 import io
 from typing import Any, Dict
-from .events import Event, EventType, EventDispatcher
+from .events import Event, EventType, EventDispatcher, ErrorMessages
 from .packets import BinaryReqType, PacketType, ControlType
 from .parsing import lpp_parse, lpp_parse_mma, parse_acl, parse_status
 from cayennelpp import LppFrame, LppData
@@ -80,7 +80,10 @@ class MessageReader:
 
         elif packet_type_value == PacketType.ERROR.value:
             if len(data) > 1:
-                result = {"error_code": data[1]}
+                result = {
+                    "error_code": data[1],
+                    "code_string": ErrorMessages[data[1]],
+                }
             else:
                 result = {}
 

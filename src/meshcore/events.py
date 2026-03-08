@@ -64,6 +64,15 @@ class EventType(Enum):
     CONNECTED = "connected"
     DISCONNECTED = "disconnected"
 
+# a dict to associate a message to an error code
+ErrorMessages = {
+    1: "ERR_CODE_UNSUPPORTED_CMD",
+    2: "ERR_CODE_NOT_FOUND",
+    3: "ERR_CODE_TABLE_FULL",
+    4: "ERR_CODE_BAD_STATE",
+    5: "ERR_CODE_FILE_IO_ERROR",
+    6: "ERR_CODE_ILLEGAL_ARG",
+}
 
 @dataclass
 class Event:
