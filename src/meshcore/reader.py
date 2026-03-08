@@ -551,7 +551,7 @@ class MessageReader:
             res = {}
             attributes = {}
 
-            pbuf.read(1)
+            dbuf.read(1)
 
             if len(data) > 7:
                 res["pubkey_prefix"] = pbuf.read(6).hex()
