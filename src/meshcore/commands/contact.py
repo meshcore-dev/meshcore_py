@@ -120,7 +120,9 @@ class ContactCommands(CommandHandlerBase):
                     res = await self.send_device_query()
                     if not res is None and res.type != EventType.ERROR:
                         if "path_hash_mode" in res.payload:
-                            path_hash_size = res.payload["path_hash_mode"] + 1
+                            path_hash_mode = res.payload["path_hash_mode"]
+                        else:
+                            path_hash_mode = 0
             else:
                 if ":" in path: # remove as it has been specified in args
                     path = path.split(":")[0].replace(":","")
