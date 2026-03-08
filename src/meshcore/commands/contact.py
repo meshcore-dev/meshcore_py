@@ -134,7 +134,7 @@ class ContactCommands(CommandHandlerBase):
             logger.debug(f"Setting {contact['adv_name']} path to {out_path_hex} with mode {out_path_hash_mode}")
 
             # reflect the change
-            contact["out_path_hash_mode"] = path_hash_mode
+            contact["out_path_hash_mode"] = out_path_hash_mode
             contact["out_path"] = out_path_hex
             contact["out_path_len"] = out_path_len
 
@@ -142,7 +142,7 @@ class ContactCommands(CommandHandlerBase):
         if out_path_len == -1: # path did not change and contact was flood
             out_path_len = 255 # we are signed
         else:
-            out_path_len = out_path_len | (path_hash_mode << 6)
+            out_path_len = out_path_len | (out_path_hash_mode << 6)
 
         if flags is None:
             flags = contact["flags"]
@@ -170,7 +170,7 @@ class ContactCommands(CommandHandlerBase):
         return await self.update_contact(contact)
 
     async def change_contact_path(self, contact, path, path_hash_mode=None) -> Event:
-        return await self.update_contact(contact, path, path_hash_mode)
+        return await self.update_contact(contact, path, path_hash_mode=path_hash_mode)
 
     async def change_contact_flags(self, contact, flags) -> Event:
         return await self.update_contact(contact, flags=flags)
