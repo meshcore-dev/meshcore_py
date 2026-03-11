@@ -26,7 +26,6 @@ class MessageReader:
         self.pending_binary_requests: Dict[str, Dict[str, Any]] = {}  # tag -> {request_type, expires_at}
 
         self.packet_parser = MeshcorePacketParser()
-        self.decrypt_channels = True
 
     @property
     def decrypt_channels(self):
