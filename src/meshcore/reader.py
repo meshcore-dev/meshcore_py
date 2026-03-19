@@ -827,13 +827,13 @@ class MessageReader:
             res["pubkey_pre"] = dbuf.read(6).hex()
             opl = dbuf.read(1)[0]
             opl_hlen = ((opl & 0xc0) >> 6) + 1
-            opl = opl & 0xbf
+            opl = opl & 0x3f
             res["out_path_len"] = opl
             res["out_path_hash_len"] = opl_hlen
             res["out_path"] = dbuf.read(opl*opl_hlen).hex()
             ipl = dbuf.read(1)[0]
             ipl_hlen = ((ipl & 0xc0) >> 6) + 1
-            ipl = ipl & 0xbf
+            ipl = ipl & 0x3f
             res["in_path_len"] = ipl
             res["in_path_hash_len"] = ipl_hlen
             res["in_path"] = dbuf.read(ipl*ipl_hlen).hex()
