@@ -79,6 +79,10 @@ class SerialConnection:
             idx = data.find(b"\x3e")
             if idx < 0: # no start of frame
                 return
+            # Discard any leading junk bytes before the actual frame marker.
+            # Some radios interleave console/debug text on the same UART, so
+            # valid companion frames may begin at an offset inside the chunk.
+            data = data[idx:]
             self.header = data[0:1]
             data = data[1:]
 
