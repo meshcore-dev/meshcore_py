@@ -269,6 +269,8 @@ class MessagingCommands(CommandHandlerBase):
                 scope_key = b"\0"*16
             else:
                 logger.debug(f"Setting scope from string {scope}")
+                if scope[0] != "#":     # no hashtag as first char
+                    scope = "#" + scope # adding hashtag
                 scope_key = sha256(scope.encode("utf-8")).digest()[0:16]
         elif isinstance (scope, bytes): # scope has been sent directly as byte
                 logger.debug(f"Directly setting scope to {scope}")
