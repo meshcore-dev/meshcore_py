@@ -225,6 +225,7 @@ class BinaryCommandHandler(CommandHandlerBase):
 
         del res["tag"]
 
+        tries = 0
         while results_count < neighbours_count:
             #await asyncio.sleep(2) # wait 2s before next fetch
             next_res = await self.req_neighbours_sync(contact,
@@ -233,15 +234,18 @@ class BinaryCommandHandler(CommandHandlerBase):
                 order_by=order_by,
                 pubkey_prefix_length=pubkey_prefix_length,
                 timeout=timeout,
-                min_timeout=min_timeout+5) # requests are close, so let's have some more timeout
-
+                min_timeout=min_timeout+25) # requests are close and responses big, 
+                                            #so let's have some more timeout for duty cycle
             if next_res is None :
-                return res # caller should check it has everything
-
-            results_count = results_count + next_res["results_count"]
-
-            res["results_count"] = results_count
-            res["neighbours"] += next_res["neighbours"]
+                if tries > 0:
+                    return res # caller should check it has everything
+                else:
+                    tries += 1
+            else:
+                tries = 0
+                results_count += next_res["results_count"]
+                res["results_count"] = results_count
+                res["neighbours"] += next_res["neighbours"]
 
         return res
 
