@@ -108,17 +108,14 @@ class MeshcorePacketParser:
                         channel = c
                         break
 
-            chan_name = ""
-
-            if channel is None :
-                chan_name = chan_hash
-            else:
-                chan_name = channel["channel_name"]
-
             log_data["chan_hash"] = chan_hash
             log_data["cipher_mac"] = cipher_mac.hex()
             log_data["crypted"] = msg.hex()
-            log_data["chan_name"] = chan_name
+
+            chan_name = ""
+            if not channel is None :
+                chan_name = channel["channel_name"]
+                log_data["chan_name"] = chan_name
 
             if not channel is None and self.decrypt_channels:
 
