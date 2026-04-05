@@ -28,8 +28,9 @@ async def test_binary_response():
     
     # Register the binary request first
     tag = "417db968"
-    from meshcore.parsing import BinaryReqType
-    reader.register_binary_request(tag, BinaryReqType.ACL, 10.0)
+    from meshcore.packets import BinaryReqType
+    pubkey_prefix = "993acd42fc77"
+    reader.register_binary_request(pubkey_prefix, tag, BinaryReqType.ACL, 10.0)
     print(f"Registered ACL request with tag {tag}")
     
     await reader.handle_rx(packet_data)
@@ -64,7 +65,7 @@ async def test_binary_response():
         print(f"Request type in response: 0x{request_type:02x} ({request_type})")
         
         # Map request types to expected events
-        from meshcore.parsing import BinaryReqType
+        from meshcore.packets import BinaryReqType
         if request_type == BinaryReqType.STATUS.value:
             expected_event = EventType.STATUS_RESPONSE
         elif request_type == BinaryReqType.TELEMETRY.value:

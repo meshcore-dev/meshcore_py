@@ -2,9 +2,11 @@ import pytest
 import asyncio
 from unittest.mock import MagicMock, AsyncMock
 from meshcore.commands import CommandHandler
-from meshcore.events import EventType, Event
+from meshcore.events import EventType, Event, Subscription
 
 pytestmark = pytest.mark.asyncio
+
+VALID_PUBKEY_HEX = "0123456789abcdef" * 4  # 64 hex chars = 32 bytes
 
 
 # Fixtures
@@ -20,6 +22,15 @@ def mock_dispatcher():
     dispatcher = MagicMock()
     dispatcher.wait_for_event = AsyncMock()
     dispatcher.dispatch = AsyncMock()
+
+    def fake_subscribe(event_type, handler, attribute_filters=None):
+        sub = MagicMock(spec=Subscription)
+        sub.unsubscribe = MagicMock()
+        dispatcher._last_subscribe_handler = handler
+        dispatcher._last_subscribe_event_type = event_type
+        return sub
+
+    dispatcher.subscribe = MagicMock(side_effect=fake_subscribe)
     return dispatcher
 
 
@@ -36,20 +47,17 @@ def command_handler(mock_connection, mock_dispatcher):
     return handler
 
 
-# Test helper
 def setup_event_response(mock_dispatcher, event_type, payload, attribute_filters=None):
-    async def wait_response(requested_type, filters=None, timeout=None):
-        if requested_type == event_type:
-            if filters and attribute_filters:
-                if not all(
-                    attribute_filters.get(key) == value
-                    for key, value in filters.items()
-                ):
-                    return None
-            return Event(event_type, payload)
-        return None
+    def fake_subscribe(evt_type, handler, attr_filters=None):
+        sub = MagicMock(spec=Subscription)
+        sub.unsubscribe = MagicMock()
+        if evt_type == event_type:
+            asyncio.get_event_loop().call_soon(
+                handler, Event(event_type, payload)
+            )
+        return sub
 
-    mock_dispatcher.wait_for_event.side_effect = wait_response
+    mock_dispatcher.subscribe = MagicMock(side_effect=fake_subscribe)
 
 
 # Basic tests
@@ -72,11 +80,9 @@ async def test_send_with_event(command_handler, mock_connection, mock_dispatcher
 
 
 async def test_send_timeout(command_handler, mock_connection, mock_dispatcher):
-    mock_dispatcher.wait_for_event.side_effect = asyncio.TimeoutError
-
     result = await command_handler.send(b"test_command", [EventType.OK], timeout=0.1)
     assert result.type == EventType.ERROR
-    assert result.payload == {"reason": "timeout"}
+    assert result.payload == {"reason": "no_event_received"}
 
 
 # Destination validation tests
@@ -106,7 +112,7 @@ async def test_validate_destination_contact_object(command_handler, mock_connect
 
 # Command tests
 async def test_send_login(command_handler, mock_connection):
-    await command_handler.send_login("0123456789abcdef", "password")
+    await command_handler.send_login(VALID_PUBKEY_HEX, "password")
 
     assert mock_connection.send.call_args[0][0].startswith(b"\x1a")
     assert b"\x01\x23\x45\x67\x89\xab" in mock_connection.send.call_args[0][0]
@@ -198,15 +204,14 @@ async def test_get_contacts(command_handler, mock_connection):
 
 
 async def test_reset_path(command_handler, mock_connection):
-    dst = "0123456789abcdef"
-    await command_handler.reset_path(dst)
+    command_handler._get_contact_by_prefix = lambda prefix: None
+    await command_handler.reset_path(VALID_PUBKEY_HEX)
     assert mock_connection.send.call_args[0][0].startswith(b"\x0d")
     assert b"\x01\x23\x45\x67\x89\xab" in mock_connection.send.call_args[0][0]
 
 
 async def test_share_contact(command_handler, mock_connection):
-    dst = "0123456789abcdef"
-    await command_handler.share_contact(dst)
+    await command_handler.share_contact(VALID_PUBKEY_HEX)
     assert mock_connection.send.call_args[0][0].startswith(b"\x10")
     assert b"\x01\x23\x45\x67\x89\xab" in mock_connection.send.call_args[0][0]
 
@@ -218,15 +223,13 @@ async def test_export_contact(command_handler, mock_connection):
 
     # Test exporting specific contact
     mock_connection.reset_mock()
-    dst = "0123456789abcdef"
-    await command_handler.export_contact(dst)
+    await command_handler.export_contact(VALID_PUBKEY_HEX)
     assert mock_connection.send.call_args[0][0].startswith(b"\x11")
     assert b"\x01\x23\x45\x67\x89\xab" in mock_connection.send.call_args[0][0]
 
 
 async def test_remove_contact(command_handler, mock_connection):
-    dst = "0123456789abcdef"
-    await command_handler.remove_contact(dst)
+    await command_handler.remove_contact(VALID_PUBKEY_HEX)
     assert mock_connection.send.call_args[0][0].startswith(b"\x0f")
     assert b"\x01\x23\x45\x67\x89\xab" in mock_connection.send.call_args[0][0]
 
@@ -242,15 +245,13 @@ async def test_get_msg(command_handler, mock_connection):
 
 
 async def test_send_logout(command_handler, mock_connection):
-    dst = "0123456789abcdef"
-    await command_handler.send_logout(dst)
+    await command_handler.send_logout(VALID_PUBKEY_HEX)
     assert mock_connection.send.call_args[0][0].startswith(b"\x1d")
     assert b"\x01\x23\x45\x67\x89\xab" in mock_connection.send.call_args[0][0]
 
 
 async def test_send_statusreq(command_handler, mock_connection):
-    dst = "0123456789abcdef"
-    await command_handler.send_statusreq(dst)
+    await command_handler.send_statusreq(VALID_PUBKEY_HEX)
     assert mock_connection.send.call_args[0][0].startswith(b"\x1b")
     assert b"\x01\x23\x45\x67\x89\xab" in mock_connection.send.call_args[0][0]
 
@@ -261,10 +262,10 @@ async def test_send_trace(command_handler, mock_connection):
     first_call = mock_connection.send.call_args[0][0]
     assert first_call.startswith(b"\x24")  # 36 in decimal = 0x24 in hex
 
-    # Test with all parameters
+    # Test with all parameters (flags=1 means path_hash_len=2, so 4 hex chars each)
     mock_connection.reset_mock()
     await command_handler.send_trace(
-        auth_code=12345, tag=67890, flags=1, path="01,23,45"
+        auth_code=12345, tag=67890, flags=1, path="0123,2345,4567"
     )
     second_call = mock_connection.send.call_args[0][0]
     assert second_call.startswith(b"\x24")
@@ -273,25 +274,14 @@ async def test_send_trace(command_handler, mock_connection):
 async def test_send_with_multiple_expected_events_returns_first_completed(
     command_handler, mock_connection, mock_dispatcher
 ):
-    # Setup the dispatcher to return an ERROR event
     error_payload = {"reason": "command_failed"}
+    setup_event_response(mock_dispatcher, EventType.ERROR, error_payload)
 
-    async def simulate_error_event(*args, **kwargs):
-        # Simulate an ERROR event being returned
-        return Event(EventType.ERROR, error_payload)
-
-    # Patch the wait_for_event method to return our simulated event
-    mock_dispatcher.wait_for_event.side_effect = simulate_error_event
-
-    # Call send with both OK and ERROR in the expected_events list, with OK first
     result = await command_handler.send(
         b"test_command", [EventType.OK, EventType.ERROR]
     )
 
-    # Verify the command was sent
     mock_connection.send.assert_called_once_with(b"test_command")
-
-    # Verify that even though OK was listed first, the ERROR event was returned
     assert result.type == EventType.ERROR
     assert result.payload == error_payload
 
