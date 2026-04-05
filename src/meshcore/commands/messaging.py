@@ -30,6 +30,18 @@ class MessagingCommands(CommandHandlerBase):
         data = b"\x1a" + dst_bytes + pwd.encode("utf-8")
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
 
+    async def send_login_sync(self, dst: DestinationType, pwd: str, timeout: float = 10.0) -> Optional[Event]:
+        """Send login to a remote node and wait for the response."""
+        async with self._mesh_request_lock:
+            result = await self.send_login(dst, pwd)
+            if result is None or result.type == EventType.ERROR:
+                return None
+            login_event = await self.dispatcher.wait_for_event(
+                EventType.LOGIN_SUCCESS,
+                timeout=timeout,
+            )
+            return login_event
+
     async def send_logout(self, dst: DestinationType) -> Event:
         dst_bytes = _validate_destination(dst, prefix_length=32)
         data = b"\x1d" + dst_bytes
@@ -85,7 +97,7 @@ class MessagingCommands(CommandHandlerBase):
         self, dst: DestinationType, msg: str, timestamp: Optional[int] = None,
         max_attempts=3, max_flood_attempts=2, flood_after=2, timeout=0, min_timeout=0
     ) -> Event:
-        
+
         try:
             dst_bytes = _validate_destination(dst, prefix_length=32)
             # with 32 bytes we can reset to flood
@@ -105,8 +117,8 @@ class MessagingCommands(CommandHandlerBase):
             # we can't know if we're flood without fetching all contacts
             # if we have a full key (meaning we can reset path) consider direct
             # else consider flood
-            flood = len(dst_bytes) < 32 
-            logger.info(f"send_msg_with_retry: can't determine if flood, assume {flood}")
+            flood = len(dst_bytes) < 32
+            logger.info(f"send_msg_with_retry: can't determine if flood, assume {flood}")
         res = None
         while attempts < max_attempts and res is None \
                     and (not flood or flood_attempts < max_flood_attempts):
@@ -122,8 +134,8 @@ class MessagingCommands(CommandHandlerBase):
                         contact["out_path_len"] = -1
 
             if attempts > 0:
-                logger.info(f"Retry sending msg: {attempts + 1}")
-                
+                logger.info(f"Retry sending msg: {attempts + 1}")
+
             result = await self.send_msg(dst, msg, timestamp, attempt=attempts)
             if result.type == EventType.ERROR:
                 logger.error(f"⚠️ Failed to send message: {result.payload}")
@@ -131,14 +143,14 @@ class MessagingCommands(CommandHandlerBase):
             exp_ack = result.payload["expected_ack"].hex()
             timeout = result.payload["suggested_timeout"] / 1000 * 1.2 if timeout==0 else timeout
             timeout = timeout if timeout > min_timeout else min_timeout
-            res = await self.dispatcher.wait_for_event(EventType.ACK, 
-                        attribute_filters={"code": exp_ack}, 
+            res = await self.dispatcher.wait_for_event(EventType.ACK,
+                        attribute_filters={"code": exp_ack},
                         timeout=timeout)
 
             attempts = attempts + 1
             if flood :
                 flood_attempts = flood_attempts + 1
-    
+
         return None if res is None else result
 
     async def send_chan_msg(self, chan: int, msg: str, timestamp: Optional[int|bytes] = None) -> Event:
@@ -176,6 +188,18 @@ class MessagingCommands(CommandHandlerBase):
         logger.debug(f"Path discovery request for {dst_bytes.hex()}")
         data = b"\x34\x00" + dst_bytes
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
+
+    async def send_path_discovery_sync(self, dst: DestinationType, timeout: float = 30.0) -> Optional[Event]:
+        """Send path discovery request and wait for the response."""
+        async with self._mesh_request_lock:
+            result = await self.send_path_discovery(dst)
+            if result is None or result.type == EventType.ERROR:
+                return None
+            path_event = await self.dispatcher.wait_for_event(
+                EventType.PATH_RESPONSE,
+                timeout=timeout,
+            )
+            return path_event
 
     async def send_trace(
         self,
