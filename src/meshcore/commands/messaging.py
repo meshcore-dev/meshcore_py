@@ -24,16 +24,20 @@ class MessagingCommands(CommandHandlerBase):
             timeout,
         )
 
-    async def send_login(self, dst: DestinationType, pwd: str) -> Event:
+    async def _send_login_raw(self, dst: DestinationType, pwd: str) -> Event:
         dst_bytes = _validate_destination(dst, prefix_length=32)
         logger.debug(f"Sending login request to: {dst_bytes.hex()}")
         data = b"\x1a" + dst_bytes + pwd.encode("utf-8")
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
 
+    async def send_login(self, dst: DestinationType, pwd: str) -> Event:
+        logger.warning("*** please consider using send_login_sync instead of send_login")
+        return await self._send_login_raw(dst, pwd)
+
     async def send_login_sync(self, dst: DestinationType, pwd: str, timeout: float = 10.0) -> Optional[Event]:
         """Send login to a remote node and wait for the response."""
         async with self._mesh_request_lock:
-            result = await self.send_login(dst, pwd)
+            result = await self._send_login_raw(dst, pwd)
             if result is None or result.type == EventType.ERROR:
                 return None
             login_event = await self.dispatcher.wait_for_event(
@@ -48,6 +52,7 @@ class MessagingCommands(CommandHandlerBase):
         return await self.send(data, [EventType.OK, EventType.ERROR])
 
     async def send_statusreq(self, dst: DestinationType) -> Event:
+        logger.warning("*** please consider using req_status_sync instead of send_statusreq")
         dst_bytes = _validate_destination(dst, prefix_length=32)
         logger.debug(f"Sending status request to: {dst_bytes.hex()}")
         data = b"\x1b" + dst_bytes
@@ -178,21 +183,26 @@ class MessagingCommands(CommandHandlerBase):
         return await self.send(data, [EventType.OK, EventType.ERROR])
 
     async def send_telemetry_req(self, dst: DestinationType) -> Event:
+        logger.warning("*** please consider using req_telemetry_sync instead of send_telemetry_req")
         dst_bytes = _validate_destination(dst, prefix_length=32)
         logger.debug(f"Asking telemetry to {dst_bytes.hex()}")
         data = b"\x27\x00\x00\x00" + dst_bytes
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
 
-    async def send_path_discovery(self, dst: DestinationType) -> Event:
+    async def _send_path_discovery_raw(self, dst: DestinationType) -> Event:
         dst_bytes = _validate_destination(dst, prefix_length=32)
         logger.debug(f"Path discovery request for {dst_bytes.hex()}")
         data = b"\x34\x00" + dst_bytes
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
 
+    async def send_path_discovery(self, dst: DestinationType) -> Event:
+        logger.warning("*** please consider using send_path_discovery_sync instead of send_path_discovery")
+        return await self._send_path_discovery_raw(dst)
+
     async def send_path_discovery_sync(self, dst: DestinationType, timeout: float = 30.0) -> Optional[Event]:
         """Send path discovery request and wait for the response."""
         async with self._mesh_request_lock:
-            result = await self.send_path_discovery(dst)
+            result = await self._send_path_discovery_raw(dst)
             if result is None or result.type == EventType.ERROR:
                 return None
             path_event = await self.dispatcher.wait_for_event(
