@@ -64,6 +64,7 @@ class CommandHandlerBase:
         self._sender_func: Optional[Callable[[bytes], Coroutine[Any, Any, None]]] = None
         self._reader: Optional[MessageReader] = None
         self.dispatcher: Optional[EventDispatcher] = None
+        self._mesh_request_lock = asyncio.Lock()
         self.default_timeout = (
             default_timeout if default_timeout is not None else self.DEFAULT_TIMEOUT
         )

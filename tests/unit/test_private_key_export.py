@@ -7,13 +7,12 @@ import pytest
 import asyncio
 from unittest.mock import MagicMock, AsyncMock
 from meshcore.commands import CommandHandler
-from meshcore.events import Event, EventType
+from meshcore.events import Event, EventType, Subscription
 from meshcore.reader import MessageReader
 
 pytestmark = pytest.mark.asyncio
 
 
-# Fixtures (consistent with existing test patterns)
 @pytest.fixture
 def mock_connection():
     connection = MagicMock()
@@ -26,6 +25,13 @@ def mock_dispatcher():
     dispatcher = MagicMock()
     dispatcher.wait_for_event = AsyncMock()
     dispatcher.dispatch = AsyncMock()
+
+    def fake_subscribe(event_type, handler, attribute_filters=None):
+        sub = MagicMock(spec=Subscription)
+        sub.unsubscribe = MagicMock()
+        return sub
+
+    dispatcher.subscribe = MagicMock(side_effect=fake_subscribe)
     return dispatcher
 
 
@@ -41,14 +47,17 @@ def command_handler(mock_connection, mock_dispatcher):
     return handler
 
 
-# Test helper (consistent with existing patterns)
 def setup_event_response(mock_dispatcher, event_type, payload):
-    async def wait_response(requested_type, filters=None, timeout=None):
-        if requested_type == event_type:
-            return Event(event_type, payload)
-        return None
+    def fake_subscribe(evt_type, handler, attr_filters=None):
+        sub = MagicMock(spec=Subscription)
+        sub.unsubscribe = MagicMock()
+        if evt_type == event_type:
+            asyncio.get_event_loop().call_soon(
+                handler, Event(event_type, payload)
+            )
+        return sub
 
-    mock_dispatcher.wait_for_event.side_effect = wait_response
+    mock_dispatcher.subscribe = MagicMock(side_effect=fake_subscribe)
 
 
 # Command tests
