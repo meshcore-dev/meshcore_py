@@ -34,12 +34,14 @@ class MessagingCommands(CommandHandlerBase):
         logger.warning("*** please consider using send_login_sync instead of send_login")
         return await self._send_login_raw(dst, pwd)
 
-    async def send_login_sync(self, dst: DestinationType, pwd: str, timeout: float = 10.0) -> Optional[Event]:
+    async def send_login_sync(self, dst: DestinationType, pwd: str, timeout=0, min_timeout=0) -> Optional[Event]:
         """Send login to a remote node and wait for the response."""
         async with self._mesh_request_lock:
             result = await self._send_login_raw(dst, pwd)
             if result is None or result.type == EventType.ERROR:
                 return None
+            timeout = result.payload["suggested_timeout"] / 800 if timeout == 0 else timeout
+            timeout = timeout if timeout > min_timeout else min_timeout
             login_event = await self.dispatcher.wait_for_event(
                 EventType.LOGIN_SUCCESS,
                 timeout=timeout,
@@ -199,12 +201,14 @@ class MessagingCommands(CommandHandlerBase):
         logger.warning("*** please consider using send_path_discovery_sync instead of send_path_discovery")
         return await self._send_path_discovery_raw(dst)
 
-    async def send_path_discovery_sync(self, dst: DestinationType, timeout: float = 30.0) -> Optional[Event]:
+    async def send_path_discovery_sync(self, dst: DestinationType, timeout=0, min_timeout=0) -> Optional[Event]:
         """Send path discovery request and wait for the response."""
         async with self._mesh_request_lock:
             result = await self._send_path_discovery_raw(dst)
             if result is None or result.type == EventType.ERROR:
                 return None
+            timeout = result.payload["suggested_timeout"] / 800 if timeout == 0 else timeout
+            timeout = timeout if timeout > min_timeout else min_timeout
             path_event = await self.dispatcher.wait_for_event(
                 EventType.PATH_RESPONSE,
                 timeout=timeout,
