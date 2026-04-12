@@ -154,6 +154,17 @@ class BLEConnection:
         self.client = self._user_provided_client
         self.device = self._user_provided_device
 
+        # Re-register disconnect callback on the reset client so subsequent
+        # disconnects after a reconnect cycle are still detected.
+        if self.client is not None and hasattr(self.client, 'set_disconnected_callback'):
+            try:
+                self.client.set_disconnected_callback(self.handle_disconnect)
+            except Exception:
+                # set_disconnected_callback may not be available on all bleak
+                # versions; the next connect() call will re-create the client
+                # with the callback anyway.
+                pass
+
         if self._disconnect_callback:
             asyncio.create_task(self._disconnect_callback("ble_disconnect"))
 
