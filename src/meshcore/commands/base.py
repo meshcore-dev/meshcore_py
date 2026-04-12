@@ -58,7 +58,7 @@ def _validate_destination(dst: DestinationType, prefix_length: int = 6) -> bytes
 
 
 class CommandHandlerBase:
-    DEFAULT_TIMEOUT = 5.0
+    DEFAULT_TIMEOUT = 15.0
 
     def __init__(self, default_timeout: Optional[float] = None):
         self._sender_func: Optional[Callable[[bytes], Coroutine[Any, Any, None]]] = None
