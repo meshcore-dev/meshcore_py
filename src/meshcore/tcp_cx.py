@@ -96,7 +96,7 @@ class TCPConnection:
                 self.frame_expected_size = 0
                 if len(data) > 0: # rerun handle_rx on remaining data
                     self.handle_rx(data)
-                    return
+                return  # nothing left to process after reset
 
         upbound = self.frame_expected_size - len(self.inframe)
         if len(data) < upbound :
