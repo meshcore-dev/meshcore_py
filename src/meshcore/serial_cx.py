@@ -125,11 +125,18 @@ class SerialConnection:
     async def send(self, data):
         if not self.transport:
             logger.error("Transport not connected, cannot send data")
+            if self._disconnect_callback:
+                await self._disconnect_callback("serial_transport_lost")
             return
         size = len(data)
         pkt = b"\x3c" + size.to_bytes(2, byteorder="little") + data
         logger.debug(f"sending pkt : {pkt}")
-        self.transport.write(pkt)
+        try:
+            self.transport.write(pkt)
+        except OSError as exc:
+            logger.warning(f"Serial write failed: {exc}")
+            if self._disconnect_callback:
+                await self._disconnect_callback(f"serial_write_failed: {exc}")
 
     async def disconnect(self):
         """Close the serial connection."""

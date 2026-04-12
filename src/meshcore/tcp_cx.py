@@ -137,7 +137,12 @@ class TCPConnection:
         size = len(data)
         pkt = b"\x3c" + size.to_bytes(2, byteorder="little") + data
         logger.debug(f"sending pkt : {pkt}")
-        self.transport.write(pkt)
+        try:
+            self.transport.write(pkt)
+        except (OSError, ConnectionResetError) as exc:
+            logger.warning(f"TCP write failed: {exc}")
+            if self._disconnect_callback:
+                await self._disconnect_callback(f"tcp_write_failed: {exc}")
 
     async def disconnect(self):
         """Close the TCP connection."""

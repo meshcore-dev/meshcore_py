@@ -171,11 +171,19 @@ class BLEConnection:
     async def send(self, data):
         if not self.client:
             logger.error("Client is not connected")
+            if self._disconnect_callback:
+                await self._disconnect_callback("ble_transport_lost")
             return False
         if not self.rx_char:
             logger.error("RX characteristic not found")
             return False
-        await self.client.write_gatt_char(self.rx_char, bytes(data), response=True)
+        try:
+            await self.client.write_gatt_char(self.rx_char, bytes(data), response=True)
+        except Exception as exc:
+            logger.warning(f"BLE write failed: {exc}")
+            if self._disconnect_callback:
+                await self._disconnect_callback(f"ble_write_failed: {exc}")
+            return False
 
     async def disconnect(self):
         """Disconnect from the BLE device."""
