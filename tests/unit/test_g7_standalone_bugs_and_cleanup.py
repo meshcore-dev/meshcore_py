@@ -177,12 +177,14 @@ async def test_r03_placeholder_registered_before_send():
         return_value=Event(EventType.MSG_SENT, {"expected_ack": b"\x01\x02\x03\x04"})
     )
 
-    # Resolve subscribed events immediately so send() doesn't block
+    # Resolve subscribed events immediately so send() doesn't block.
+    # Use MSG_SENT with expected_ack because send_binary_req reads that key.
     def resolving_subscribe(event_type, cb, attribute_filters=None):
         sub = MagicMock()
         sub.unsubscribe = MagicMock()
+        payload = {"expected_ack": b"\x01\x02\x03\x04"} if event_type == EventType.MSG_SENT else {}
         asyncio.get_event_loop().call_soon(
-            cb, Event(event_type, {})
+            cb, Event(event_type, payload)
         )
         return sub
     handler.dispatcher.subscribe = MagicMock(side_effect=resolving_subscribe)
