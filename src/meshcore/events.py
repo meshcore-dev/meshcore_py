@@ -104,6 +104,17 @@ class Event:
         if kwargs:
             self.attributes.update(kwargs)
 
+    def is_error(self) -> bool:
+        """Return True if this event represents an error response.
+
+        Callers that include ``EventType.ERROR`` in their expected-events
+        list **must** check ``result.is_error()`` (or ``result.type ==
+        EventType.ERROR``) before accessing keyed payload fields, because
+        an ERROR payload contains ``{"reason": "..."}`` — not the
+        command-specific keys the caller expects on the happy path.
+        """
+        return self.type == EventType.ERROR
+
     def clone(self):
         """
         Create a copy of the event.

@@ -90,6 +90,14 @@ class CommandHandlerBase:
         expected_events: Optional[Union[EventType, List[EventType]]] = None,
         timeout: Optional[float] = None,
     ) -> Event:
+        """Wait for the first of *expected_events* to arrive.
+
+        Returns the first matched ``Event``.  When ``EventType.ERROR`` is
+        among the expected types, the caller **must** check
+        ``result.is_error()`` before accessing command-specific payload
+        keys — an ERROR payload is ``{"reason": "..."}`` and will
+        ``KeyError`` on any other key.
+        """
         try:
             # Convert single event to list if needed
             if not isinstance(expected_events, list):
@@ -129,9 +137,6 @@ class CommandHandlerBase:
             logger.debug(f"Command error: {e}")
             return Event(EventType.ERROR, {"error": str(e)})
 
-        return Event(EventType.ERROR, {})
-
-
     async def send(
         self,
         data: bytes,
@@ -151,7 +156,14 @@ class CommandHandlerBase:
             timeout: Timeout in seconds, or None to use default_timeout
 
         Returns:
-            Event: The full event object that was received in response to the command
+            Event: The full event object that was received in response to
+            the command.
+
+        Important:
+            When ``EventType.ERROR`` is included in *expected_events*, the
+            returned event may be an error response.  Callers **must**
+            check ``result.is_error()`` before accessing command-specific
+            payload keys to avoid ``KeyError``.
         """
         if not self.dispatcher:
             raise RuntimeError("Dispatcher not set, cannot send commands")
@@ -266,6 +278,7 @@ class CommandHandlerBase:
         contact = self._get_contact_by_prefix(dst_bytes.hex()) # need a contact for return path
         if contact is None:
             logger.error("No contact found")
+            return Event(EventType.ERROR, {"reason": "contact_not_found"})
 
         zero_hop = False
         if contact["out_path_len"] == -1: 
