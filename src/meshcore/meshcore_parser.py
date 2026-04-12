@@ -171,39 +171,42 @@ class MeshcorePacketParser:
                 del self.channels_log[:25]
 
         elif not payload is None and payload_type == 0x04: # Advert
-            pk_buf = io.BytesIO(pkt_payload)
-            adv_key = pk_buf.read(32).hex()
-            adv_timestamp = int.from_bytes(pk_buf.read(4), "little", signed=False)
-            signature = pk_buf.read(64).hex()
-            flags = pk_buf.read(1)[0]
-            adv_type = flags & 0x0F
-            adv_lat = None
-            adv_lon = None
-            adv_feat1 = None
-            adv_feat2 = None
-            if flags & 0x10 > 0: #has location
-                adv_lat = int.from_bytes(pk_buf.read(4), "little", signed=True)/1000000.0
-                adv_lon = int.from_bytes(pk_buf.read(4), "little", signed=True)/1000000.0
-            if flags & 0x20 > 0: #has feature1
-                adv_feat1 = pk_buf.read(2).hex()
-            if flags & 0x40 > 0: #has feature2
-                adv_feat2 = pk_buf.read(2).hex()
-            if flags & 0x80 > 0: #has name
-                adv_name = pk_buf.read().decode("utf-8", "ignore").strip("\x00")
-                log_data["adv_name"] = adv_name
+            try:
+                pk_buf = io.BytesIO(pkt_payload)
+                adv_key = pk_buf.read(32).hex()
+                adv_timestamp = int.from_bytes(pk_buf.read(4), "little", signed=False)
+                signature = pk_buf.read(64).hex()
+                flags = pk_buf.read(1)[0]
+                adv_type = flags & 0x0F
+                adv_lat = None
+                adv_lon = None
+                adv_feat1 = None
+                adv_feat2 = None
+                if flags & 0x10 > 0: #has location
+                    adv_lat = int.from_bytes(pk_buf.read(4), "little", signed=True)/1000000.0
+                    adv_lon = int.from_bytes(pk_buf.read(4), "little", signed=True)/1000000.0
+                if flags & 0x20 > 0: #has feature1
+                    adv_feat1 = pk_buf.read(2).hex()
+                if flags & 0x40 > 0: #has feature2
+                    adv_feat2 = pk_buf.read(2).hex()
+                if flags & 0x80 > 0: #has name
+                    adv_name = pk_buf.read().decode("utf-8", "ignore").strip("\x00")
+                    log_data["adv_name"] = adv_name
 
-            log_data["adv_key"] = adv_key
-            log_data["adv_timestamp"] = adv_timestamp
-            log_data["signature"] = signature
-            log_data["adv_flags"] = flags
-            log_data["adv_type"] = adv_type
-            if not adv_lat is None :
-                log_data["adv_lat"] = adv_lat
-            if not adv_lon is None :
-                log_data["adv_lon"] = adv_lon
-            if not adv_feat1 is None:
-                log_data["adv_feat1"] = adv_feat1
-            if not adv_feat2 is None:
-                log_data["adv_feat2"] = adv_feat2
+                log_data["adv_key"] = adv_key
+                log_data["adv_timestamp"] = adv_timestamp
+                log_data["signature"] = signature
+                log_data["adv_flags"] = flags
+                log_data["adv_type"] = adv_type
+                if not adv_lat is None :
+                    log_data["adv_lat"] = adv_lat
+                if not adv_lon is None :
+                    log_data["adv_lon"] = adv_lon
+                if not adv_feat1 is None:
+                    log_data["adv_feat1"] = adv_feat1
+                if not adv_feat2 is None:
+                    log_data["adv_feat2"] = adv_feat2
+            except (IndexError, ValueError) as e:
+                logger.debug(f"parsePacketPayload: malformed ADVERT payload ({type(e).__name__}: {e}), len={len(pkt_payload)}")
 
         return log_data
