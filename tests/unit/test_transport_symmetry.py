@@ -1,10 +1,10 @@
 """
-Verification tests for G4 — Transport symmetry fixes.
+Verification tests for transport symmetry fixes.
 
-Covers: F04 (send symmetry across transports), NEW-A (serial disconnect
-callback on transport-lost), F18 (serial connect timeout), M06 (oversize-frame
-return), F16 (BLE disconnect-callback re-registration), F17 (BLE pairing
-failure re-raise), N04 (TCP counter per frame not per segment).
+Covers: send symmetry across transports, serial disconnect callback on
+transport-lost, serial connect timeout, oversize-frame return, BLE
+disconnect-callback re-registration, BLE pairing failure re-raise,
+TCP counter per frame not per segment.
 """
 
 import asyncio
@@ -30,11 +30,11 @@ class RecordingReader:
 
 
 # ---------------------------------------------------------------------------
-# F04 — TCP send() wraps transport.write in try/except
+# TCP send() wraps transport.write in try/except
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_g4_tcp_send_write_error_fires_disconnect():
+async def test_tcp_send_write_error_fires_disconnect():
     """TCP: OSError during transport.write fires _disconnect_callback."""
     cx = TCPConnection("127.0.0.1", 5000)
     cb = AsyncMock()
@@ -54,12 +54,12 @@ async def test_g4_tcp_send_write_error_fires_disconnect():
 
 
 # ---------------------------------------------------------------------------
-# F04 + NEW-A — Serial send() fires disconnect on transport-lost and write error
+# Serial send() fires disconnect on transport-lost and write error
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_g4_serial_send_no_transport_fires_disconnect():
-    """Serial: send() on None transport fires _disconnect_callback (NEW-A)."""
+async def test_serial_send_no_transport_fires_disconnect():
+    """Serial: send() on None transport fires _disconnect_callback ."""
     cx = SerialConnection("/dev/null", 115200)
     cb = AsyncMock()
     cx.set_disconnect_callback(cb)
@@ -73,7 +73,7 @@ async def test_g4_serial_send_no_transport_fires_disconnect():
 
 
 @pytest.mark.asyncio
-async def test_g4_serial_send_write_error_fires_disconnect():
+async def test_serial_send_write_error_fires_disconnect():
     """Serial: OSError during transport.write fires _disconnect_callback."""
     cx = SerialConnection("/dev/null", 115200)
     cb = AsyncMock()
@@ -91,11 +91,11 @@ async def test_g4_serial_send_write_error_fires_disconnect():
 
 
 # ---------------------------------------------------------------------------
-# F04 — BLE send() fires disconnect on transport-lost and write error
+# BLE send() fires disconnect on transport-lost and write error
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_g4_ble_send_no_client_fires_disconnect():
+async def test_ble_send_no_client_fires_disconnect():
     """BLE: send() with no client fires _disconnect_callback."""
     # Can't import BLEConnection directly if bleak isn't installed,
     # so test via dynamic import with a guard.
@@ -128,11 +128,11 @@ async def test_g4_ble_send_no_client_fires_disconnect():
 
 
 # ---------------------------------------------------------------------------
-# F18 — Serial connect() times out if connection_made never fires
+# Serial connect() times out if connection_made never fires
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_g4_serial_connect_timeout():
+async def test_serial_connect_timeout():
     """Serial: connect() raises TimeoutError if connection_made never fires."""
     cx = SerialConnection("/dev/null", 115200)
 
@@ -147,11 +147,11 @@ async def test_g4_serial_connect_timeout():
 
 
 # ---------------------------------------------------------------------------
-# M06 — Oversize frame resets state and returns without dispatch
+# Oversize frame resets state and returns without dispatch
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_g4_tcp_oversize_frame_empty_data_returns():
+async def test_tcp_oversize_frame_empty_data_returns():
     """TCP: oversize header with no trailing data returns without dispatch."""
     cx = TCPConnection("127.0.0.1", 5000)
     reader = RecordingReader()
@@ -171,7 +171,7 @@ async def test_g4_tcp_oversize_frame_empty_data_returns():
 
 
 @pytest.mark.asyncio
-async def test_g4_serial_oversize_frame_empty_data_returns():
+async def test_serial_oversize_frame_empty_data_returns():
     """Serial: oversize header with no trailing data returns without dispatch."""
     cx = SerialConnection("/dev/null", 115200)
     reader = RecordingReader()
@@ -188,11 +188,11 @@ async def test_g4_serial_oversize_frame_empty_data_returns():
 
 
 # ---------------------------------------------------------------------------
-# N04 — TCP receive counter increments per MeshCore frame, not per TCP segment
+# TCP receive counter increments per MeshCore frame, not per TCP segment
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_g4_tcp_receive_count_per_frame_not_per_segment():
+async def test_tcp_receive_count_per_frame_not_per_segment():
     """TCP: _receive_count increments per completed frame, not per data_received call."""
     cx = TCPConnection("127.0.0.1", 5000)
     reader = RecordingReader()
@@ -217,7 +217,7 @@ async def test_g4_tcp_receive_count_per_frame_not_per_segment():
 
 
 @pytest.mark.asyncio
-async def test_g4_tcp_multiple_frames_count_correctly():
+async def test_tcp_multiple_frames_count_correctly():
     """TCP: two complete frames in separate segments → _receive_count == 2."""
     cx = TCPConnection("127.0.0.1", 5000)
     reader = RecordingReader()
