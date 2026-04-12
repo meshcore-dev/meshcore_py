@@ -291,11 +291,33 @@ class MessagingCommands(CommandHandlerBase):
         cmd_data.append(flags)
         cmd_data.extend(path_bytes)
 
+        # N05: Firmware requires strict len > 10 (MyMesh.cpp:1620).
+        # When path is empty, cmd(1)+tag(4)+auth(4)+flags(1) = 10 bytes exactly,
+        # which is silently rejected. Pad with one zero byte to reach 11.
+        if len(cmd_data) <= 10:
+            cmd_data.append(0x00)
+
         logger.debug(
             f"Sending trace: tag={tag}, auth={auth_code}, flags={flags}, path={path_bytes.hex()}"
         )
 
         return await self.send(cmd_data, [EventType.MSG_SENT, EventType.ERROR])
+
+    async def send_raw_data(self, payload: bytes) -> Event:
+        """N09: Send raw data via CMD_SEND_RAW_DATA (25).
+
+        Sends an arbitrary payload through the mesh network.
+
+        Args:
+            payload: Raw bytes to send.
+
+        Returns:
+            Event with MSG_SENT or ERROR.
+        """
+        if not isinstance(payload, (bytes, bytearray)):
+            raise TypeError("payload must be bytes-like")
+        data = b"\x19" + bytes(payload)
+        return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
 
     async def set_flood_scope(self, scope):
         if scope is None:
