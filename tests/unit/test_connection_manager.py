@@ -1,4 +1,4 @@
-"""Tests for reconnect-path fixes (F01, F02, F03, N11)."""
+"""Tests for reconnect-path fixes."""
 
 import asyncio
 
@@ -69,15 +69,15 @@ class _EventCollector:
 
 
 # ---------------------------------------------------------------------------
-# F01 — TCP connect() should return a plain value, not an asyncio.Future
+# TCP connect() should return a plain value, not an asyncio.Future
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
 async def test_tcp_connect_returns_plain_string():
-    """F01: After the fix, TCPConnection.connect() returns self.host (a
-    plain string), not an asyncio.Future.  We test indirectly via
-    ConnectionManager — the CONNECTED event payload should contain a plain
-    string, not a Future object."""
+    """TCPConnection.connect() returns self.host (a plain string), not an
+    asyncio.Future.  We test indirectly via ConnectionManager — the
+    CONNECTED event payload should contain a plain string, not a Future
+    object."""
     conn = FakeConnection(connect_results=["10.0.0.1"])
     dispatcher = EventDispatcher()
     await dispatcher.start()
@@ -101,12 +101,12 @@ async def test_tcp_connect_returns_plain_string():
 
 
 # ---------------------------------------------------------------------------
-# F03 — Reconnect attempts must not compound (no tail-recursive create_task)
+# Reconnect attempts must not compound (no tail-recursive create_task)
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
 async def test_reconnect_loop_does_not_compound():
-    """F03: _attempt_reconnect must use a single iterative loop.  After
+    """_attempt_reconnect must use a single iterative loop.  After
     max_reconnect_attempts failures, exactly that many connect() calls
     should have been made — no exponential fan-out from orphaned tasks."""
     # All attempts fail (return None)
@@ -140,7 +140,7 @@ async def test_reconnect_loop_does_not_compound():
 
 @pytest.mark.asyncio
 async def test_disconnect_cancels_reconnect_loop():
-    """F03: disconnect() during an active reconnect loop must cancel the
+    """disconnect() during an active reconnect loop must cancel the
     single task cleanly — no orphaned tasks left running."""
     # Simulate a connection that always fails (returns None), giving us
     # time to call disconnect() mid-loop.
@@ -173,12 +173,12 @@ async def test_disconnect_cancels_reconnect_loop():
 
 
 # ---------------------------------------------------------------------------
-# F02 — reconnect_callback (send_appstart) is called after reconnect
+# reconnect_callback (send_appstart) is called after reconnect
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
 async def test_reconnect_callback_called_after_reconnect():
-    """F02: When ConnectionManager reconnects successfully, the
+    """When ConnectionManager reconnects successfully, the
     reconnect_callback (e.g. send_appstart) must be invoked."""
     callback_called = []
 
@@ -209,8 +209,8 @@ async def test_reconnect_callback_called_after_reconnect():
 
 @pytest.mark.asyncio
 async def test_reconnect_callback_failure_does_not_crash_loop():
-    """F02: If the reconnect_callback raises, the reconnect still counts
-    as successful (transport is up) — the callback failure is logged but
+    """If the reconnect_callback raises, the reconnect still counts as
+    successful (transport is up) — the callback failure is logged but
     does not crash the loop or leave the manager in a broken state."""
     async def failing_callback():
         raise RuntimeError("appstart failed")
@@ -243,12 +243,12 @@ async def test_reconnect_callback_failure_does_not_crash_loop():
 
 
 # ---------------------------------------------------------------------------
-# N11 — connect() returning None is a soft failure (BLE scan miss)
+# connect() returning None is a soft failure (BLE scan miss)
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
 async def test_connect_none_is_soft_failure():
-    """N11: When connect() returns None (e.g. BLE scan found no device),
+    """When connect() returns None (e.g. BLE scan found no device),
     ConnectionManager.connect() should NOT set _is_connected and should
     NOT emit a CONNECTED event."""
     conn = FakeConnection(connect_results=[None])
@@ -271,8 +271,8 @@ async def test_connect_none_is_soft_failure():
 
 @pytest.mark.asyncio
 async def test_no_reconnect_callback_is_noop():
-    """N11/F02: When no reconnect_callback is provided (backwards compat
-    for direct ConnectionManager users), reconnect should still work."""
+    """When no reconnect_callback is provided (backwards compat for
+    direct ConnectionManager users), reconnect should still work."""
     conn = FakeConnection(connect_results=["10.0.0.1"])
     dispatcher = EventDispatcher()
     await dispatcher.start()
