@@ -569,6 +569,15 @@ class MessageReader:
                 )
 
             elif packet_type_value == PacketType.STATUS_RESPONSE.value:
+                # parse_status with offset=8 reads up through data[56:60]
+                # (rx_airtime field), so the full payload is 60 bytes:
+                # 1 type + 1 reserved + 6 pubkey + 52 status fields. The
+                # BINARY_RESPONSE STATUS path below gates with `>= 52` on
+                # the offset-stripped buffer; this gate is the equivalent
+                # for the push path with the 8-byte header included.
+                if len(data) < 60:
+                    logger.debug(f"STATUS_RESPONSE push frame too short ({len(data)} bytes < 60), skipping parse")
+                    return
                 res = parse_status(data, offset=8)
                 data_hex = data[8:].hex()
                 logger.debug(f"Status response: {data_hex}")
