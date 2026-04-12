@@ -1,5 +1,5 @@
 """
-Verification tests for G7 — Standalone bugs and cleanup.
+Verification tests for standalone bug fixes and cleanup.
 Findings: F13, F09, M03, M05, M07, R03, R05.
 """
 
