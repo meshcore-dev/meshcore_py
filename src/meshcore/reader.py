@@ -717,8 +717,8 @@ class MessageReader:
                             cont = False
                         else:
                             freqs.append({"min" : min, "max": max})
-                except e:
-                    print(e)
+                except Exception as e:
+                    logger.warning(f"Error parsing ALLOWED_REPEAT_FREQ payload: {e}")
 
                 res["freqs"] = freqs
 
