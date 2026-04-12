@@ -1,4 +1,4 @@
-"""Verification tests for G6 — Protocol surface gaps (N01, N02, N03, N05, N09, R04).
+"""Verification tests for protocol surface gaps.
 
 Each test constructs a mock firmware frame and verifies the SDK dispatches
 the correct EventType with the expected payload fields.
@@ -32,12 +32,12 @@ def _make_reader():
 
 
 # ---------------------------------------------------------------------------
-# N01 — CONTACT_DELETED handler
+# CONTACT_DELETED handler
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
 async def test_contact_deleted_dispatches_event():
-    """N01: A 33-byte CONTACT_DELETED frame dispatches EventType.CONTACT_DELETED."""
+    """A 33-byte CONTACT_DELETED frame dispatches EventType.CONTACT_DELETED."""
     reader, dispatched = _make_reader()
     pubkey = bytes(range(32))
     frame = bytes([PacketType.CONTACT_DELETED.value]) + pubkey
@@ -54,7 +54,7 @@ async def test_contact_deleted_dispatches_event():
 
 @pytest.mark.asyncio
 async def test_contact_deleted_short_frame_ignored():
-    """N01: A CONTACT_DELETED frame shorter than 33 bytes is silently dropped."""
+    """A CONTACT_DELETED frame shorter than 33 bytes is silently dropped."""
     reader, dispatched = _make_reader()
     # Only 10 bytes — too short
     frame = bytes([PacketType.CONTACT_DELETED.value]) + b"\x00" * 9
@@ -65,17 +65,17 @@ async def test_contact_deleted_short_frame_ignored():
 
 
 # ---------------------------------------------------------------------------
-# N02 — CONTACTS_FULL handler + enum entry
+# CONTACTS_FULL handler + enum entry
 # ---------------------------------------------------------------------------
 
 def test_contacts_full_enum_exists():
-    """N02: PacketType.CONTACTS_FULL == 0x90."""
+    """PacketType.CONTACTS_FULL == 0x90."""
     assert PacketType.CONTACTS_FULL.value == 0x90
 
 
 @pytest.mark.asyncio
 async def test_contacts_full_dispatches_event():
-    """N02: A 1-byte CONTACTS_FULL push dispatches EventType.CONTACTS_FULL."""
+    """A 1-byte CONTACTS_FULL push dispatches EventType.CONTACTS_FULL."""
     reader, dispatched = _make_reader()
     frame = bytes([PacketType.CONTACTS_FULL.value])
 
@@ -88,12 +88,12 @@ async def test_contacts_full_dispatches_event():
 
 
 # ---------------------------------------------------------------------------
-# N03 — TUNING_PARAMS handler
+# TUNING_PARAMS handler
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
 async def test_tuning_params_dispatches_event():
-    """N03: A 9-byte TUNING_PARAMS frame dispatches with rx_delay and airtime_factor."""
+    """A 9-byte TUNING_PARAMS frame dispatches with rx_delay and airtime_factor."""
     reader, dispatched = _make_reader()
     rx_delay = 500
     airtime_factor = 200
@@ -115,7 +115,7 @@ async def test_tuning_params_dispatches_event():
 
 @pytest.mark.asyncio
 async def test_tuning_params_short_frame_dispatches_error():
-    """N03: A TUNING_PARAMS frame shorter than 9 bytes dispatches ERROR."""
+    """A TUNING_PARAMS frame shorter than 9 bytes dispatches ERROR."""
     reader, dispatched = _make_reader()
     # Only 5 bytes — too short
     frame = bytes([PacketType.TUNING_PARAMS.value]) + b"\x01\x00\x00\x00"
@@ -129,12 +129,12 @@ async def test_tuning_params_short_frame_dispatches_error():
 
 
 # ---------------------------------------------------------------------------
-# N05 — send_trace() one-byte pad
+# send_trace() one-byte pad
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
 async def test_send_trace_empty_path_pads_to_11_bytes():
-    """N05: send_trace() with no path produces an 11-byte packet (not 10)."""
+    """send_trace() with no path produces an 11-byte packet (not 10)."""
     from meshcore.commands.messaging import MessagingCommands
 
     cmd = MessagingCommands.__new__(MessagingCommands)
@@ -158,7 +158,7 @@ async def test_send_trace_empty_path_pads_to_11_bytes():
 
 @pytest.mark.asyncio
 async def test_send_trace_with_path_no_padding():
-    """N05: send_trace() with a non-empty path does NOT add padding."""
+    """send_trace() with a non-empty path does NOT add padding."""
     from meshcore.commands.messaging import MessagingCommands
 
     cmd = MessagingCommands.__new__(MessagingCommands)
@@ -181,12 +181,12 @@ async def test_send_trace_with_path_no_padding():
 
 
 # ---------------------------------------------------------------------------
-# N09 — Command wrapper: send_raw_data
+# Command wrapper: send_raw_data
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
 async def test_send_raw_data_wrapper():
-    """N09: send_raw_data sends CMD 0x19 + payload."""
+    """send_raw_data sends CMD 0x19 + payload."""
     from meshcore.commands.messaging import MessagingCommands
 
     cmd = MessagingCommands.__new__(MessagingCommands)
@@ -208,12 +208,12 @@ async def test_send_raw_data_wrapper():
 
 
 # ---------------------------------------------------------------------------
-# N09 — Command wrapper: has_connection
+# Command wrapper: has_connection
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
 async def test_has_connection_wrapper():
-    """N09: has_connection sends CMD 0x1c."""
+    """has_connection sends CMD 0x1c."""
     from meshcore.commands.device import DeviceCommands
 
     cmd = DeviceCommands.__new__(DeviceCommands)
@@ -234,12 +234,12 @@ async def test_has_connection_wrapper():
 
 
 # ---------------------------------------------------------------------------
-# N09 — Command wrapper: get_tuning
+# Command wrapper: get_tuning
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
 async def test_get_tuning_wrapper():
-    """N09/N03: get_tuning sends CMD 0x2b (GET_TUNING_PARAMS = 43)."""
+    """get_tuning sends CMD 0x2b (GET_TUNING_PARAMS = 43)."""
     from meshcore.commands.device import DeviceCommands
 
     cmd = DeviceCommands.__new__(DeviceCommands)
@@ -260,12 +260,12 @@ async def test_get_tuning_wrapper():
 
 
 # ---------------------------------------------------------------------------
-# N09 — Command wrapper: get_contact_by_key
+# Command wrapper: get_contact_by_key
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
 async def test_get_contact_by_key_wrapper():
-    """N09: get_contact_by_key sends CMD 0x1e + 32-byte pubkey."""
+    """get_contact_by_key sends CMD 0x1e + 32-byte pubkey."""
     from meshcore.commands.contact import ContactCommands
 
     cmd = ContactCommands.__new__(ContactCommands)
@@ -288,12 +288,12 @@ async def test_get_contact_by_key_wrapper():
 
 
 # ---------------------------------------------------------------------------
-# N09 — Command wrapper: factory_reset (two-step)
+# Command wrapper: factory_reset (two-step)
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
 async def test_factory_reset_two_step():
-    """N09: factory_reset requires a token from request_factory_reset."""
+    """factory_reset requires a token from request_factory_reset."""
     from meshcore.commands.device import DeviceCommands
 
     cmd = DeviceCommands.__new__(DeviceCommands)
@@ -323,7 +323,7 @@ async def test_factory_reset_two_step():
 
 @pytest.mark.asyncio
 async def test_factory_reset_without_request_fails():
-    """N09: confirm_factory_reset without request_factory_reset raises ValueError."""
+    """confirm_factory_reset without request_factory_reset raises ValueError."""
     from meshcore.commands.device import DeviceCommands
 
     cmd = DeviceCommands.__new__(DeviceCommands)
@@ -333,17 +333,17 @@ async def test_factory_reset_without_request_fails():
 
 
 # ---------------------------------------------------------------------------
-# R04 — GET_STATS enum entry
+# GET_STATS enum entry
 # ---------------------------------------------------------------------------
 
 def test_get_stats_enum_exists():
-    """R04: CommandType.GET_STATS == 56."""
+    """CommandType.GET_STATS == 56."""
     assert CommandType.GET_STATS.value == 56
 
 
 @pytest.mark.asyncio
 async def test_get_stats_core_uses_enum():
-    """R04: get_stats_core sends CommandType.GET_STATS.value (0x38) + 0x00."""
+    """get_stats_core sends CommandType.GET_STATS.value (0x38) + 0x00."""
     from meshcore.commands.device import DeviceCommands
 
     cmd = DeviceCommands.__new__(DeviceCommands)
