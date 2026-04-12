@@ -24,6 +24,14 @@ class TCPConnection:
         self.frame_expected_size = 0
         self.header = b""
         self.inframe = b""
+        self._background_tasks: set[asyncio.Task] = set()
+
+    def _spawn_background(self, coro) -> asyncio.Task:
+        """Create a tracked background task (prevents GC of fire-and-forget tasks)."""
+        task = asyncio.create_task(coro)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+        return task
 
     class MCClientProtocol(asyncio.Protocol):
         def __init__(self, cx):
@@ -47,7 +55,7 @@ class TCPConnection:
         def connection_lost(self, exc):
             logger.debug("TCP server closed the connection")
             if self.cx._disconnect_callback:
-                asyncio.create_task(self.cx._disconnect_callback("tcp_disconnect"))
+                self.cx._spawn_background(self.cx._disconnect_callback("tcp_disconnect"))
 
     async def connect(self):
         """
@@ -108,7 +116,7 @@ class TCPConnection:
         data = data[upbound:]
         if self.reader is not None:
             # feed meshcore reader
-            asyncio.create_task(self.reader.handle_rx(self.inframe))
+            self._spawn_background(self.reader.handle_rx(self.inframe))
         # reset inframe
         self.inframe = b""
         self.header = b""

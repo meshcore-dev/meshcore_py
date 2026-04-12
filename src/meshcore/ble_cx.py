@@ -51,6 +51,14 @@ class BLEConnection:
         self.pin = pin
         self.rx_char = None
         self._disconnect_callback = None
+        self._background_tasks: set[asyncio.Task] = set()
+
+    def _spawn_background(self, coro) -> asyncio.Task:
+        """Create a tracked background task (prevents GC of fire-and-forget tasks)."""
+        task = asyncio.create_task(coro)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+        return task
 
     async def connect(self):
         """
@@ -155,7 +163,7 @@ class BLEConnection:
         self.device = self._user_provided_device
 
         if self._disconnect_callback:
-            asyncio.create_task(self._disconnect_callback("ble_disconnect"))
+            self._spawn_background(self._disconnect_callback("ble_disconnect"))
 
     def set_disconnect_callback(self, callback):
         """Set callback to handle disconnections."""
@@ -166,7 +174,7 @@ class BLEConnection:
 
     def handle_rx(self, _: BleakGATTCharacteristic, data: bytearray):
         if self.reader is not None:
-            asyncio.create_task(self.reader.handle_rx(data))
+            self._spawn_background(self.reader.handle_rx(data))
 
     async def send(self, data):
         if not self.client:

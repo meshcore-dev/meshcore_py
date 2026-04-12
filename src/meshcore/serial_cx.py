@@ -20,10 +20,18 @@ class SerialConnection:
         self._disconnect_callback = None
         self.cx_dly = cx_dly
         self._connected_event = asyncio.Event()
+        self._background_tasks: set[asyncio.Task] = set()
 
         self.frame_expected_size = 0
         self.inframe = b""
         self.header = b""
+
+    def _spawn_background(self, coro) -> asyncio.Task:
+        """Create a tracked background task (prevents GC of fire-and-forget tasks)."""
+        task = asyncio.create_task(coro)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+        return task
 
     class MCSerialClientProtocol(asyncio.Protocol):
         def __init__(self, cx):
@@ -44,7 +52,7 @@ class SerialConnection:
             self.cx._connected_event.clear()
 
             if self.cx._disconnect_callback:
-                asyncio.create_task(self.cx._disconnect_callback("serial_disconnect"))
+                self.cx._spawn_background(self.cx._disconnect_callback("serial_disconnect"))
 
         def pause_writing(self):
             logger.debug("pause writing")
@@ -114,7 +122,7 @@ class SerialConnection:
         data = data[upbound:]
         if self.reader is not None:
             # feed meshcore reader
-            asyncio.create_task(self.reader.handle_rx(self.inframe))
+            self._spawn_background(self.reader.handle_rx(self.inframe))
         # reset inframe
         self.inframe = b""
         self.header = b""

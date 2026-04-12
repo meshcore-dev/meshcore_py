@@ -134,6 +134,14 @@ class EventDispatcher:
         self.subscriptions: List[Subscription] = []
         self.running = False
         self._task = None
+        self._background_tasks: set[asyncio.Task] = set()
+
+    def _spawn_background(self, coro) -> asyncio.Task:
+        """Create a tracked background task (prevents GC of fire-and-forget tasks)."""
+        task = asyncio.create_task(coro)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+        return task
 
     def subscribe(
         self,
@@ -197,7 +205,7 @@ class EventDispatcher:
                     # returns - avoids the race where create_task schedules the callback after
                     # the waiter has already timed out with done=set().
                     if asyncio.iscoroutinefunction(subscription.callback):
-                        asyncio.create_task(self._execute_callback(subscription.callback, event.clone()))
+                        self._spawn_background(self._execute_callback(subscription.callback, event.clone()))
                     else:
                         try:
                             subscription.callback(event.clone())
