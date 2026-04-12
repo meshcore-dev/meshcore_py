@@ -1,5 +1,5 @@
 """
-Verification tests for G5 — Asyncio lifecycle fixes (F05, F07, F08, F19).
+Verification tests for asyncio lifecycle fixes.
 """
 
 import asyncio
@@ -13,8 +13,8 @@ from meshcore.serial_cx import SerialConnection
 from meshcore.commands.base import CommandHandlerBase
 
 
-class TestF05BackgroundTaskTracking(unittest.TestCase):
-    """F05: fire-and-forget create_task calls must be tracked to prevent GC."""
+class TestBackgroundTaskTracking(unittest.TestCase):
+    """Fire-and-forget create_task calls must be tracked to prevent GC."""
 
     def test_tcp_spawn_background_retains_task(self):
         """TCP _spawn_background adds the task to _background_tasks."""
@@ -109,7 +109,7 @@ class TestF05BackgroundTaskTracking(unittest.TestCase):
         asyncio.run(_run())
 
     def test_gc_does_not_cancel_tracked_tasks(self):
-        """Tracked tasks survive GC pressure (the whole point of F05)."""
+        """Tracked tasks survive GC pressure (the whole point of tracking)."""
         async def _run():
             cx = TCPConnection("127.0.0.1", 5555)
             result = []
@@ -127,8 +127,8 @@ class TestF05BackgroundTaskTracking(unittest.TestCase):
         asyncio.run(_run())
 
 
-class TestF07TaskDoneCorrectness(unittest.TestCase):
-    """F07: EventDispatcher.stop() must wait for in-flight async callbacks."""
+class TestTaskDoneCorrectness(unittest.TestCase):
+    """EventDispatcher.stop() must wait for in-flight async callbacks."""
 
     def test_stop_waits_for_async_callbacks(self):
         """stop() should not return until async callbacks have completed."""
@@ -156,8 +156,8 @@ class TestF07TaskDoneCorrectness(unittest.TestCase):
         asyncio.run(_run())
 
 
-class TestF08DeferredPrimitiveConstruction(unittest.TestCase):
-    """F08: Queue and Lock must not bind to import-time loop."""
+class TestDeferredPrimitiveConstruction(unittest.TestCase):
+    """Queue and Lock must not bind to import-time loop."""
 
     def test_event_dispatcher_queue_is_none_before_start(self):
         """EventDispatcher.queue should be None until start() is called."""
@@ -202,8 +202,8 @@ class TestF08DeferredPrimitiveConstruction(unittest.TestCase):
         asyncio.run(_run())
 
 
-class TestF19GetRunningLoop(unittest.TestCase):
-    """F19: get_event_loop() replaced with get_running_loop() in send()."""
+class TestGetRunningLoop(unittest.TestCase):
+    """get_event_loop() replaced with get_running_loop() in send()."""
 
     def test_send_uses_get_running_loop(self):
         """send() should call get_running_loop, not get_event_loop."""
