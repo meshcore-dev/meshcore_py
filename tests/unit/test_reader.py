@@ -106,14 +106,14 @@ class _CapturingDispatcher:
 
 @pytest.mark.asyncio
 async def test_handle_rx_malformed_frame_logged_and_swallowed(caplog):
-    """F06: malformed frame must not propagate, must be logged with traceback."""
+    """Malformed frame must not propagate, must be logged with traceback."""
     dispatcher = _CapturingDispatcher()
     reader = MessageReader(dispatcher)
 
     # 4-byte CHANNEL_MSG_RECV_V3 frame: type byte (0x11) + 1 SNR byte +
     # 2 reserved bytes, but no channel_idx byte. The handler will raise
     # IndexError on the next dbuf.read(1)[0] when the buffer is empty.
-    # F06's umbrella try/except must catch it, log the parse error, and
+    # The umbrella try/except must catch it, log the parse error, and
     # return cleanly.
     malformed = bytearray.fromhex("11100000")
 
@@ -125,9 +125,9 @@ async def test_handle_rx_malformed_frame_logged_and_swallowed(caplog):
         f"Expected an error log containing 'handle_rx parse error'; "
         f"got: {[r.message for r in caplog.records]}"
     )
-    # Traceback should be present in the log message (F06 includes it)
+    # Traceback should be present in the log message
     assert "Traceback" in error_records[0].message, (
-        "F06 umbrella log message must include a traceback"
+        "Umbrella log message must include a traceback"
     )
     # No CHANNEL_MSG_RECV event should have been dispatched
     assert not any(e.type == EventType.CHANNEL_MSG_RECV for e in dispatcher.events)
@@ -135,7 +135,7 @@ async def test_handle_rx_malformed_frame_logged_and_swallowed(caplog):
 
 @pytest.mark.asyncio
 async def test_battery_short_frame_omits_storage_fields():
-    """N07: short BATTERY frame must not silently yield zero used_kb/total_kb."""
+    """Short BATTERY frame must not silently yield zero used_kb/total_kb."""
     dispatcher = _CapturingDispatcher()
     reader = MessageReader(dispatcher)
 
@@ -168,7 +168,7 @@ async def test_battery_too_short_for_level(caplog):
 
     A 1-byte frame (just the packet-type byte 0x0c, no level bytes) would cause
     dbuf.read(2) to return b"" and int.from_bytes(b"", ...) to silently yield 0.
-    The fix adds an early return with a debug log, matching the NEW-C pattern.
+    The fix adds an early return with a debug log.
     """
     dispatcher = _CapturingDispatcher()
     reader = MessageReader(dispatcher)
@@ -191,7 +191,7 @@ async def test_battery_too_short_for_level(caplog):
 
 @pytest.mark.asyncio
 async def test_status_response_short_frame_skipped(caplog):
-    """NEW-C: short STATUS_RESPONSE push frame must be skipped, not parsed with bogus zeros."""
+    """Short STATUS_RESPONSE push frame must be skipped, not parsed with bogus zeros."""
     dispatcher = _CapturingDispatcher()
     reader = MessageReader(dispatcher)
 
@@ -212,12 +212,12 @@ async def test_status_response_short_frame_skipped(caplog):
     )
     assert any(
         "STATUS_RESPONSE push frame too short" in r.message for r in caplog.records
-    ), "Expected the NEW-C debug log line for short STATUS_RESPONSE frames"
+    ), "Expected a debug log line for short STATUS_RESPONSE frames"
 
 
 @pytest.mark.asyncio
 async def test_parse_packet_payload_txt_type_decodes_high_bits():
-    """R02: txt_type must decode the high 6 bits of byte 4, not always be 0."""
+    """txt_type must decode the high 6 bits of byte 4, not always be 0."""
     from Crypto.Cipher import AES
     from Crypto.Hash import HMAC, SHA256
     from meshcore.meshcore_parser import MeshcorePacketParser
@@ -242,7 +242,7 @@ async def test_parse_packet_payload_txt_type_decodes_high_bits():
     #   byte 4    = (txt_type << 2) | attempt
     #   bytes 5-15 = message + null padding
     # Pick txt_type=5, attempt=1 → byte 4 = (5 << 2) | 1 = 0x15.
-    # Pre-R02-fix uncrypted[4:4] is empty so txt_type would be 0;
+    # Pre-fix uncrypted[4:4] is empty so txt_type would be 0;
     # post-fix uncrypted[4:5] yields 0x15 >> 2 = 5.
     plaintext = b"\x00\x00\x00\x00\x15hello\x00\x00\x00\x00\x00\x00"
     assert len(plaintext) == 16
@@ -273,7 +273,7 @@ async def test_parse_packet_payload_txt_type_decodes_high_bits():
         f"log_data keys: {list(log_data.keys())}"
     )
     assert log_data["txt_type"] == 5, (
-        f"Expected txt_type=5 (R02 fix), got {log_data['txt_type']}"
+        f"Expected txt_type=5, got {log_data['txt_type']}"
     )
     assert log_data["attempt"] == 1, (
         f"Expected attempt=1, got {log_data['attempt']}"
