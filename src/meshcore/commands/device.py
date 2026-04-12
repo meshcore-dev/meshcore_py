@@ -13,7 +13,7 @@ class DeviceCommands(CommandHandlerBase):
     async def send_appstart(self) -> Event:
         logger.debug("Sending appstart command")
         b1 = bytearray(b"\x01\x03      mccli")
-        return await self.send(b1, [EventType.SELF_INFO])
+        return await self.send(b1, [EventType.SELF_INFO, EventType.ERROR])
 
     async def send_device_query(self) -> Event:
         logger.debug("Sending device query command")
@@ -129,32 +129,50 @@ class DeviceCommands(CommandHandlerBase):
         return await self.send(data, [EventType.OK, EventType.ERROR])
 
     async def set_telemetry_mode_base(self, telemetry_mode_base: int) -> Event:
-        infos = (await self.send_appstart()).payload
+        result = await self.send_appstart()
+        if result.is_error():
+            return result
+        infos = result.payload
         infos["telemetry_mode_base"] = telemetry_mode_base
         return await self.set_other_params_from_infos(infos)
 
     async def set_telemetry_mode_loc(self, telemetry_mode_loc: int) -> Event:
-        infos = (await self.send_appstart()).payload
+        result = await self.send_appstart()
+        if result.is_error():
+            return result
+        infos = result.payload
         infos["telemetry_mode_loc"] = telemetry_mode_loc
         return await self.set_other_params_from_infos(infos)
 
     async def set_telemetry_mode_env(self, telemetry_mode_env: int) -> Event:
-        infos = (await self.send_appstart()).payload
+        result = await self.send_appstart()
+        if result.is_error():
+            return result
+        infos = result.payload
         infos["telemetry_mode_env"] = telemetry_mode_env
         return await self.set_other_params_from_infos(infos)
 
     async def set_manual_add_contacts(self, manual_add_contacts: bool) -> Event:
-        infos = (await self.send_appstart()).payload
+        result = await self.send_appstart()
+        if result.is_error():
+            return result
+        infos = result.payload
         infos["manual_add_contacts"] = manual_add_contacts
         return await self.set_other_params_from_infos(infos)
 
     async def set_advert_loc_policy(self, advert_loc_policy: int) -> Event:
-        infos = (await self.send_appstart()).payload
+        result = await self.send_appstart()
+        if result.is_error():
+            return result
+        infos = result.payload
         infos["adv_loc_policy"] = advert_loc_policy
         return await self.set_other_params_from_infos(infos)
 
     async def set_multi_acks(self, multi_acks: int) -> Event:
-        infos = (await self.send_appstart()).payload
+        result = await self.send_appstart()
+        if result.is_error():
+            return result
+        infos = result.payload
         infos["multi_acks"] = multi_acks
         return await self.set_other_params_from_infos(infos)
 
