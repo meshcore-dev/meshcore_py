@@ -243,18 +243,31 @@ class CommandHandlerBase:
         logger.debug(f"Binary request to {dst_bytes.hex()}")
         data = b"\x32" + dst_bytes + request_type.value.to_bytes(1, "little", signed=False) + (data if data else b"")
 
-        result = await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
-        
-        # Register the request with the reader if we have both reader and request_type
-        if (result.type == EventType.MSG_SENT and 
-            self._reader is not None and 
-            request_type is not None):
-            
-            exp_tag = result.payload["expected_ack"].hex()
-            # Use provided timeout or fallback to suggested timeout (with 5s default)
-            actual_timeout = timeout if timeout is not None and timeout > 0 else result.payload.get("suggested_timeout", 4000) / 800.0
+        # Pre-register a placeholder binary request before send() to close the race
+        # window where a BINARY_RESPONSE could arrive between send() returning and
+        # registration. The placeholder tag is patched to the real tag once MSG_SENT
+        # returns. If send() fails, the placeholder is cleaned up.
+        placeholder_tag = None
+        if self._reader is not None and request_type is not None:
+            placeholder_tag = f"_pending_{id(data)}"
+            actual_timeout = timeout if timeout is not None and timeout > 0 else self.default_timeout
             actual_timeout = min_timeout if actual_timeout < min_timeout else actual_timeout
-            self._reader.register_binary_request(pubkey_prefix.hex(), exp_tag, request_type, actual_timeout, context=context)
+            self._reader.register_binary_request(pubkey_prefix.hex(), placeholder_tag, request_type, actual_timeout, context=context)
+
+        result = await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
+
+        # Patch the placeholder tag with the real tag from MSG_SENT, or clean up on failure
+        if placeholder_tag is not None and self._reader is not None:
+            # Remove the placeholder entry
+            self._reader.pending_binary_requests.pop(placeholder_tag, None)
+            if (result.type == EventType.MSG_SENT and
+                    request_type is not None):
+                exp_tag = result.payload["expected_ack"].hex()
+                # Use suggested_timeout from the result if available
+                actual_timeout = timeout if timeout is not None and timeout > 0 else result.payload.get("suggested_timeout", 4000) / 800.0
+                actual_timeout = min_timeout if actual_timeout < min_timeout else actual_timeout
+                # Register with the real tag
+                self._reader.register_binary_request(pubkey_prefix.hex(), exp_tag, request_type, actual_timeout, context=context)
 
         return result
 
