@@ -185,7 +185,7 @@ class CommandHandlerBase:
             futures: List[asyncio.Future] = []
             subscriptions = []
 
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             for event_type in expected_events:
                 future = loop.create_future()
 
