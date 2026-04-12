@@ -163,6 +163,33 @@ async def test_g1_battery_short_frame_omits_storage_fields():
 
 
 @pytest.mark.asyncio
+async def test_g1_battery_too_short_for_level(caplog):
+    """BATTERY frame shorter than 3 bytes must be dropped entirely (Option B).
+
+    A 1-byte frame (just the packet-type byte 0x0c, no level bytes) would cause
+    dbuf.read(2) to return b"" and int.from_bytes(b"", ...) to silently yield 0.
+    The fix adds an early return with a debug log, matching the NEW-C pattern.
+    """
+    dispatcher = _CapturingDispatcher()
+    reader = MessageReader(dispatcher)
+
+    # 1-byte BATTERY frame: only the type byte, no level payload.
+    too_short = bytearray.fromhex("0c")
+
+    with caplog.at_level(logging.DEBUG, logger="meshcore"):
+        await reader.handle_rx(too_short)
+
+    battery_events = [e for e in dispatcher.events if e.type == EventType.BATTERY]
+    assert len(battery_events) == 0, (
+        "BATTERY frame shorter than 3 bytes must not dispatch an event"
+    )
+    debug_records = [
+        r for r in caplog.records if "BATTERY frame too short" in r.message
+    ]
+    assert debug_records, "Expected a debug log about the short BATTERY frame"
+
+
+@pytest.mark.asyncio
 async def test_g1_status_response_short_frame_skipped(caplog):
     """G1/NEW-C: short STATUS_RESPONSE push frame must be skipped, not parsed with bogus zeros."""
     dispatcher = _CapturingDispatcher()

@@ -341,12 +341,20 @@ class MessageReader:
                 await self.dispatcher.dispatch(Event(EventType.CONTACT_URI, result))
 
             elif packet_type_value == PacketType.BATTERY.value:
+                # Full RESP_CODE_BATT_AND_STORAGE: 1 type + 2 level + 4 used_kb + 4 total_kb = 11 bytes.
+                # Minimum viable frame is 3 bytes (type + level).  Shorter frames are
+                # malformed — dbuf.read(2) would return short bytes and
+                # int.from_bytes(b"", ...) silently yields 0 (same class as N07).
+                if len(data) < 3:
+                    logger.debug(
+                        "BATTERY frame too short for level field "
+                        f"({len(data)} bytes < 3), skipping"
+                    )
+                    return
                 battery_level = int.from_bytes(dbuf.read(2), byteorder="little")
                 result = {"level": battery_level}
-                # Full RESP_CODE_BATT_AND_STORAGE frame is 11 bytes:
-                # 1 type + 2 level + 4 used_kb + 4 total_kb. The previous
-                # `len(data) > 3` guard let 4-10 byte truncated frames through,
-                # producing silent zero values for used_kb/total_kb because
+                # The previous `len(data) > 3` guard let 4-10 byte truncated frames
+                # through, producing silent zero values for used_kb/total_kb because
                 # io.BytesIO.read() returns short data without raising.
                 if len(data) >= 11:  # has storage info as well
                     result["used_kb"] = int.from_bytes(dbuf.read(4), byteorder="little")
