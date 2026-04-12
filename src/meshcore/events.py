@@ -129,8 +129,17 @@ class Subscription:
 
 
 class EventDispatcher:
+    """Event dispatch engine.
+
+    .. note::
+        ``start()`` must be called before dispatching or processing events.
+        The internal ``asyncio.Queue`` is created lazily inside ``start()``
+        so that it binds to the correct running event loop (required for
+        Python 3.9/3.10 compatibility).
+    """
+
     def __init__(self):
-        self.queue: asyncio.Queue[Event] = asyncio.Queue()
+        self.queue: Optional[asyncio.Queue[Event]] = None
         self.subscriptions: List[Subscription] = []
         self.running = False
         self._task = None
@@ -174,6 +183,10 @@ class EventDispatcher:
             self.subscriptions.remove(subscription)
 
     async def dispatch(self, event: Event):
+        if self.queue is None:
+            raise RuntimeError(
+                "EventDispatcher.start() must be called before dispatching events"
+            )
         await self.queue.put(event)
 
     async def _process_events(self):
@@ -228,6 +241,8 @@ class EventDispatcher:
 
     async def start(self):
         if not self.running:
+            if self.queue is None:
+                self.queue = asyncio.Queue()
             self.running = True
             self._task = asyncio.create_task(self._process_events())
 
@@ -235,7 +250,8 @@ class EventDispatcher:
         if self.running:
             self.running = False
             if self._task:
-                await self.queue.join()
+                if self.queue is not None:
+                    await self.queue.join()
                 # Wait for any in-flight async callbacks to complete before
                 # tearing down (F07: task_done fires before callbacks finish).
                 if self._background_tasks:
