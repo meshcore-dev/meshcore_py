@@ -92,7 +92,7 @@ if __name__ == "__main__":
 
 
 # ---------------------------------------------------------------------------
-# G1 verification tests (proposal §4.1)
+# Reader/parser crash-safety verification tests
 # ---------------------------------------------------------------------------
 
 class _CapturingDispatcher:
@@ -105,8 +105,8 @@ class _CapturingDispatcher:
 
 
 @pytest.mark.asyncio
-async def test_g1_handle_rx_malformed_frame_logged_and_swallowed(caplog):
-    """G1/F06: malformed frame must not propagate, must be logged with traceback."""
+async def test_handle_rx_malformed_frame_logged_and_swallowed(caplog):
+    """F06: malformed frame must not propagate, must be logged with traceback."""
     dispatcher = _CapturingDispatcher()
     reader = MessageReader(dispatcher)
 
@@ -134,8 +134,8 @@ async def test_g1_handle_rx_malformed_frame_logged_and_swallowed(caplog):
 
 
 @pytest.mark.asyncio
-async def test_g1_battery_short_frame_omits_storage_fields():
-    """G1/N07: short BATTERY frame must not silently yield zero used_kb/total_kb."""
+async def test_battery_short_frame_omits_storage_fields():
+    """N07: short BATTERY frame must not silently yield zero used_kb/total_kb."""
     dispatcher = _CapturingDispatcher()
     reader = MessageReader(dispatcher)
 
@@ -163,7 +163,7 @@ async def test_g1_battery_short_frame_omits_storage_fields():
 
 
 @pytest.mark.asyncio
-async def test_g1_battery_too_short_for_level(caplog):
+async def test_battery_too_short_for_level(caplog):
     """BATTERY frame shorter than 3 bytes must be dropped entirely (Option B).
 
     A 1-byte frame (just the packet-type byte 0x0c, no level bytes) would cause
@@ -190,8 +190,8 @@ async def test_g1_battery_too_short_for_level(caplog):
 
 
 @pytest.mark.asyncio
-async def test_g1_status_response_short_frame_skipped(caplog):
-    """G1/NEW-C: short STATUS_RESPONSE push frame must be skipped, not parsed with bogus zeros."""
+async def test_status_response_short_frame_skipped(caplog):
+    """NEW-C: short STATUS_RESPONSE push frame must be skipped, not parsed with bogus zeros."""
     dispatcher = _CapturingDispatcher()
     reader = MessageReader(dispatcher)
 
@@ -216,8 +216,8 @@ async def test_g1_status_response_short_frame_skipped(caplog):
 
 
 @pytest.mark.asyncio
-async def test_g1_parse_packet_payload_txt_type_decodes_high_bits():
-    """G1/R02: txt_type must decode the high 6 bits of byte 4, not always be 0."""
+async def test_parse_packet_payload_txt_type_decodes_high_bits():
+    """R02: txt_type must decode the high 6 bits of byte 4, not always be 0."""
     from Crypto.Cipher import AES
     from Crypto.Hash import HMAC, SHA256
     from meshcore.meshcore_parser import MeshcorePacketParser
