@@ -236,6 +236,10 @@ class EventDispatcher:
             self.running = False
             if self._task:
                 await self.queue.join()
+                # Wait for any in-flight async callbacks to complete before
+                # tearing down (F07: task_done fires before callbacks finish).
+                if self._background_tasks:
+                    await asyncio.gather(*self._background_tasks, return_exceptions=True)
                 self._task.cancel()
                 try:
                     await self._task
