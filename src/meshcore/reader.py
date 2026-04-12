@@ -343,7 +343,12 @@ class MessageReader:
             elif packet_type_value == PacketType.BATTERY.value:
                 battery_level = int.from_bytes(dbuf.read(2), byteorder="little")
                 result = {"level": battery_level}
-                if len(data) > 3:  # has storage info as well
+                # Full RESP_CODE_BATT_AND_STORAGE frame is 11 bytes:
+                # 1 type + 2 level + 4 used_kb + 4 total_kb. The previous
+                # `len(data) > 3` guard let 4-10 byte truncated frames through,
+                # producing silent zero values for used_kb/total_kb because
+                # io.BytesIO.read() returns short data without raising.
+                if len(data) >= 11:  # has storage info as well
                     result["used_kb"] = int.from_bytes(dbuf.read(4), byteorder="little")
                     result["total_kb"] = int.from_bytes(dbuf.read(4), byteorder="little")
                 await self.dispatcher.dispatch(Event(EventType.BATTERY, result))
