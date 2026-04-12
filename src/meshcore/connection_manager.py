@@ -48,11 +48,13 @@ class ConnectionManager:
         event_dispatcher=None,
         auto_reconnect: bool = False,
         max_reconnect_attempts: int = 3,
+        reconnect_callback: Optional[Callable[[], Awaitable[None]]] = None,
     ):
         self.connection = connection
         self.event_dispatcher = event_dispatcher
         self.auto_reconnect = auto_reconnect
         self.max_reconnect_attempts = max_reconnect_attempts
+        self._reconnect_callback = reconnect_callback
 
         self._reconnect_attempts = 0
         self._is_connected = False
@@ -139,6 +141,16 @@ class ConnectionManager:
                 if result is not None:
                     self._is_connected = True
                     self._reconnect_attempts = 0
+
+                    # Invoke reconnect callback (e.g. send_appstart) if provided
+                    if self._reconnect_callback is not None:
+                        try:
+                            await self._reconnect_callback()
+                        except Exception as cb_err:
+                            logger.warning(
+                                f"Reconnect callback failed: {cb_err}"
+                            )
+
                     await self._emit_event(
                         EventType.CONNECTED,
                         {"connection_info": result, "reconnected": True},
