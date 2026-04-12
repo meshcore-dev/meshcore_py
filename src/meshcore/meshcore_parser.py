@@ -150,7 +150,7 @@ class MeshcorePacketParser:
                     uncrypted = cipher.decrypt(msg)
                     timestamp = int.from_bytes(uncrypted[0:4], "little", signed=False)
                     attempt = uncrypted[4] & 3
-                    txt_type = int.from_bytes(uncrypted[4:4], "little", signed=False) >> 2
+                    txt_type = int.from_bytes(uncrypted[4:5], "little", signed=False) >> 2
                     message = uncrypted[5:].strip(b"\0")
                     msg_hash = int.from_bytes(SHA256.new(timestamp.to_bytes(4, "little", signed=False) + message).digest()[0:4], "little", signed=False)
                     log_data["message"] = message.decode("utf-8", "ignore")
