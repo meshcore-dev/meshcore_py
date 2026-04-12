@@ -144,8 +144,12 @@ class MessagingCommands(CommandHandlerBase):
                 logger.info(f"Retry sending msg: {attempts + 1}")
 
             result = await self.send_msg(dst, msg, timestamp, attempt=attempts)
-            if result.type == EventType.ERROR:
-                logger.error(f"⚠️ Failed to send message: {result.payload}")
+            if result.is_error():
+                logger.error(f"Failed to send message: {result.payload}")
+                attempts += 1
+                if flood:
+                    flood_attempts += 1
+                continue
 
             exp_ack = result.payload["expected_ack"].hex()
             timeout = result.payload["suggested_timeout"] / 1000 * 1.2 if timeout==0 else timeout
@@ -255,7 +259,7 @@ class MessagingCommands(CommandHandlerBase):
                 elif path_hash_len == 8 :
                     flags = 3
                 else :
-                    logger.error(f"Invalid path format: {e}")
+                    logger.error(f"Invalid path format: unknown path_hash_len {path_hash_len}")
                     return Event(EventType.ERROR, {"reason": "invalid_path_format"})
             else:
                 flags = 0
