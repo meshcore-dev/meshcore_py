@@ -118,45 +118,41 @@ class ConnectionManager:
             )
 
     async def _attempt_reconnect(self):
-        """Attempt to reconnect with flat delay."""
-        logger.debug(
-            f"Attempting reconnection ({self._reconnect_attempts + 1}/{self.max_reconnect_attempts})"
-        )
-        self._reconnect_attempts += 1
+        """Attempt to reconnect using an iterative loop.
 
-        # Flat 1 second delay for all attempts
-        await asyncio.sleep(1)
+        Runs as a single persistent task for the entire reconnect session.
+        Previous implementation used tail-recursion via create_task which
+        orphaned the running task reference — disconnect() could only cancel
+        the newest pointer, leaving earlier attempts in flight (F03).
+        """
+        while self._reconnect_attempts < self.max_reconnect_attempts:
+            self._reconnect_attempts += 1
+            logger.debug(
+                f"Attempting reconnection ({self._reconnect_attempts}/{self.max_reconnect_attempts})"
+            )
 
-        try:
-            result = await self.connection.connect()
-            if result is not None:
-                self._is_connected = True
-                self._reconnect_attempts = 0
-                await self._emit_event(
-                    EventType.CONNECTED,
-                    {"connection_info": result, "reconnected": True},
-                )
-                logger.debug("Reconnected successfully")
-            else:
-                # Reconnection failed, try again if we haven't exceeded max attempts
-                if self._reconnect_attempts < self.max_reconnect_attempts:
-                    self._reconnect_task = asyncio.create_task(
-                        self._attempt_reconnect()
-                    )
-                else:
+            # Flat 1 second delay for all attempts
+            await asyncio.sleep(1)
+
+            try:
+                result = await self.connection.connect()
+                if result is not None:
+                    self._is_connected = True
+                    self._reconnect_attempts = 0
                     await self._emit_event(
-                        EventType.DISCONNECTED,
-                        {"reason": "reconnect_failed", "max_attempts_exceeded": True},
+                        EventType.CONNECTED,
+                        {"connection_info": result, "reconnected": True},
                     )
-        except Exception as e:
-            logger.debug(f"Reconnection attempt failed: {e}")
-            if self._reconnect_attempts < self.max_reconnect_attempts:
-                self._reconnect_task = asyncio.create_task(self._attempt_reconnect())
-            else:
-                await self._emit_event(
-                    EventType.DISCONNECTED,
-                    {"reason": f"reconnect_error: {e}", "max_attempts_exceeded": True},
-                )
+                    logger.debug("Reconnected successfully")
+                    return
+            except Exception as e:
+                logger.debug(f"Reconnection attempt failed: {e}")
+
+        # All attempts exhausted
+        await self._emit_event(
+            EventType.DISCONNECTED,
+            {"reason": "reconnect_failed", "max_attempts_exceeded": True},
+        )
 
     async def _emit_event(self, event_type: EventType, payload: dict):
         """Emit connection events if dispatcher is available."""
