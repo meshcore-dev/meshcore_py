@@ -1,4 +1,4 @@
-"""Tests for G3 reconnect-path fixes (F01, F02, F03, N11)."""
+"""Tests for reconnect-path fixes (F01, F02, F03, N11)."""
 
 import asyncio
 
@@ -73,7 +73,7 @@ class _EventCollector:
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_g3_tcp_connect_returns_plain_string():
+async def test_tcp_connect_returns_plain_string():
     """F01: After the fix, TCPConnection.connect() returns self.host (a
     plain string), not an asyncio.Future.  We test indirectly via
     ConnectionManager — the CONNECTED event payload should contain a plain
@@ -105,7 +105,7 @@ async def test_g3_tcp_connect_returns_plain_string():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_g3_reconnect_loop_does_not_compound():
+async def test_reconnect_loop_does_not_compound():
     """F03: _attempt_reconnect must use a single iterative loop.  After
     max_reconnect_attempts failures, exactly that many connect() calls
     should have been made — no exponential fan-out from orphaned tasks."""
@@ -139,7 +139,7 @@ async def test_g3_reconnect_loop_does_not_compound():
 
 
 @pytest.mark.asyncio
-async def test_g3_disconnect_cancels_reconnect_loop():
+async def test_disconnect_cancels_reconnect_loop():
     """F03: disconnect() during an active reconnect loop must cancel the
     single task cleanly — no orphaned tasks left running."""
     # Simulate a connection that always fails (returns None), giving us
@@ -177,7 +177,7 @@ async def test_g3_disconnect_cancels_reconnect_loop():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_g3_reconnect_callback_called_after_reconnect():
+async def test_reconnect_callback_called_after_reconnect():
     """F02: When ConnectionManager reconnects successfully, the
     reconnect_callback (e.g. send_appstart) must be invoked."""
     callback_called = []
@@ -208,7 +208,7 @@ async def test_g3_reconnect_callback_called_after_reconnect():
 
 
 @pytest.mark.asyncio
-async def test_g3_reconnect_callback_failure_does_not_crash_loop():
+async def test_reconnect_callback_failure_does_not_crash_loop():
     """F02: If the reconnect_callback raises, the reconnect still counts
     as successful (transport is up) — the callback failure is logged but
     does not crash the loop or leave the manager in a broken state."""
@@ -247,7 +247,7 @@ async def test_g3_reconnect_callback_failure_does_not_crash_loop():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_g3_connect_none_is_soft_failure():
+async def test_connect_none_is_soft_failure():
     """N11: When connect() returns None (e.g. BLE scan found no device),
     ConnectionManager.connect() should NOT set _is_connected and should
     NOT emit a CONNECTED event."""
@@ -270,7 +270,7 @@ async def test_g3_connect_none_is_soft_failure():
 
 
 @pytest.mark.asyncio
-async def test_g3_no_reconnect_callback_is_noop():
+async def test_no_reconnect_callback_is_noop():
     """N11/F02: When no reconnect_callback is provided (backwards compat
     for direct ConnectionManager users), reconnect should still work."""
     conn = FakeConnection(connect_results=["10.0.0.1"])
