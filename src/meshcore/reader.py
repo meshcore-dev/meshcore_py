@@ -222,7 +222,7 @@ class MessageReader:
 
                 await self.dispatcher.dispatch(Event(evt_type, res, attributes))
 
-            elif packet_type_value == 16:  # A reply to CMD_SYNC_NEXT_MESSAGE (ver >= 3)
+            elif packet_type_value == PacketType.CONTACT_MSG_RECV_V3.value:  # A reply to CMD_SYNC_NEXT_MESSAGE (ver >= 3)
                 res = {}
                 res["type"] = "PRIV"
                 res["SNR"] = int.from_bytes(dbuf.read(1), byteorder="little", signed=True) / 4
@@ -287,7 +287,7 @@ class MessageReader:
                     Event(EventType.CHANNEL_MSG_RECV, res, attributes)
                 )
 
-            elif packet_type_value == 17:  # A reply to CMD_SYNC_NEXT_MESSAGE (ver >= 3)
+            elif packet_type_value == PacketType.CHANNEL_MSG_RECV_V3.value:  # A reply to CMD_SYNC_NEXT_MESSAGE (ver >= 3)
                 res = {}
                 res["type"] = "CHAN"
                 res["SNR"] = int.from_bytes(dbuf.read(1), byteorder="little", signed=True) / 4
@@ -534,7 +534,7 @@ class MessageReader:
                 res["RSSI"] = int.from_bytes(dbuf.read(1), byteorder="little", signed=True)
                 res["payload"] = dbuf.read(4).hex()
                 logger.debug("Received raw data")
-                print(res)
+                logger.debug(res)
                 await self.dispatcher.dispatch(Event(EventType.RAW_DATA, res))
 
             elif packet_type_value == PacketType.LOGIN_SUCCESS.value:
@@ -895,6 +895,9 @@ class MessageReader:
                 res["RSSI"] = int.from_bytes(dbuf.read(1), byteorder="little", signed=True)
                 res["path_len"] = dbuf.read(1)[0]
                 payload = dbuf.read()
+                if len(payload) == 0:
+                    logger.debug("CONTROL_DATA frame has empty payload, skipping")
+                    return
                 payload_type = payload[0]
                 res["payload_type"] = payload_type
                 res["payload"] = payload
