@@ -1,8 +1,7 @@
-"""Verification tests for G2 — error response handling fixes.
+"""Verification tests for error response handling fixes.
 
-Each test maps to a finding in proposal §4.3.  The tests confirm that
-error responses are surfaced cleanly instead of causing KeyError,
-TypeError, NameError, or silent fallthrough.
+The tests confirm that error responses are surfaced cleanly instead
+of causing KeyError, TypeError, NameError, or silent fallthrough.
 """
 import asyncio
 import pytest
@@ -83,28 +82,28 @@ def setup_event_response(mock_dispatcher, event_type, payload):
     mock_dispatcher.subscribe = MagicMock(side_effect=fake_subscribe)
 
 
-# ── F22: Event.is_error() helper ──────────────────────────────────
+# ── Event.is_error() helper ──────────────────────────────────
 
-async def test_g2_event_is_error_true():
-    """F22: is_error() returns True for ERROR events."""
+async def test_event_is_error_true():
+    """is_error() returns True for ERROR events."""
     event = Event(EventType.ERROR, {"reason": "test"})
     assert event.is_error() is True
 
 
-async def test_g2_event_is_error_false():
-    """F22: is_error() returns False for non-ERROR events."""
+async def test_event_is_error_false():
+    """is_error() returns False for non-ERROR events."""
     event = Event(EventType.OK, {})
     assert event.is_error() is False
     event2 = Event(EventType.SELF_INFO, {"name": "test"})
     assert event2.is_error() is False
 
 
-# ── F21/M01: send_msg_with_retry continues on ERROR ──────────────
+# ── send_msg_with_retry continues on ERROR ──────────────
 
-async def test_g2_send_msg_with_retry_error_no_keyerror(
+async def test_send_msg_with_retry_error_no_keyerror(
     command_handler, mock_dispatcher
 ):
-    """F21/M01: send_msg_with_retry returns None (exhausted retries) on
+    """send_msg_with_retry returns None (exhausted retries) on
     persistent ERROR instead of raising KeyError on missing 'expected_ack'."""
     setup_error_response(mock_dispatcher)
 
@@ -120,12 +119,12 @@ async def test_g2_send_msg_with_retry_error_no_keyerror(
     assert result is None
 
 
-# ── M02: send_appstart includes ERROR in expected events ──────────
+# ── send_appstart includes ERROR in expected events ──────────
 
-async def test_g2_send_appstart_returns_error(
+async def test_send_appstart_returns_error(
     command_handler, mock_dispatcher
 ):
-    """M02: send_appstart returns ERROR event instead of hanging on timeout."""
+    """send_appstart returns ERROR event instead of hanging on timeout."""
     setup_error_response(mock_dispatcher)
 
     result = await command_handler.send_appstart()
@@ -135,12 +134,12 @@ async def test_g2_send_appstart_returns_error(
     assert result.payload["reason"] == "test_error"
 
 
-# ── M04: device setters return ERROR from send_appstart ───────────
+# ── device setters return ERROR from send_appstart ───────────
 
-async def test_g2_set_telemetry_mode_base_error(
+async def test_set_telemetry_mode_base_error(
     command_handler, mock_dispatcher
 ):
-    """M04: set_telemetry_mode_base returns ERROR instead of KeyError."""
+    """set_telemetry_mode_base returns ERROR instead of KeyError."""
     setup_error_response(mock_dispatcher)
 
     result = await command_handler.set_telemetry_mode_base(1)
@@ -149,10 +148,10 @@ async def test_g2_set_telemetry_mode_base_error(
     assert result.payload["reason"] == "test_error"
 
 
-async def test_g2_set_telemetry_mode_loc_error(
+async def test_set_telemetry_mode_loc_error(
     command_handler, mock_dispatcher
 ):
-    """M04: set_telemetry_mode_loc returns ERROR instead of KeyError."""
+    """set_telemetry_mode_loc returns ERROR instead of KeyError."""
     setup_error_response(mock_dispatcher)
 
     result = await command_handler.set_telemetry_mode_loc(1)
@@ -160,10 +159,10 @@ async def test_g2_set_telemetry_mode_loc_error(
     assert result.is_error()
 
 
-async def test_g2_set_telemetry_mode_env_error(
+async def test_set_telemetry_mode_env_error(
     command_handler, mock_dispatcher
 ):
-    """M04: set_telemetry_mode_env returns ERROR instead of KeyError."""
+    """set_telemetry_mode_env returns ERROR instead of KeyError."""
     setup_error_response(mock_dispatcher)
 
     result = await command_handler.set_telemetry_mode_env(1)
@@ -171,10 +170,10 @@ async def test_g2_set_telemetry_mode_env_error(
     assert result.is_error()
 
 
-async def test_g2_set_manual_add_contacts_error(
+async def test_set_manual_add_contacts_error(
     command_handler, mock_dispatcher
 ):
-    """M04: set_manual_add_contacts returns ERROR instead of KeyError."""
+    """set_manual_add_contacts returns ERROR instead of KeyError."""
     setup_error_response(mock_dispatcher)
 
     result = await command_handler.set_manual_add_contacts(True)
@@ -182,10 +181,10 @@ async def test_g2_set_manual_add_contacts_error(
     assert result.is_error()
 
 
-async def test_g2_set_advert_loc_policy_error(
+async def test_set_advert_loc_policy_error(
     command_handler, mock_dispatcher
 ):
-    """M04: set_advert_loc_policy returns ERROR instead of KeyError."""
+    """set_advert_loc_policy returns ERROR instead of KeyError."""
     setup_error_response(mock_dispatcher)
 
     result = await command_handler.set_advert_loc_policy(1)
@@ -193,10 +192,10 @@ async def test_g2_set_advert_loc_policy_error(
     assert result.is_error()
 
 
-async def test_g2_set_multi_acks_error(
+async def test_set_multi_acks_error(
     command_handler, mock_dispatcher
 ):
-    """M04: set_multi_acks returns ERROR instead of KeyError."""
+    """set_multi_acks returns ERROR instead of KeyError."""
     setup_error_response(mock_dispatcher)
 
     result = await command_handler.set_multi_acks(1)
@@ -204,12 +203,12 @@ async def test_g2_set_multi_acks_error(
     assert result.is_error()
 
 
-# ── N06: send_anon_req returns ERROR on contact not found ─────────
+# ── send_anon_req returns ERROR on contact not found ─────────
 
-async def test_g2_send_anon_req_contact_not_found(
+async def test_send_anon_req_contact_not_found(
     command_handler, mock_dispatcher
 ):
-    """N06: send_anon_req returns ERROR event when contact prefix not found,
+    """send_anon_req returns ERROR event when contact prefix not found,
     instead of raising TypeError on NoneType subscript."""
     command_handler._get_contact_by_prefix = MagicMock(return_value=None)
 
@@ -221,12 +220,12 @@ async def test_g2_send_anon_req_contact_not_found(
     assert result.payload["reason"] == "contact_not_found"
 
 
-# ── F14: send_trace handles unknown path_hash_len without NameError ──
+# ── send_trace handles unknown path_hash_len without NameError ──
 
-async def test_g2_send_trace_unknown_path_hash_len(
+async def test_send_trace_unknown_path_hash_len(
     command_handler, mock_connection, mock_dispatcher
 ):
-    """F14: send_trace with a path whose segments don't match any known
+    """send_trace with a path whose segments don't match any known
     path_hash_len returns ERROR cleanly instead of NameError on 'e'."""
     # 5-char hex segments → path_hash_len = 2.5 → doesn't match 1,2,4,8
     result = await command_handler.send_trace(
