@@ -4,14 +4,23 @@ Connection manager that orchestrates reconnection logic for any connection type.
 
 import asyncio
 import logging
-from typing import Optional, Any, Callable, Protocol
+from typing import Optional, Any, Awaitable, Callable, Protocol
 from .events import Event, EventType
 
 logger = logging.getLogger("meshcore")
 
 
 class ConnectionProtocol(Protocol):
-    """Protocol defining the interface that connection classes must implement."""
+    """Protocol defining the interface that connection classes must implement.
+
+    Return contract for connect():
+        - On success: return a truthy value (typically an address string)
+          that identifies the connection. This value is included in the
+          CONNECTED event payload as ``connection_info``.
+        - On failure: return ``None`` (soft failure — triggers a retry in
+          ``_attempt_reconnect``) **or** raise an exception (hard failure —
+          also triggers a retry, logged as an error).
+    """
 
     async def connect(self) -> Optional[Any]:
         """Connect and return connection info, or None if failed."""
