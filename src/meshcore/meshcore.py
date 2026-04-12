@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Any, Callable, Coroutine, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional, Union
 
 from .events import Event, EventDispatcher, EventType, Subscription
 from .reader import MessageReader
@@ -206,7 +206,7 @@ class MeshCore:
     def subscribe(
         self,
         event_type: Union[EventType, None],
-        callback: Callable[[Event], Coroutine[Any, Any, None]],
+        callback: Callable[[Event], Union[None, asyncio.Future]],
         attribute_filters: Optional[Dict[str, Any]] = None,
     ) -> Subscription:
         """
