@@ -1,6 +1,5 @@
 """
 Verification tests for standalone bug fixes and cleanup.
-Findings: F13, F09, M03, M05, M07, R03, R05.
 """
 
 import pytest
@@ -18,58 +17,58 @@ from meshcore.meshcore import MeshCore
 pytestmark = pytest.mark.asyncio
 
 
-# ── F13: req_mma removed ──────────────────────────────────────────────────────
+# ── req_mma removed ──────────────────────────────────────────────────────
 
-def test_f13_req_mma_removed():
-    """F13: The broken req_mma method should no longer exist on BinaryCommandHandler."""
+def test_req_mma_removed():
+    """The broken req_mma method should no longer exist on BinaryCommandHandler."""
     assert not hasattr(BinaryCommandHandler, "req_mma"), \
         "req_mma should be removed — it had NameError on undefined start/end"
 
 
-def test_f13_req_mma_sync_still_exists():
-    """F13: req_mma_sync should still be present and functional."""
+def test_req_mma_sync_still_exists():
+    """req_mma_sync should still be present and functional."""
     assert hasattr(BinaryCommandHandler, "req_mma_sync"), \
         "req_mma_sync should still exist after removing req_mma"
 
 
-# ── F09: DEFAULT_TIMEOUT bumped ───────────────────────────────────────────────
+# ── DEFAULT_TIMEOUT bumped ───────────────────────────────────────────────
 
-def test_f09_default_timeout_bumped():
-    """F09: DEFAULT_TIMEOUT should be 15.0, not the old 5.0."""
+def test_default_timeout_bumped():
+    """DEFAULT_TIMEOUT should be 15.0, not the old 5.0."""
     assert CommandHandlerBase.DEFAULT_TIMEOUT == 15.0, \
         f"DEFAULT_TIMEOUT is {CommandHandlerBase.DEFAULT_TIMEOUT}, expected 15.0"
 
 
-def test_f09_instance_default_timeout():
-    """F09: Instance default_timeout should inherit the new 15.0 value."""
+def test_instance_default_timeout():
+    """Instance default_timeout should inherit the new 15.0 value."""
     handler = CommandHandlerBase()
     assert handler.default_timeout == 15.0
 
 
-def test_f09_custom_timeout_still_works():
-    """F09: Passing a custom timeout should still override the default."""
+def test_custom_timeout_still_works():
+    """Passing a custom timeout should still override the default."""
     handler = CommandHandlerBase(default_timeout=30.0)
     assert handler.default_timeout == 30.0
 
 
-# ── M03: set_flood_scope TypeError guard ──────────────────────────────────────
+# ── set_flood_scope TypeError guard ──────────────────────────────────────
 
-async def test_m03_set_flood_scope_bad_type_raises():
-    """M03: Passing an unsupported type (e.g., int) should raise TypeError."""
+async def test_set_flood_scope_bad_type_raises():
+    """Passing an unsupported type (e.g., int) should raise TypeError."""
     handler = MessagingCommands()
     with pytest.raises(TypeError, match="unsupported scope type"):
         await handler.set_flood_scope(42)
 
 
-async def test_m03_set_flood_scope_bad_type_bytearray():
-    """M03: bytearray is not bytes — should raise TypeError."""
+async def test_set_flood_scope_bad_type_bytearray():
+    """bytearray is not bytes — should raise TypeError."""
     handler = MessagingCommands()
     with pytest.raises(TypeError, match="unsupported scope type"):
         await handler.set_flood_scope(bytearray(b"\x00" * 16))
 
 
-async def test_m03_set_flood_scope_none_still_works():
-    """M03: None scope should reach send() without TypeError — verifies the None branch still binds scope_key."""
+async def test_set_flood_scope_none_still_works():
+    """None scope should reach send() without TypeError — verifies the None branch still binds scope_key."""
     handler = MessagingCommands()
     handler._sender_func = AsyncMock()
     handler.dispatcher = EventDispatcher()
@@ -86,8 +85,8 @@ async def test_m03_set_flood_scope_none_still_works():
         handler.dispatcher.running = False
 
 
-async def test_m03_set_flood_scope_str_still_works():
-    """M03: String scope should reach send() without TypeError."""
+async def test_set_flood_scope_str_still_works():
+    """String scope should reach send() without TypeError."""
     handler = MessagingCommands()
     handler._sender_func = AsyncMock()
     handler.dispatcher = EventDispatcher()
@@ -103,8 +102,8 @@ async def test_m03_set_flood_scope_str_still_works():
         handler.dispatcher.running = False
 
 
-async def test_m03_set_flood_scope_bytes_still_works():
-    """M03: Bytes scope should reach send() without TypeError."""
+async def test_set_flood_scope_bytes_still_works():
+    """Bytes scope should reach send() without TypeError."""
     handler = MessagingCommands()
     handler._sender_func = AsyncMock()
     handler.dispatcher = EventDispatcher()
@@ -120,20 +119,20 @@ async def test_m03_set_flood_scope_bytes_still_works():
         handler.dispatcher.running = False
 
 
-# ── M05: dead path_hash_mode shift removed ────────────────────────────────────
+# ── dead path_hash_mode shift removed ────────────────────────────────────
 
-def test_m05_no_shift_in_update_contact():
-    """M05: The dead `>> 6` shift on out_path_len should not appear in contact.py."""
+def test_no_shift_in_update_contact():
+    """The dead `>> 6` shift on out_path_len should not appear in contact.py."""
     import meshcore.commands.contact as contact_mod
     source = inspect.getsource(contact_mod.ContactCommands.update_contact)
     assert ">> 6" not in source, \
         "Dead path_hash_mode = out_path_len >> 6 shift should be removed"
 
 
-# ── M07: get_contacts returns Event, never None ───────────────────────────────
+# ── get_contacts returns Event, never None ───────────────────────────────
 
-async def test_m07_get_contacts_timeout_returns_error_event():
-    """M07: On timeout (no futures complete), get_contacts should return an Error Event, not None."""
+async def test_get_contacts_timeout_returns_error_event():
+    """On timeout (no futures complete), get_contacts should return an Error Event, not None."""
     handler = ContactCommands()
     handler._sender_func = AsyncMock()
     handler._reader = MagicMock()
@@ -147,10 +146,10 @@ async def test_m07_get_contacts_timeout_returns_error_event():
     assert result.type == EventType.ERROR
 
 
-# ── R03: binary request pre-registration ──────────────────────────────────────
+# ── binary request pre-registration ──────────────────────────────────────
 
-async def test_r03_placeholder_registered_before_send():
-    """R03: A placeholder binary request should be registered before send() is called."""
+async def test_placeholder_registered_before_send():
+    """A placeholder binary request should be registered before send() is called."""
     from meshcore.packets import BinaryReqType
 
     handler = CommandHandlerBase()
@@ -198,10 +197,10 @@ async def test_r03_placeholder_registered_before_send():
         "register_binary_request should be called at least once for the placeholder"
 
 
-# ── R05: MeshCore.subscribe annotation matches EventDispatcher ────────────────
+# ── MeshCore.subscribe annotation matches EventDispatcher ────────────────
 
-def test_r05_subscribe_annotation_matches_dispatcher():
-    """R05: MeshCore.subscribe callback annotation should match EventDispatcher.subscribe."""
+def test_subscribe_annotation_matches_dispatcher():
+    """MeshCore.subscribe callback annotation should match EventDispatcher.subscribe."""
     mc_hints = MeshCore.subscribe.__annotations__
     ed_hints = EventDispatcher.subscribe.__annotations__
 
@@ -216,8 +215,8 @@ def test_r05_subscribe_annotation_matches_dispatcher():
     )
 
 
-def test_r05_no_coroutine_import_in_meshcore():
-    """R05: After widening the annotation, Coroutine should no longer be imported in meshcore.py."""
+def test_no_coroutine_import_in_meshcore():
+    """After widening the annotation, Coroutine should no longer be imported in meshcore.py."""
     import meshcore.meshcore as mc_mod
     source = inspect.getsource(mc_mod)
     # Check the import line specifically — Coroutine should not be in the typing imports
