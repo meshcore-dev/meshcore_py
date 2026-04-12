@@ -42,8 +42,30 @@ class MeshcorePacketParser:
             Returns :
             completed log_data
         """
+        # Minimum viable payload is 2 bytes (1 header + 1 path_byte) for a
+        # direct route. Anything shorter is provably broken — for example,
+        # the LOG_DATA branch in reader.py only requires `len(data) > 3`,
+        # which means a 4-byte LOG_DATA frame produces a 1-byte payload
+        # here, and `path_byte = pbuf.read(1)[0]` further down would raise
+        # IndexError on the empty buffer. Populate sentinel values so the
+        # caller's downstream `log_data['route_type']` etc. lookups don't
+        # KeyError, then return early.
+        if len(payload) < 2:
+            logger.debug(f"parsePacketPayload: payload too short ({len(payload)} bytes < 2), returning sentinel log_data")
+            log_data["route_type"] = -1
+            log_data["route_typename"] = "UNK"
+            log_data["payload_type"] = -1
+            log_data["payload_typename"] = "UNK"
+            log_data["payload_ver"] = 0
+            log_data["path_len"] = 0
+            log_data["path_hash_size"] = 1
+            log_data["path"] = ""
+            log_data["pkt_payload"] = b""
+            log_data["pkt_hash"] = 0
+            return log_data
+
         pbuf = io.BytesIO(payload)
-        
+
         header = pbuf.read(1)[0]
         route_type = header & 0x03
         payload_type = (header & 0x3c) >> 2
