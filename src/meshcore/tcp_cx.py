@@ -38,7 +38,6 @@ class TCPConnection:
 
         def data_received(self, data):
             logger.debug("data received")
-            self.cx._receive_count += 1
             self.cx.handle_rx(data)
 
         def error_received(self, exc):
@@ -106,6 +105,10 @@ class TCPConnection:
 
         self.inframe = self.inframe + data[0:upbound]
         data = data[upbound:]
+        # Increment per completed MeshCore frame, not per TCP segment (N04).
+        # The threshold heuristic in send() compares _send_count vs
+        # _receive_count — counting per-segment skews it under fragmentation.
+        self._receive_count += 1
         if self.reader is not None:
             # feed meshcore reader
             asyncio.create_task(self.reader.handle_rx(self.inframe))
