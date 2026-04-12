@@ -52,12 +52,16 @@ class SerialConnection:
         def resume_writing(self):
             logger.debug("resume writing")
 
-    async def connect(self):
+    async def connect(self, timeout: float = 10.0):
         """
-        Connects to the device
+        Connects to the device.
+
+        Args:
+            timeout: Maximum seconds to wait for connection_made callback.
+                     Defaults to 10.0. Raises asyncio.TimeoutError on expiry.
         """
         self._connected_event.clear()
-        
+
         loop = asyncio.get_running_loop()
         await serial_asyncio.create_serial_connection(
             loop,
@@ -66,7 +70,7 @@ class SerialConnection:
             baudrate=self.baudrate,
         )
 
-        await self._connected_event.wait()
+        await asyncio.wait_for(self._connected_event.wait(), timeout=timeout)
         logger.info("Serial Connection started")
         return self.port
 
