@@ -116,9 +116,12 @@ class BLEConnection:
                     await self.client.pair()
                     logger.info("BLE pairing successful")
                 except Exception as e:
-                    logger.warning(f"BLE pairing failed: {e}")
-                    # Don't fail the connection if pairing fails, as the device
-                    # might already be paired or not require pairing
+                    logger.error(f"BLE pairing failed: {e}")
+                    # A failed pairing leaves the transport in a half-usable
+                    # state — re-raise so the caller gets a clean failure
+                    # instead of a silently degraded connection.
+                    await self.client.disconnect()
+                    raise
                     
         except BleakDeviceNotFoundError:
             return None
