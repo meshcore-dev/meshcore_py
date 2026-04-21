@@ -553,7 +553,7 @@ class MessageReader:
             dbuf.read(1)
 
             if len(data) > 7:
-                res["pubkey_prefix"] = pbuf.read(6).hex()
+                res["pubkey_prefix"] = dbuf.read(6).hex()
 
                 attributes = {"pubkey_prefix": res.get("pubkey_prefix")}
 
