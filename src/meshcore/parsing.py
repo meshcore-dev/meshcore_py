@@ -105,5 +105,11 @@ def parse_status(data, pubkey_prefix=None, offset=0):
     res["direct_dups"] = int.from_bytes(data[offset+44:offset+46], byteorder="little")
     res["flood_dups"] = int.from_bytes(data[offset+46:offset+48], byteorder="little")
     res["rx_airtime"] = int.from_bytes(data[offset+48:offset+52], byteorder="little")
-    
+
+    # n_recv_errors: uint32_t appended in firmware v1.12.0 (56-byte frame)
+    if len(data) >= offset + 56:
+        res["recv_errors"] = int.from_bytes(data[offset+52:offset+56], byteorder="little")
+    else:
+        res["recv_errors"] = None
+
     return res
