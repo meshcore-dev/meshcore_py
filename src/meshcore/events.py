@@ -58,6 +58,7 @@ class EventType(Enum):
     SIGN_START = "sign_start"
     SIGNATURE = "signature"
     ALLOWED_REPEAT_FREQ = "allowed_repeat_freq"
+    DEFAULT_FLOOD_SCOPE = "default_flood_scope"
 
     # Command response types
     OK = "command_ok"

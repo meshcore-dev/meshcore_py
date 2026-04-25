@@ -182,6 +182,12 @@ class MessageReader:
                 self_info["name"] = dbuf.read().decode("utf-8", "ignore")
                 await self.dispatcher.dispatch(Event(EventType.SELF_INFO, self_info))
 
+            elif packet_type_value == PacketType.DEFAULT_FLOOD_SCOPE.value:
+                res = {}
+                res["scope_name"] = dbuf.read(31).decode("utf-8", "ignore").replace("\0", "")
+                res["scope_key"] = dbuf.read(16).hex()
+                await self.dispatcher.dispatch(Event(EventType.DEFAULT_FLOOD_SCOPE, res))
+
             elif packet_type_value == PacketType.MSG_SENT.value:
                 res = {}
                 res["type"] = dbuf.read(1)[0]
