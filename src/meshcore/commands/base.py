@@ -58,16 +58,31 @@ def _validate_destination(dst: DestinationType, prefix_length: int = 6) -> bytes
 
 
 class CommandHandlerBase:
+    """Base class for command handlers.
+
+    .. note::
+        The internal ``asyncio.Lock`` is created lazily on first access
+        so that it binds to the correct running event loop (required for
+        Python 3.9/3.10 compatibility).
+    """
+
     DEFAULT_TIMEOUT = 5.0
 
     def __init__(self, default_timeout: Optional[float] = None):
         self._sender_func: Optional[Callable[[bytes], Coroutine[Any, Any, None]]] = None
         self._reader: Optional[MessageReader] = None
         self.dispatcher: Optional[EventDispatcher] = None
-        self._mesh_request_lock = asyncio.Lock()
+        self.__mesh_request_lock: Optional[asyncio.Lock] = None
         self.default_timeout = (
             default_timeout if default_timeout is not None else self.DEFAULT_TIMEOUT
         )
+
+    @property
+    def _mesh_request_lock(self) -> asyncio.Lock:
+        """Lazy-init lock so it binds to the running loop, not import-time."""
+        if self.__mesh_request_lock is None:
+            self.__mesh_request_lock = asyncio.Lock()
+        return self.__mesh_request_lock
 
     def set_connection(self, connection: Any) -> None:
         async def sender(data: bytes) -> None:
@@ -170,7 +185,7 @@ class CommandHandlerBase:
             futures: List[asyncio.Future] = []
             subscriptions = []
 
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             for event_type in expected_events:
                 future = loop.create_future()
 
