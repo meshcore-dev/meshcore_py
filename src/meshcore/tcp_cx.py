@@ -46,7 +46,6 @@ class TCPConnection:
 
         def data_received(self, data):
             logger.debug("data received")
-            self.cx._receive_count += 1
             self.cx.handle_rx(data)
 
         def error_received(self, exc):
@@ -101,7 +100,7 @@ class TCPConnection:
                 self.frame_expected_size = 0
                 if len(data) > 0: # rerun handle_rx on remaining data
                     self.handle_rx(data)
-                    return
+                return  # nothing left to process after reset
 
         upbound = self.frame_expected_size - len(self.inframe)
         if len(data) < upbound :
@@ -111,6 +110,10 @@ class TCPConnection:
 
         self.inframe = self.inframe + data[0:upbound]
         data = data[upbound:]
+        # Increment per completed MeshCore frame, not per TCP segment (N04).
+        # The threshold heuristic in send() compares _send_count vs
+        # _receive_count — counting per-segment skews it under fragmentation.
+        self._receive_count += 1
         if self.reader is not None:
             # feed meshcore reader
             self._spawn_background(self.reader.handle_rx(self.inframe))
@@ -142,7 +145,12 @@ class TCPConnection:
         size = len(data)
         pkt = b"\x3c" + size.to_bytes(2, byteorder="little") + data
         logger.debug(f"sending pkt : {pkt}")
-        self.transport.write(pkt)
+        try:
+            self.transport.write(pkt)
+        except (OSError, ConnectionResetError) as exc:
+            logger.warning(f"TCP write failed: {exc}")
+            if self._disconnect_callback:
+                await self._disconnect_callback(f"tcp_write_failed: {exc}")
 
     async def disconnect(self):
         """Close the TCP connection."""

@@ -124,9 +124,12 @@ class BLEConnection:
                     await self.client.pair()
                     logger.info("BLE pairing successful")
                 except Exception as e:
-                    logger.warning(f"BLE pairing failed: {e}")
-                    # Don't fail the connection if pairing fails, as the device
-                    # might already be paired or not require pairing
+                    logger.error(f"BLE pairing failed: {e}")
+                    # A failed pairing leaves the transport in a half-usable
+                    # state — re-raise so the caller gets a clean failure
+                    # instead of a silently degraded connection.
+                    await self.client.disconnect()
+                    raise
                     
         except BleakDeviceNotFoundError:
             return None
@@ -162,6 +165,17 @@ class BLEConnection:
         self.client = self._user_provided_client
         self.device = self._user_provided_device
 
+        # Re-register disconnect callback on the reset client so subsequent
+        # disconnects after a reconnect cycle are still detected.
+        if self.client is not None and hasattr(self.client, 'set_disconnected_callback'):
+            try:
+                self.client.set_disconnected_callback(self.handle_disconnect)
+            except Exception:
+                # set_disconnected_callback may not be available on all bleak
+                # versions; the next connect() call will re-create the client
+                # with the callback anyway.
+                pass
+
         if self._disconnect_callback:
             self._spawn_background(self._disconnect_callback("ble_disconnect"))
 
@@ -179,11 +193,19 @@ class BLEConnection:
     async def send(self, data):
         if not self.client:
             logger.error("Client is not connected")
+            if self._disconnect_callback:
+                await self._disconnect_callback("ble_transport_lost")
             return False
         if not self.rx_char:
             logger.error("RX characteristic not found")
             return False
-        await self.client.write_gatt_char(self.rx_char, bytes(data), response=True)
+        try:
+            await self.client.write_gatt_char(self.rx_char, bytes(data), response=True)
+        except Exception as exc:
+            logger.warning(f"BLE write failed: {exc}")
+            if self._disconnect_callback:
+                await self._disconnect_callback(f"ble_write_failed: {exc}")
+            return False
 
     async def disconnect(self):
         """Disconnect from the BLE device."""

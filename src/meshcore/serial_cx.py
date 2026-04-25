@@ -60,12 +60,16 @@ class SerialConnection:
         def resume_writing(self):
             logger.debug("resume writing")
 
-    async def connect(self):
+    async def connect(self, timeout: float = 10.0):
         """
-        Connects to the device
+        Connects to the device.
+
+        Args:
+            timeout: Maximum seconds to wait for connection_made callback.
+                     Defaults to 10.0. Raises asyncio.TimeoutError on expiry.
         """
         self._connected_event.clear()
-        
+
         loop = asyncio.get_running_loop()
         await serial_asyncio.create_serial_connection(
             loop,
@@ -74,7 +78,7 @@ class SerialConnection:
             baudrate=self.baudrate,
         )
 
-        await self._connected_event.wait()
+        await asyncio.wait_for(self._connected_event.wait(), timeout=timeout)
         logger.info("Serial Connection started")
         return self.port
 
@@ -110,7 +114,7 @@ class SerialConnection:
                 self.frame_expected_size = 0
                 if len(data) > 0: # rerun handle_rx on remaining data
                     self.handle_rx(data)
-                    return
+                return  # nothing left to process after reset
 
         upbound = self.frame_expected_size - len(self.inframe)
         if len(data) < upbound:
@@ -133,11 +137,18 @@ class SerialConnection:
     async def send(self, data):
         if not self.transport:
             logger.error("Transport not connected, cannot send data")
+            if self._disconnect_callback:
+                await self._disconnect_callback("serial_transport_lost")
             return
         size = len(data)
         pkt = b"\x3c" + size.to_bytes(2, byteorder="little") + data
         logger.debug(f"sending pkt : {pkt}")
-        self.transport.write(pkt)
+        try:
+            self.transport.write(pkt)
+        except OSError as exc:
+            logger.warning(f"Serial write failed: {exc}")
+            if self._disconnect_callback:
+                await self._disconnect_callback(f"serial_write_failed: {exc}")
 
     async def disconnect(self):
         """Close the serial connection."""
