@@ -339,6 +339,8 @@ class MessagingCommands(CommandHandlerBase):
         elif isinstance (scope, bytes): # scope has been sent directly as byte
                 logger.debug(f"Directly setting scope to {scope}")
                 scope_key = scope
+        else:
+            raise TypeError(f"set_flood_scope: unsupported scope type {type(scope).__name__}")
 
         logger.debug(f"Setting scope to {scope_key.hex()}")
 

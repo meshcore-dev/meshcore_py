@@ -73,10 +73,6 @@ class BinaryCommandHandler(CommandHandlerBase):
 
             return telem_event.payload["lpp"] if telem_event else None
 
-    async def req_mma(self, contact, timeout=0, min_timeout=0):
-        logger.error("*** please consider using req_mma_sync instead of req_mma") 
-        return await self.req_mma_sync(contact, start, end, timeout,min_timeout)
-
     async def req_mma_sync(self, contact, start, end, timeout=0,min_timeout=0):
         async with self._mesh_request_lock:
             req = (

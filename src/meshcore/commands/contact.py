@@ -43,13 +43,17 @@ class ContactCommands(CommandHandlerBase):
                     logger.debug("Timeout while getting contacts")
                     for future in pending: # cancel all futures
                         future.cancel()
-                    return None
+                    return Event(EventType.ERROR, {"reason": "timeout waiting for contacts"})
 
                 for future in done:
                     event = await future
-                    if event is None or event.type != EventType.NEXT_CONTACT:
-                        for future in pending:
-                            future.cancel()
+                    if event is None:
+                        for f in pending:
+                            f.cancel()
+                        return Event(EventType.ERROR, {"reason": "no event received during contacts retrieval"})
+                    if event.type != EventType.NEXT_CONTACT:
+                        for f in pending:
+                            f.cancel()
                         return event
 
                 futures = []
@@ -64,7 +68,7 @@ class ContactCommands(CommandHandlerBase):
     
         except asyncio.TimeoutError:
             logger.debug(f"Timeout receiving contacts")
-            return None
+            return Event(EventType.ERROR, {"reason": "asyncio timeout receiving contacts"})
         except Exception as e:
             logger.debug(f"Command error: {e}")
             return Event(EventType.ERROR, {"error": str(e)})
@@ -116,7 +120,9 @@ class ContactCommands(CommandHandlerBase):
                     path_hash_mode = int(path.split(":")[1])
                     path = path.split(":")[0].replace(":","")
                 else: # use device one by default
-                    path_hash_mode = contact["out_path_len"] >> 6 # would fallback to previous val
+                    # out_path_len is pre-masked (& 0x3F) in reader.py, so high bits are always 0;
+                    # the actual path_hash_mode is fetched from the device query below.
+                    path_hash_mode = 0
                     res = await self.send_device_query()
                     if not res is None and res.type != EventType.ERROR:
                         if "path_hash_mode" in res.payload:
