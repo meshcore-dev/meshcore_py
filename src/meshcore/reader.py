@@ -942,36 +942,36 @@ class MessageReader:
                     await self.dispatcher.dispatch(
                         Event(EventType.DISCOVER_RESPONSE, ndr, attributes)
                     )
-          elif packet_type_value == PacketType.CONTACT_DELETED.value:
-              # N01: PUSH_CODE_CONTACT_DELETED (0x8F) — 1-byte code + 32-byte pubkey
-              # Emitted by MyMesh::onContactOverwrite() (MyMesh.cpp:325-334)
-              if len(data) < 33:
-                  logger.debug("CONTACT_DELETED frame too short (%d bytes, need 33)", len(data))
-                  return
-              pubkey = data[1:33].hex()
-              await self.dispatcher.dispatch(
-                  Event(EventType.CONTACT_DELETED, {"pubkey": pubkey}, {"pubkey": pubkey})
-              )
+            elif packet_type_value == PacketType.CONTACT_DELETED.value:
+                # N01: PUSH_CODE_CONTACT_DELETED (0x8F) — 1-byte code + 32-byte pubkey
+                # Emitted by MyMesh::onContactOverwrite() (MyMesh.cpp:325-334)
+                if len(data) < 33:
+                    logger.debug("CONTACT_DELETED frame too short (%d bytes, need 33)", len(data))
+                    return
+                pubkey = data[1:33].hex()
+                await self.dispatcher.dispatch(
+                    Event(EventType.CONTACT_DELETED, {"pubkey": pubkey}, {"pubkey": pubkey})
+                )
 
-          elif packet_type_value == PacketType.CONTACTS_FULL.value:
-              # N02: PUSH_CODE_CONTACTS_FULL (0x90) — 1-byte push, no payload
-              # Emitted by MyMesh::onContactsFull() (MyMesh.cpp:336)
-              await self.dispatcher.dispatch(Event(EventType.CONTACTS_FULL, {}))
+            elif packet_type_value == PacketType.CONTACTS_FULL.value:
+                # N02: PUSH_CODE_CONTACTS_FULL (0x90) — 1-byte push, no payload
+                # Emitted by MyMesh::onContactsFull() (MyMesh.cpp:336)
+                await self.dispatcher.dispatch(Event(EventType.CONTACTS_FULL, {}))
 
-          elif packet_type_value == PacketType.TUNING_PARAMS.value:
-              # N03: RESP_CODE_TUNING_PARAMS (23) — response to CMD_GET_TUNING_PARAMS (43)
-              # Format: 1-byte code + 4-byte rx_delay (LE) + 4-byte airtime_factor (LE) = 9 bytes
-              # Emitted by MyMesh.cpp:1307-1313
-              if len(data) < 9:
-                  logger.debug("TUNING_PARAMS frame too short (%d bytes, need 9)", len(data))
-                  await self.dispatcher.dispatch(
-                      Event(EventType.ERROR, {"reason": "invalid_frame_length"})
-                  )
-                  return
-              rx_delay = int.from_bytes(data[1:5], byteorder="little")
-              airtime_factor = int.from_bytes(data[5:9], byteorder="little")
-              res = {"rx_delay": rx_delay, "airtime_factor": airtime_factor}
-              await self.dispatcher.dispatch(Event(EventType.TUNING_PARAMS, res))
+            elif packet_type_value == PacketType.TUNING_PARAMS.value:
+                # N03: RESP_CODE_TUNING_PARAMS (23) — response to CMD_GET_TUNING_PARAMS (43)
+                # Format: 1-byte code + 4-byte rx_delay (LE) + 4-byte airtime_factor (LE) = 9 bytes
+                # Emitted by MyMesh.cpp:1307-1313
+                if len(data) < 9:
+                    logger.debug("TUNING_PARAMS frame too short (%d bytes, need 9)", len(data))
+                    await self.dispatcher.dispatch(
+                        Event(EventType.ERROR, {"reason": "invalid_frame_length"})
+                    )
+                    return
+                rx_delay = int.from_bytes(data[1:5], byteorder="little")
+                airtime_factor = int.from_bytes(data[5:9], byteorder="little")
+                res = {"rx_delay": rx_delay, "airtime_factor": airtime_factor}
+                await self.dispatcher.dispatch(Event(EventType.TUNING_PARAMS, res))
 
             else:
                 logger.debug(f"Unhandled data received {data}")
