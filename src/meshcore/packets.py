@@ -71,6 +71,7 @@ class CommandType(Enum):
     SET_AUTOADD_CONFIG = 58
     GET_AUTOADD_CONFIG = 59
     GET_ALLOWED_REPEAT_FREQ = 60
+    GET_STATS = 56  # R04: CMD_GET_STATS — used by get_stats_core/radio/packets
     SET_PATH_HASH_MODE = 61
 
 # Packet prefixes for the protocol
@@ -120,3 +121,6 @@ class PacketType(Enum):
     PATH_DISCOVERY_RESPONSE = 0x8D
     CONTROL_DATA = 0x8E
     CONTACT_DELETED = 0x8F
+    CONTACTS_FULL = 0x90  # N02: MyMesh::onContactsFull() — 1-byte push, no payload
+    # Note: 0x90 == ControlType.NODE_DISCOVER_RESP in a different namespace.
+    # Not a literal conflict (PacketType vs ControlType), but a maintenance hazard.

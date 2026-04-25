@@ -28,6 +28,10 @@ def mock_dispatcher():
         sub.unsubscribe = MagicMock()
         dispatcher._last_subscribe_handler = handler
         dispatcher._last_subscribe_event_type = event_type
+        # Immediately resolve the future so send() doesn't block
+        asyncio.get_event_loop().call_soon(
+            handler, Event(event_type, {})
+        )
         return sub
 
     dispatcher.subscribe = MagicMock(side_effect=fake_subscribe)
@@ -80,6 +84,13 @@ async def test_send_with_event(command_handler, mock_connection, mock_dispatcher
 
 
 async def test_send_timeout(command_handler, mock_connection, mock_dispatcher):
+    # Override to NOT resolve events, so we can test the timeout path
+    def non_resolving_subscribe(event_type, handler, attribute_filters=None):
+        sub = MagicMock(spec=Subscription)
+        sub.unsubscribe = MagicMock()
+        return sub
+    mock_dispatcher.subscribe = MagicMock(side_effect=non_resolving_subscribe)
+
     result = await command_handler.send(b"test_command", [EventType.OK], timeout=0.1)
     assert result.type == EventType.ERROR
     assert result.payload == {"reason": "no_event_received"}
