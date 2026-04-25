@@ -28,10 +28,17 @@ class MeshCore:
         auto_reconnect: bool = False,
         max_reconnect_attempts: int = 3,
     ):
-        # Wrap connection with ConnectionManager
+        # Wrap connection with ConnectionManager.
+        # The reconnect callback ensures send_appstart() runs after every
+        # transport-level reconnect, which is required by firmware to
+        # initialize the session (F02).
         self.dispatcher = EventDispatcher()
         self.connection_manager = ConnectionManager(
-            cx, self.dispatcher, auto_reconnect, max_reconnect_attempts
+            cx,
+            self.dispatcher,
+            auto_reconnect,
+            max_reconnect_attempts,
+            reconnect_callback=self._on_reconnect,
         )
         self.cx = self.connection_manager  # For backward compatibility
 
@@ -173,6 +180,15 @@ class MeshCore:
             await mc.disconnect()
             return None
         return mc
+
+    async def _on_reconnect(self):
+        """Callback invoked by ConnectionManager after a successful reconnect.
+
+        Firmware requires CMD_APP_START after every transport-level connection
+        to initialize the session.  MeshCore.connect() does this on the initial
+        connection; this callback ensures it also happens on reconnects (F02).
+        """
+        await self.commands.send_appstart()
 
     async def connect(self):
         await self.dispatcher.start()

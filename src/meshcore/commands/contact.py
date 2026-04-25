@@ -191,6 +191,24 @@ class ContactCommands(CommandHandlerBase):
         data = b"\x3B"
         return await self.send(data, [EventType.AUTOADD_CONFIG, EventType.ERROR])
 
+    async def get_contact_by_key(self, pubkey: bytes) -> Event:
+        """N09: Retrieve a single contact by its public key (CMD 30).
+
+        Args:
+            pubkey: 32-byte public key of the contact.
+
+        Returns:
+            Event with the contact data (same format as CONTACT/NEXT_CONTACT),
+            or ERROR if not found.
+        """
+        if not isinstance(pubkey, (bytes, bytearray)):
+            raise TypeError("pubkey must be bytes-like")
+        # Truncate or pad to 32 bytes
+        key_bytes = bytes(pubkey[:32])
+        logger.debug(f"Getting contact by key: {key_bytes.hex()}")
+        data = b"\x1e" + key_bytes
+        return await self.send(data, [EventType.NEXT_CONTACT, EventType.ERROR])
+
     async def get_advert_path(self, key: DestinationType) -> Event:
         key_bytes = _validate_destination(key, prefix_length=32)
         logger.debug(f"getting advert path for: {key} {key_bytes.hex()}")

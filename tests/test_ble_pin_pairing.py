@@ -37,7 +37,7 @@ class TestBLEPinPairing(unittest.TestCase):
 
     @patch("meshcore.ble_cx.BleakClient")
     def test_ble_connection_with_pin_failed_pairing(self, mock_bleak_client):
-        """Test BLE connection with PIN when pairing fails but connection continues"""
+        """Test BLE connection with PIN when pairing fails — re-raises (F17)."""
         # Arrange
         mock_client_instance = self._get_mock_bleak_client()
         mock_client_instance.pair = AsyncMock(side_effect=Exception("Pairing failed"))
@@ -47,17 +47,16 @@ class TestBLEPinPairing(unittest.TestCase):
         pin = "123456"
         ble_conn = BLEConnection(address=address, pin=pin)
 
-        # Act
-        result = asyncio.run(ble_conn.connect())
-
-        # Assert
+        # Act & Assert — pairing failure now re-raises instead of being
+        # swallowed, because a half-usable transport is worse than a clean
+        # failure (forensics finding F17).
+        with self.assertRaises(Exception) as ctx:
+            asyncio.run(ble_conn.connect())
+        self.assertIn("Pairing failed", str(ctx.exception))
         mock_client_instance.connect.assert_called_once()
         mock_client_instance.pair.assert_called_once()
-        mock_client_instance.start_notify.assert_called_once_with(
-            UART_TX_CHAR_UUID, ble_conn.handle_rx
-        )
-        # Connection should still succeed even if pairing fails
-        self.assertEqual(result, address)
+        # disconnect should be called to clean up the failed connection
+        mock_client_instance.disconnect.assert_called_once()
 
     @patch("meshcore.ble_cx.BleakClient")
     def test_ble_connection_without_pin_no_pairing(self, mock_bleak_client):

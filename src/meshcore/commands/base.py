@@ -58,16 +58,31 @@ def _validate_destination(dst: DestinationType, prefix_length: int = 6) -> bytes
 
 
 class CommandHandlerBase:
+    """Base class for command handlers.
+
+    .. note::
+        The internal ``asyncio.Lock`` is created lazily on first access
+        so that it binds to the correct running event loop (required for
+        Python 3.9/3.10 compatibility).
+    """
+
     DEFAULT_TIMEOUT = 15.0
 
     def __init__(self, default_timeout: Optional[float] = None):
         self._sender_func: Optional[Callable[[bytes], Coroutine[Any, Any, None]]] = None
         self._reader: Optional[MessageReader] = None
         self.dispatcher: Optional[EventDispatcher] = None
-        self._mesh_request_lock = asyncio.Lock()
+        self.__mesh_request_lock: Optional[asyncio.Lock] = None
         self.default_timeout = (
             default_timeout if default_timeout is not None else self.DEFAULT_TIMEOUT
         )
+
+    @property
+    def _mesh_request_lock(self) -> asyncio.Lock:
+        """Lazy-init lock so it binds to the running loop, not import-time."""
+        if self.__mesh_request_lock is None:
+            self.__mesh_request_lock = asyncio.Lock()
+        return self.__mesh_request_lock
 
     def set_connection(self, connection: Any) -> None:
         async def sender(data: bytes) -> None:
@@ -90,6 +105,14 @@ class CommandHandlerBase:
         expected_events: Optional[Union[EventType, List[EventType]]] = None,
         timeout: Optional[float] = None,
     ) -> Event:
+        """Wait for the first of *expected_events* to arrive.
+
+        Returns the first matched ``Event``.  When ``EventType.ERROR`` is
+        among the expected types, the caller **must** check
+        ``result.is_error()`` before accessing command-specific payload
+        keys — an ERROR payload is ``{"reason": "..."}`` and will
+        ``KeyError`` on any other key.
+        """
         try:
             # Convert single event to list if needed
             if not isinstance(expected_events, list):
@@ -129,9 +152,6 @@ class CommandHandlerBase:
             logger.debug(f"Command error: {e}")
             return Event(EventType.ERROR, {"error": str(e)})
 
-        return Event(EventType.ERROR, {})
-
-
     async def send(
         self,
         data: bytes,
@@ -151,7 +171,14 @@ class CommandHandlerBase:
             timeout: Timeout in seconds, or None to use default_timeout
 
         Returns:
-            Event: The full event object that was received in response to the command
+            Event: The full event object that was received in response to
+            the command.
+
+        Important:
+            When ``EventType.ERROR`` is included in *expected_events*, the
+            returned event may be an error response.  Callers **must**
+            check ``result.is_error()`` before accessing command-specific
+            payload keys to avoid ``KeyError``.
         """
         if not self.dispatcher:
             raise RuntimeError("Dispatcher not set, cannot send commands")
@@ -170,7 +197,7 @@ class CommandHandlerBase:
             futures: List[asyncio.Future] = []
             subscriptions = []
 
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             for event_type in expected_events:
                 future = loop.create_future()
 
@@ -279,6 +306,7 @@ class CommandHandlerBase:
         contact = self._get_contact_by_prefix(dst_bytes.hex()) # need a contact for return path
         if contact is None:
             logger.error("No contact found")
+            return Event(EventType.ERROR, {"reason": "contact_not_found"})
 
         zero_hop = False
         if contact["out_path_len"] == -1: 
