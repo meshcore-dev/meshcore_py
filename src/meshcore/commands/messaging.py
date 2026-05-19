@@ -307,21 +307,28 @@ class MessagingCommands(CommandHandlerBase):
 
         return await self.send(cmd_data, [EventType.MSG_SENT, EventType.ERROR])
 
-    async def send_raw_data(self, payload: bytes) -> Event:
+    async def send_raw_data(self, payload: bytes, path: bytes = b"") -> Event:
         """N09: Send raw data via CMD_SEND_RAW_DATA (25).
 
-        Sends an arbitrary payload through the mesh network.
+        Sends an arbitrary raw-data payload directly (no flood support yet).
+
+        Command format:
+            0x19 | path_len(1) | path(path_len bytes) | payload(>=4 bytes)
 
         Args:
-            payload: Raw bytes to send.
+            payload: Raw bytes to send (minimum 4 bytes).
+            path:    Optional path bytes for intermediate hops (default: empty = zero-hop direct).
 
         Returns:
-            Event with MSG_SENT or ERROR.
+            Event with OK or ERROR.
         """
         if not isinstance(payload, (bytes, bytearray)):
             raise TypeError("payload must be bytes-like")
-        data = b"\x19" + bytes(payload)
-        return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
+        if len(payload) < 4:
+            raise ValueError("payload must be at least 4 bytes")
+        path = bytes(path)
+        data = bytes([0x19, len(path)]) + path + bytes(payload)
+        return await self.send(data, [EventType.OK, EventType.ERROR])
 
     async def set_flood_scope(self, scope):
         if scope is None:
