@@ -184,8 +184,13 @@ class MessageReader:
 
             elif packet_type_value == PacketType.DEFAULT_FLOOD_SCOPE.value:
                 res = {}
-                res["scope_name"] = dbuf.read(31).decode("utf-8", "ignore").replace("\0", "")
-                res["scope_key"] = dbuf.read(16).hex()
+                # Firmware emits a 48-byte frame when a scope is configured,
+                # or a 1-byte sentinel frame (just the response code) when no
+                # scope is set. Gate the 31+16 byte read so the sentinel
+                # dispatches an empty payload instead of empty-string fields.
+                if len(data) >= 48:
+                    res["scope_name"] = dbuf.read(31).decode("utf-8", "ignore").replace("\0", "")
+                    res["scope_key"] = dbuf.read(16).hex()
                 await self.dispatcher.dispatch(Event(EventType.DEFAULT_FLOOD_SCOPE, res))
 
             elif packet_type_value == PacketType.MSG_SENT.value:
@@ -526,7 +531,12 @@ class MessageReader:
 
                 res = {}
                 res["config"] = dbuf.read(1)[0]
-                await self.dispatcher.dispatch(Event(EventType.AUTOADD_CONFIG, res, res))            
+                # `max_hops` trailing byte added in companion-v1.14.0
+                # (firmware commit 00566741). Pre-v1.14.0 firmware emits a
+                # 1-byte response; read defensively to remain compatible.
+                if len(data) >= 3:
+                    res["max_hops"] = dbuf.read(1)[0]
+                await self.dispatcher.dispatch(Event(EventType.AUTOADD_CONFIG, res, res))
 
             elif packet_type_value == PacketType.CHANNEL_INFO.value:
                 logger.debug(f"received channel info response: {data.hex()}")
@@ -568,6 +578,12 @@ class MessageReader:
 
                 if len(data) >= 5:
                     ack_data["code"] = dbuf.read(4).hex()
+                # `trip_time` (round-trip latency in ms) has been on the wire
+                # since companion-v1.0.0a (firmware commit d9dc76f1, Jan 2025).
+                # Read defensively so legacy frames without this field still
+                # dispatch correctly.
+                if len(data) >= 9:
+                    ack_data["trip_time"] = int.from_bytes(dbuf.read(4), "little")
 
                 attributes = {"code": ack_data.get("code", "")}
 
@@ -596,8 +612,19 @@ class MessageReader:
                     res["is_admin"] = (perms & 1) == 1  # Check if admin bit is set
                 if len(data) > 7:
                     res["pubkey_prefix"] = dbuf.read(6).hex()
-                    
+
                     attributes = {"pubkey_prefix": res.get("pubkey_prefix")}
+                # The following trailing fields are emitted only by the new-
+                # style RESP_SERVER_LOGIN_OK path. server_timestamp landed in
+                # firmware commit 0e90b731 (companion-v1.10.0); acl_permissions
+                # in 7947e8a2; fw_ver_level in 418ae08b (also companion-v1.10.0).
+                # Per-field length gates handle every firmware-version tier.
+                if len(data) >= 12:
+                    res["server_timestamp"] = int.from_bytes(dbuf.read(4), "little")
+                if len(data) >= 13:
+                    res["acl_permissions"] = dbuf.read(1)[0]
+                if len(data) >= 14:
+                    res["fw_ver_level"] = dbuf.read(1)[0]
 
                 await self.dispatcher.dispatch(
                     Event(EventType.LOGIN_SUCCESS, res, attributes)
