@@ -14,6 +14,7 @@ class EventType(Enum):
     SELF_INFO = "self_info"
     CONTACT_MSG_RECV = "contact_message"
     CHANNEL_MSG_RECV = "channel_message"
+    CHANNEL_DATA_RECV = "channel_data"
     CURRENT_TIME = "time_update"
     NO_MORE_MSGS = "no_more_messages"
     CONTACT_URI = "contact_uri"

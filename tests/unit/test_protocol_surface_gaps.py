@@ -362,3 +362,127 @@ async def test_get_stats_core_uses_enum():
     assert captured_data is not None
     assert captured_data[0] == CommandType.GET_STATS.value  # 0x38 = 56
     assert captured_data[1] == 0x00
+
+
+# ---------------------------------------------------------------------------
+# CHANNEL_DATA_RECV handler + enum entry (group-channel binary data)
+# ---------------------------------------------------------------------------
+
+def test_channel_data_recv_enum_exists():
+    """PacketType.CHANNEL_DATA_RECV == 27 (the previously-skipped enum slot)."""
+    assert PacketType.CHANNEL_DATA_RECV.value == 27
+
+
+@pytest.mark.asyncio
+async def test_channel_data_recv_direct_path_frame():
+    """A realistic direct-path CHANNEL_DATA_RECV frame dispatches the typed payload.
+
+    Frame: code + snr(0x10) + reserved(00 00) + channel_idx(1)
+           + path_len(0xFF direct) + data_type(0x0123 LE) + data_len(4)
+           + payload(DEADBEEF).
+    """
+    reader, dispatched = _make_reader()
+    frame = bytes([
+        PacketType.CHANNEL_DATA_RECV.value,
+        0x10,              # SNR (signed int8) -> 16 / 4 = 4.0
+        0x00, 0x00,        # reserved
+        0x01,              # channel_idx
+        0xFF,              # path_len sentinel -> direct message
+        0x23, 0x01,        # data_type = 0x0123 (uint16 little-endian)
+        0x04,              # data_len
+        0xDE, 0xAD, 0xBE, 0xEF,  # payload
+    ])
+    assert len(frame) == 13
+
+    await reader.handle_rx(bytearray(frame))
+
+    assert len(dispatched) == 1
+    evt = dispatched[0]
+    assert evt.type == EventType.CHANNEL_DATA_RECV
+    assert evt.payload["SNR"] == 4.0
+    assert evt.payload["channel_idx"] == 1
+    assert evt.payload["path_len"] == 255
+    assert evt.payload["path_hash_mode"] == -1
+    assert evt.payload["data_type"] == 0x0123
+    assert evt.payload["data_len"] == 4
+    assert evt.payload["payload"] == "deadbeef"
+    assert evt.attributes["channel_idx"] == 1
+    assert evt.attributes["data_type"] == 0x0123
+
+
+@pytest.mark.asyncio
+async def test_channel_data_recv_route_flood_path_len_bits():
+    """A route-flood path_len byte splits into hash-mode (>>6) and length (&0x3F).
+
+    path_len = 0x42 = 0b01000010 -> hash_mode = 1, length = 2.
+    """
+    reader, dispatched = _make_reader()
+    frame = bytes([
+        PacketType.CHANNEL_DATA_RECV.value,
+        0x10,              # SNR
+        0x00, 0x00,        # reserved
+        0x02,              # channel_idx
+        0x42,              # path_len -> hash_mode 1, length 2
+        0x00, 0x00,        # data_type = 0
+        0x02,              # data_len
+        0xAA, 0xBB,        # payload
+    ])
+    assert len(frame) == 11
+
+    await reader.handle_rx(bytearray(frame))
+
+    assert len(dispatched) == 1
+    evt = dispatched[0]
+    assert evt.type == EventType.CHANNEL_DATA_RECV
+    assert evt.payload["path_hash_mode"] == 1
+    assert evt.payload["path_len"] == 2
+    assert evt.payload["channel_idx"] == 2
+    assert evt.payload["data_type"] == 0
+    assert evt.payload["data_len"] == 2
+    assert evt.payload["payload"] == "aabb"
+
+
+@pytest.mark.asyncio
+async def test_channel_data_recv_under_minimum_frame_ignored():
+    """A CHANNEL_DATA_RECV frame shorter than the 9-byte header is dropped."""
+    reader, dispatched = _make_reader()
+    # 8 bytes total (header needs 9) — missing the data_len byte.
+    frame = bytes([
+        PacketType.CHANNEL_DATA_RECV.value,
+        0x10, 0x00, 0x00, 0x01, 0xFF, 0x00, 0x00,
+    ])
+    assert len(frame) == 8
+
+    await reader.handle_rx(bytearray(frame))
+
+    assert len(dispatched) == 0
+
+
+@pytest.mark.asyncio
+async def test_channel_data_recv_widened_data_type():
+    """data_type is a 16-bit field: a value > 0xFF round-trips through the 2-byte read.
+
+    data_type = 0x0201 (513) confirms the high byte is not truncated. data_len = 0
+    exercises the empty-payload tail.
+    """
+    reader, dispatched = _make_reader()
+    frame = bytes([
+        PacketType.CHANNEL_DATA_RECV.value,
+        0x10,              # SNR
+        0x00, 0x00,        # reserved
+        0x00,              # channel_idx
+        0xFF,              # path_len direct
+        0x01, 0x02,        # data_type = 0x0201 (little-endian)
+        0x00,              # data_len = 0
+    ])
+    assert len(frame) == 9
+
+    await reader.handle_rx(bytearray(frame))
+
+    assert len(dispatched) == 1
+    evt = dispatched[0]
+    assert evt.type == EventType.CHANNEL_DATA_RECV
+    assert evt.payload["data_type"] == 0x0201
+    assert evt.payload["data_type"] > 0xFF
+    assert evt.payload["data_len"] == 0
+    assert evt.payload["payload"] == ""

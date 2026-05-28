@@ -105,6 +105,7 @@ class PacketType(Enum):
     STATS = 24
     AUTOADD_CONFIG = 25
     ALLOWED_REPEAT_FREQ = 26
+    CHANNEL_DATA_RECV = 27
     DEFAULT_FLOOD_SCOPE = 28
 
     # Push notifications

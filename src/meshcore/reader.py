@@ -332,6 +332,41 @@ class MessageReader:
                     Event(EventType.CHANNEL_MSG_RECV, res, attributes)
                 )
 
+            elif packet_type_value == PacketType.CHANNEL_DATA_RECV.value:
+                # Group-channel binary data (PAYLOAD_TYPE_GRP_DATA), companion-v1.15.0+.
+                # Fixed 9-byte header (including the code byte) + variable payload:
+                #   code(1) + snr(1) + reserved(2) + channel_idx(1)
+                #   + path_len(1) + data_type(2) + data_len(1) = 9 bytes
+                # The first six post-code bytes share CHANNEL_MSG_RECV_V3's framing;
+                # data_type is a 16-bit little-endian field (widened from uint8 in
+                # firmware, so the high byte may be non-zero).
+                if len(data) < 9:
+                    logger.debug(f"CHANNEL_DATA_RECV frame too short ({len(data)} bytes < 9), skipping parse")
+                    return
+                res = {}
+                res["SNR"] = int.from_bytes(dbuf.read(1), byteorder="little", signed=True) / 4
+                dbuf.read(2)  # reserved
+                res["channel_idx"] = dbuf.read(1)[0]
+                plen = dbuf.read(1)[0]
+                if plen == 255:  # direct message
+                    res["path_hash_mode"] = -1
+                    res["path_len"] = plen
+                else:
+                    res["path_hash_mode"] = plen >> 6
+                    res["path_len"] = plen & 0x3F
+                res["data_type"] = int.from_bytes(dbuf.read(2), byteorder="little")
+                res["data_len"] = dbuf.read(1)[0]
+                res["payload"] = dbuf.read(res["data_len"]).hex()
+
+                attributes = {
+                    "channel_idx": res["channel_idx"],
+                    "data_type": res["data_type"],
+                }
+
+                await self.dispatcher.dispatch(
+                    Event(EventType.CHANNEL_DATA_RECV, res, attributes)
+                )
+
             elif packet_type_value == PacketType.CURRENT_TIME.value:
                 time_value = int.from_bytes(dbuf.read(4), byteorder="little")
                 result = {"time": time_value}
