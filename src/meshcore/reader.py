@@ -546,7 +546,8 @@ class MessageReader:
                 res = {}
                 res["SNR"] = int.from_bytes(dbuf.read(1), byteorder="little", signed=True) / 4
                 res["RSSI"] = int.from_bytes(dbuf.read(1), byteorder="little", signed=True)
-                res["payload"] = dbuf.read(4).hex()
+                dbuf.read(1)  # skip reserved byte (0xFF, possibly path_len in future)
+                res["payload"] = dbuf.read().hex()  # read all remaining payload bytes
                 logger.debug("Received raw data")
                 logger.debug(res)
                 await self.dispatcher.dispatch(Event(EventType.RAW_DATA, res))
