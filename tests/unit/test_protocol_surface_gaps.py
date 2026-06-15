@@ -186,7 +186,7 @@ async def test_send_trace_with_path_no_padding():
 
 @pytest.mark.asyncio
 async def test_send_raw_data_wrapper():
-    """send_raw_data sends CMD 0x19 + payload."""
+    """send_raw_data sends CMD 0x19 + path_len + payload."""
     from meshcore.commands.messaging import MessagingCommands
 
     cmd = MessagingCommands.__new__(MessagingCommands)
@@ -200,11 +200,12 @@ async def test_send_raw_data_wrapper():
 
     cmd.send = mock_send
 
-    await cmd.send_raw_data(b"\xDE\xAD")
+    await cmd.send_raw_data(b"\xDE\xAD\xBE\xEF")
 
     assert captured_data is not None
     assert captured_data[0] == 0x19  # CMD_SEND_RAW_DATA
-    assert captured_data[1:] == b"\xDE\xAD"
+    assert captured_data[1] == 0x00  # path_len: zero-hop direct (empty path)
+    assert captured_data[2:] == b"\xDE\xAD\xBE\xEF"
 
 
 # ---------------------------------------------------------------------------
