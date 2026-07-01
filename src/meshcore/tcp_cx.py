@@ -73,8 +73,8 @@ class TCPConnection:
 
     def handle_rx(self, data: bytearray):
         if len(self.header) == 0: # did not find start of frame yet
-            # search start of frame (0x3e) in data
-            idx = data.find(b"\x3e")
+            # search start of frame (0x3c) in data
+            idx = data.find(b"\x3c")
             if idx < 0: # no start of frame
                 return
             # Discard any leading junk bytes before the actual frame marker.
