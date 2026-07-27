@@ -412,3 +412,67 @@ async def test_send_trace_unknown_path_hash_len(
 
     assert result.is_error()
     assert result.payload["reason"] == "invalid_path_format"
+
+
+# ── BLE transport serialises writes ──────────────────────────
+
+async def test_ble_send_serialises_concurrent_writes():
+    """Overlapping write_gatt_char() calls must not interleave.
+
+    Two concurrent writes to the same characteristic drop the link outright
+    (observed on macOS/CoreBluetooth: "BLE write failed: 19"). Nothing above the
+    transport guarantees callers are sequential, so the transport must.
+    """
+    from meshcore.ble_cx import BLEConnection
+
+    conn = BLEConnection.__new__(BLEConnection)   # bypass bleak availability check
+    conn._disconnect_callback = None
+    conn._write_lock = None
+    conn.rx_char = object()
+
+    overlap = {"current": 0, "max": 0}
+
+    class FakeClient:
+        async def write_gatt_char(self, char, data, response=True):
+            overlap["current"] += 1
+            overlap["max"] = max(overlap["max"], overlap["current"])
+            await asyncio.sleep(0.01)     # a real write is not instantaneous
+            overlap["current"] -= 1
+
+    conn.client = FakeClient()
+
+    await asyncio.gather(*(conn.send(b"\x01\x02") for _ in range(8)))
+
+    assert overlap["max"] == 1, f"{overlap['max']} writes overlapped"
+
+
+async def test_ble_send_releases_lock_on_write_failure():
+    """A failed write must not wedge the lock for every later command."""
+    from meshcore.ble_cx import BLEConnection
+
+    conn = BLEConnection.__new__(BLEConnection)
+    conn._write_lock = None
+    conn.rx_char = object()
+    reasons = []
+
+    async def capture(reason):
+        reasons.append(reason)
+
+    conn._disconnect_callback = capture
+
+    class BoomThenOK:
+        def __init__(self):
+            self.calls = 0
+
+        async def write_gatt_char(self, char, data, response=True):
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("19")
+
+    conn.client = BoomThenOK()
+
+    await conn.send(b"\x01")
+    assert reasons == ["ble_write_failed: 19"]
+    # Second write must still be able to acquire the lock.
+    await asyncio.wait_for(conn.send(b"\x02"), timeout=1.0)
+    assert conn.client.calls == 2

@@ -4,6 +4,7 @@ mccli.py : CLI interface to MeschCore BLE companion app
 
 import asyncio
 import logging
+from typing import Optional
 
 
 # Make bleak optional - only fail if BLE operations are attempted
@@ -52,6 +53,13 @@ class BLEConnection:
         self.rx_char = None
         self._disconnect_callback = None
         self._background_tasks: set[asyncio.Task] = set()
+        # Serialises write_gatt_char(). Two overlapping writes to the same
+        # characteristic drop the link outright (observed on macOS/CoreBluetooth:
+        # "BLE write failed: 19", connection gone). Nothing above this layer
+        # guarantees callers are sequential -- schedulers, health checks and
+        # user commands all issue commands independently -- so the transport has
+        # to enforce it. Lazily created so it binds to the running loop.
+        self._write_lock: Optional[asyncio.Lock] = None
 
     def _spawn_background(self, coro) -> asyncio.Task:
         """Create a tracked background task (prevents GC of fire-and-forget tasks)."""
@@ -199,8 +207,11 @@ class BLEConnection:
         if not self.rx_char:
             logger.error("RX characteristic not found")
             return False
+        if self._write_lock is None:
+            self._write_lock = asyncio.Lock()
         try:
-            await self.client.write_gatt_char(self.rx_char, bytes(data), response=True)
+            async with self._write_lock:
+                await self.client.write_gatt_char(self.rx_char, bytes(data), response=True)
         except Exception as exc:
             logger.warning(f"BLE write failed: {exc}")
             if self._disconnect_callback:
