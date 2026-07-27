@@ -330,14 +330,18 @@ class MessagingCommands(CommandHandlerBase):
         data = bytes([0x19, len(path)]) + path + bytes(payload)
         return await self.send(data, [EventType.OK, EventType.ERROR])
 
-    async def set_flood_scope(self, scope):
+    async def set_flood_scope(self, scope, force_unscoped=False):
         if scope is None:
             logger.debug(f"Resetting scope")
             scope_key = b"\0"*16
         elif isinstance (scope, str):
-            if scope == "0" or scope == "None" or scope == "*" or scope == "": # disable
+            if scope == "0" or scope == "None" or scope == "": # revert to default
                 logger.debug(f"Resetting scope")
                 scope_key = b"\0"*16
+                logger.debug("revert to default_scope")
+            elif scope == "*":
+                force_unscoped = True
+                logger.debug("forcing unscoped msgs")
             else:
                 logger.debug(f"Setting scope from string {scope}")
                 if scope[0] != "#":     # no hashtag as first char
@@ -352,10 +356,19 @@ class MessagingCommands(CommandHandlerBase):
         logger.debug(f"Setting scope to {scope_key.hex()}")
 
         cmd_data = bytearray([CommandType.SET_FLOOD_SCOPE.value])
-        cmd_data.extend(b"\0")
-        cmd_data.extend(scope_key)
+        if force_unscoped:
+            cmd_data.append(0x01)
+        else:
+            cmd_data.extend(b"\0")
+            cmd_data.extend(scope_key)
 
         return await self.send(cmd_data, [EventType.OK, EventType.ERROR])
+
+    async def reset_flood_scope(self):
+        return await self.set_flood_scope(b"")
+
+    async def force_unscoped(self):
+        return await self.set_flood_scope(b"", force_unscoped=True)
 
     async def set_default_flood_scope(self, scope):
         if scope is None:
