@@ -299,34 +299,61 @@ class CommandHandlerBase:
         return result
 
     async def send_anon_req(self, dst: DestinationType, request_type: AnonReqType, data: Optional[bytes] = None, context={}, timeout=None, min_timeout=0) -> Event:
+        """Send an anonymous request to *dst*.
+
+        *dst* need not be a known contact. When it is, that contact's out path is
+        used as the reply path; otherwise a zero-hop direct reply path is
+        requested (see the comment below).
+
+        Note: *data* is currently ignored -- the request body is the reply path,
+        which is derived here rather than supplied by the caller.
+        """
         dst_bytes = _validate_destination(dst, prefix_length=32)
         pubkey_prefix = _validate_destination(dst, prefix_length=6)
         logger.debug(f"Anon Binary request to {dst_bytes.hex()}")
 
-        contact = self._get_contact_by_prefix(dst_bytes.hex()) # need a contact for return path
-        if contact is None:
-            logger.error("No contact found")
-            return Event(EventType.ERROR, {"reason": "contact_not_found"})
+        # The contact is consulted only to build the reply path appended to the
+        # request; it is not required to send one. Companion firmware from
+        # FIRMWARE_VER_CODE 13 synthesises a transient anon contact for an unknown
+        # pubkey (out_path_len = 0, zero-hop direct), so an unknown destination is
+        # reachable as long as we ask it to reply zero-hop. Refusing here would
+        # block probing any node the client has not already added - for instance
+        # asking a freshly discovered neighbour for its regions.
+        contact = self._get_contact_by_prefix(dst_bytes.hex())
 
         zero_hop = False
-        if contact["out_path_len"] == -1: 
-            logger.info("No path set trying zero hop")
-            zero_hop = True
-            await self.change_contact_path(contact, "")
+        if contact is None:
+            logger.debug("No contact found, requesting a zero-hop direct reply path")
+            out_path_len = 0
+            out_path = b""
+        else:
+            if contact["out_path_len"] == -1:
+                logger.info("No path set trying zero hop")
+                zero_hop = True
+                await self.change_contact_path(contact, "")
+            # update_contact() normally reflects the change back onto the dict, so
+            # out_path_len reads 0 here. Clamp anyway: if that call failed (e.g. the
+            # device query inside it errored) the dict is still -1, and the unsigned
+            # to_bytes below would raise OverflowError -- which would skip the
+            # reset_path at the end of this method and leave the contact pinned to
+            # zero-hop on the device. Zero is the right value to send regardless,
+            # since zero-hop is exactly what we just asked for.
+            out_path_len = max(contact["out_path_len"], 0)
+            out_path = bytes.fromhex(contact["out_path"])[::-1]
 
-        data = contact["out_path_len"].to_bytes(1, "little") + bytes.fromhex(contact["out_path"])[::-1]
+        data = out_path_len.to_bytes(1, "little") + out_path
         data = b"\x39" + dst_bytes + request_type.value.to_bytes(1, "little", signed=False) + (data if data else b"")
 
         result = await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
-        
+
         # Register the request with the reader if we have both reader and request_type
-        if (result.type == EventType.MSG_SENT and 
-            self._reader is not None and 
+        if (result.type == EventType.MSG_SENT and
+            self._reader is not None and
             request_type is not None):
-            
+
             exp_tag = result.payload["expected_ack"].hex()
             # Use provided timeout or fallback to suggested timeout (with 5s default)
-            result.payload["suggested_timeout"] = result.payload.get("suggested_timeout", 4000) * (contact["out_path_len"] + 1) # update timeout from path_len
+            result.payload["suggested_timeout"] = result.payload.get("suggested_timeout", 4000) * (out_path_len + 1) # update timeout from path_len
             actual_timeout = timeout if timeout is not None and timeout > 0 else result.payload.get("suggested_timeout", 4000) / 800.0
             actual_timeout = min_timeout if actual_timeout < min_timeout else actual_timeout
             self._reader.register_binary_request(pubkey_prefix.hex(), exp_tag, request_type, actual_timeout, context=context, is_anon=True)

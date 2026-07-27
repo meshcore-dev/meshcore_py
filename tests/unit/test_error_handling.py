@@ -203,21 +203,199 @@ async def test_set_multi_acks_error(
     assert result.is_error()
 
 
-# ── send_anon_req returns ERROR on contact not found ─────────
+# ── send_anon_req falls back to zero-hop when no contact exists ─────────
 
-async def test_send_anon_req_contact_not_found(
-    command_handler, mock_dispatcher
+async def test_send_anon_req_without_contact_sends_zero_hop(
+    command_handler, mock_connection, mock_dispatcher
 ):
-    """send_anon_req returns ERROR event when contact prefix not found,
-    instead of raising TypeError on NoneType subscript."""
+    """An unknown destination is sent with a zero-hop reply path.
+
+    The contact is only used to build the reply path. Companion firmware from
+    FIRMWARE_VER_CODE 13 synthesises a transient anon contact for an unknown
+    pubkey, so refusing to send here would needlessly block probing any node
+    the client has not already added. Must still not raise TypeError on the
+    NoneType subscript that this test originally guarded.
+    """
     command_handler._get_contact_by_prefix = MagicMock(return_value=None)
+    command_handler.change_contact_path = AsyncMock()
+    command_handler.reset_path = AsyncMock()
+    setup_event_response(
+        mock_dispatcher, EventType.MSG_SENT,
+        {"expected_ack": b"\x01\x02\x03\x04", "suggested_timeout": 4000},
+    )
 
     result = await command_handler.send_anon_req(
         VALID_PUBKEY_HEX, MagicMock(value=1)
     )
 
-    assert result.is_error()
-    assert result.payload["reason"] == "contact_not_found"
+    assert not result.is_error()
+    sent = mock_connection.send.await_args.args[0]
+    # \x39 | 32-byte pubkey | request type | reply-path-len 0 (no path bytes)
+    assert sent == b"\x39" + bytes.fromhex(VALID_PUBKEY_HEX) + b"\x01" + b"\x00"
+
+    # No contact to mutate, so no device round-trips for path changes.
+    command_handler.change_contact_path.assert_not_awaited()
+    command_handler.reset_path.assert_not_awaited()
+
+
+async def test_send_anon_req_without_contact_does_not_scale_timeout(
+    command_handler, mock_dispatcher
+):
+    """suggested_timeout must not be multiplied by a path length we don't have."""
+    command_handler._get_contact_by_prefix = MagicMock(return_value=None)
+    reader = MagicMock()
+    reader.register_binary_request = MagicMock()
+    command_handler._reader = reader
+    setup_event_response(
+        mock_dispatcher, EventType.MSG_SENT,
+        {"expected_ack": b"\x01\x02\x03\x04", "suggested_timeout": 4000},
+    )
+
+    result = await command_handler.send_anon_req(
+        VALID_PUBKEY_HEX, MagicMock(value=1)
+    )
+
+    # out_path_len 0 -> (0 + 1) -> unchanged from the device's own estimate.
+    assert result.payload["suggested_timeout"] == 4000
+    reader.register_binary_request.assert_called_once()
+
+
+async def test_send_anon_req_with_contact_still_uses_its_path(
+    command_handler, mock_connection, mock_dispatcher
+):
+    """A known contact's reply path and timeout scaling are both unchanged.
+
+    _reader must be set: the out_path_len-based timeout scaling is gated behind
+    it, and that scaling is the only behaviour the no-contact refactor touches on
+    this path -- without a reader it is never executed.
+    """
+    command_handler._get_contact_by_prefix = MagicMock(return_value={
+        "public_key": VALID_PUBKEY_HEX,
+        "out_path_len": 3,
+        "out_path": "aabbcc",
+    })
+    command_handler.change_contact_path = AsyncMock()
+    command_handler.reset_path = AsyncMock()
+    reader = MagicMock()
+    command_handler._reader = reader
+    setup_event_response(
+        mock_dispatcher, EventType.MSG_SENT,
+        {"expected_ack": b"\x01\x02\x03\x04", "suggested_timeout": 4000},
+    )
+
+    result = await command_handler.send_anon_req(VALID_PUBKEY_HEX, MagicMock(value=1))
+
+    sent = mock_connection.send.await_args.args[0]
+    # \x39 | pubkey | request type | reply-path-len 3 | path reversed
+    assert sent == (
+        b"\x39" + bytes.fromhex(VALID_PUBKEY_HEX) + b"\x01"
+        + b"\x03" + bytes.fromhex("ccbbaa")
+    )
+    # Scaled by out_path_len + 1 = 4.
+    assert result.payload["suggested_timeout"] == 16000
+    reader.register_binary_request.assert_called_once()
+    assert reader.register_binary_request.call_args.args[3] == 16000 / 800.0
+    command_handler.change_contact_path.assert_not_awaited()
+    command_handler.reset_path.assert_not_awaited()
+
+
+async def test_send_anon_req_timeout_uses_path_len_as_sent(
+    command_handler, mock_connection, mock_dispatcher
+):
+    """The timeout multiplier must match the path length actually transmitted.
+
+    The contact dict is a live reference that other commands mutate in place, so
+    re-reading it after the await could scale the timeout by a path length that
+    was never sent.
+    """
+    contact = {"public_key": VALID_PUBKEY_HEX, "out_path_len": 3, "out_path": "aabbcc"}
+    command_handler._get_contact_by_prefix = MagicMock(return_value=contact)
+    command_handler._reader = MagicMock()
+
+    def fake_subscribe(evt_type, handler, attr_filters=None):
+        sub = MagicMock(spec=Subscription)
+        sub.unsubscribe = MagicMock()
+        if evt_type == EventType.MSG_SENT:
+            # Simulate another command flipping the contact to flood mid-send.
+            contact["out_path_len"] = -1
+            contact["out_path"] = ""
+            asyncio.get_event_loop().call_soon(
+                handler,
+                Event(EventType.MSG_SENT,
+                      {"expected_ack": b"\x01\x02\x03\x04", "suggested_timeout": 4000}),
+            )
+        return sub
+
+    mock_dispatcher.subscribe = MagicMock(side_effect=fake_subscribe)
+
+    result = await command_handler.send_anon_req(VALID_PUBKEY_HEX, MagicMock(value=1))
+
+    sent = mock_connection.send.await_args.args[0]
+    assert sent.endswith(b"\x03" + bytes.fromhex("ccbbaa"))
+    # 4 x 4000, matching the 3-hop path in the frame -- not 0 from the mutated -1.
+    assert result.payload["suggested_timeout"] == 16000
+
+
+async def test_send_anon_req_flood_contact_still_forces_and_restores_zero_hop(
+    command_handler, mock_connection, mock_dispatcher
+):
+    """out_path_len == -1 keeps its existing force-zero-hop-then-restore path."""
+    contact = {
+        "public_key": VALID_PUBKEY_HEX,
+        "out_path_len": -1,
+        "out_path": "",
+    }
+
+    async def fake_change_path(c, path):
+        # update_contact() reflects the change onto the dict; -1 would otherwise
+        # raise OverflowError on the unsigned to_bytes below.
+        c["out_path_len"] = 0
+        c["out_path"] = ""
+
+    command_handler._get_contact_by_prefix = MagicMock(return_value=contact)
+    command_handler.change_contact_path = AsyncMock(side_effect=fake_change_path)
+    command_handler.reset_path = AsyncMock()
+    setup_event_response(
+        mock_dispatcher, EventType.MSG_SENT,
+        {"expected_ack": b"\x01\x02\x03\x04", "suggested_timeout": 4000},
+    )
+
+    await command_handler.send_anon_req(VALID_PUBKEY_HEX, MagicMock(value=1))
+
+    command_handler.change_contact_path.assert_awaited_once()
+    command_handler.reset_path.assert_awaited_once()
+    sent = mock_connection.send.await_args.args[0]
+    assert sent == b"\x39" + bytes.fromhex(VALID_PUBKEY_HEX) + b"\x01" + b"\x00"
+
+
+async def test_send_anon_req_survives_change_contact_path_not_mutating(
+    command_handler, mock_connection, mock_dispatcher
+):
+    """A failed change_contact_path must not crash and must still restore the path.
+
+    update_contact() normally writes out_path_len back onto the dict, but if it
+    errors the value stays -1. Unclamped, the unsigned to_bytes raises
+    OverflowError, which skips reset_path and leaves the contact pinned to
+    zero-hop on the device.
+    """
+    contact = {"public_key": VALID_PUBKEY_HEX, "out_path_len": -1, "out_path": ""}
+    command_handler._get_contact_by_prefix = MagicMock(return_value=contact)
+    # Returns an error without reflecting the change onto the dict.
+    command_handler.change_contact_path = AsyncMock(
+        return_value=Event(EventType.ERROR, {"reason": "device_query_failed"})
+    )
+    command_handler.reset_path = AsyncMock()
+    setup_event_response(
+        mock_dispatcher, EventType.MSG_SENT,
+        {"expected_ack": b"\x01\x02\x03\x04", "suggested_timeout": 4000},
+    )
+
+    result = await command_handler.send_anon_req(VALID_PUBKEY_HEX, MagicMock(value=1))
+
+    assert not result.is_error()
+    sent = mock_connection.send.await_args.args[0]
+    assert sent == b"\x39" + bytes.fromhex(VALID_PUBKEY_HEX) + b"\x01" + b"\x00"
+    command_handler.reset_path.assert_awaited_once()
 
 
 # ── send_trace handles unknown path_hash_len without NameError ──
