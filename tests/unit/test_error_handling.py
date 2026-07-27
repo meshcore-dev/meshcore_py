@@ -368,34 +368,30 @@ async def test_send_anon_req_flood_contact_still_forces_and_restores_zero_hop(
     assert sent == b"\x39" + bytes.fromhex(VALID_PUBKEY_HEX) + b"\x01" + b"\x00"
 
 
-async def test_send_anon_req_survives_change_contact_path_not_mutating(
+async def test_send_anon_req_aborts_when_change_contact_path_fails(
     command_handler, mock_connection, mock_dispatcher
 ):
-    """A failed change_contact_path must not crash and must still restore the path.
+    """A failed zero-hop switch must abort, not send an unanswerable request.
 
-    update_contact() normally writes out_path_len back onto the dict, but if it
-    errors the value stays -1. Unclamped, the unsigned to_bytes raises
-    OverflowError, which skips reset_path and leaves the contact pinned to
-    zero-hop on the device.
+    If change_contact_path() fails the device still has the contact as flood, so
+    sendAnonReq() floods the request -- and the server gates REGIONS/OWNER/BASIC
+    behind isRouteDirect(), dropping it silently. Sending anyway would burn a
+    full path-scaled timeout waiting for a reply that cannot arrive.
     """
     contact = {"public_key": VALID_PUBKEY_HEX, "out_path_len": -1, "out_path": ""}
     command_handler._get_contact_by_prefix = MagicMock(return_value=contact)
-    # Returns an error without reflecting the change onto the dict.
     command_handler.change_contact_path = AsyncMock(
         return_value=Event(EventType.ERROR, {"reason": "device_query_failed"})
     )
     command_handler.reset_path = AsyncMock()
-    setup_event_response(
-        mock_dispatcher, EventType.MSG_SENT,
-        {"expected_ack": b"\x01\x02\x03\x04", "suggested_timeout": 4000},
-    )
 
     result = await command_handler.send_anon_req(VALID_PUBKEY_HEX, MagicMock(value=1))
 
-    assert not result.is_error()
-    sent = mock_connection.send.await_args.args[0]
-    assert sent == b"\x39" + bytes.fromhex(VALID_PUBKEY_HEX) + b"\x01" + b"\x00"
-    command_handler.reset_path.assert_awaited_once()
+    assert result.is_error()
+    assert result.payload["reason"] == "path_reset_failed"
+    mock_connection.send.assert_not_awaited()
+    # Nothing was changed on the device, so there is nothing to restore.
+    command_handler.reset_path.assert_not_awaited()
 
 
 # ── send_trace handles unknown path_hash_len without NameError ──
@@ -427,7 +423,6 @@ async def test_ble_send_serialises_concurrent_writes():
 
     conn = BLEConnection.__new__(BLEConnection)   # bypass bleak availability check
     conn._disconnect_callback = None
-    conn._write_lock = None
     conn.rx_char = object()
 
     overlap = {"current": 0, "max": 0}
@@ -451,7 +446,6 @@ async def test_ble_send_releases_lock_on_write_failure():
     from meshcore.ble_cx import BLEConnection
 
     conn = BLEConnection.__new__(BLEConnection)
-    conn._write_lock = None
     conn.rx_char = object()
     reasons = []
 
@@ -595,3 +589,128 @@ async def test_reader_contact_out_path_keeps_zero_bytes():
     assert contact["out_path_len"] == 1
     assert contact["out_path_hash_mode"] == 2
     assert contact["out_path"] == "aa00bb", "the 0x00 inside the hop hash was lost"
+
+
+# ── BLE write bound (a stalled write must not wedge the client) ──
+
+async def test_ble_write_timeout_tears_down_the_link():
+    """A stalled write must be bounded and must drop the link, not just release.
+
+    CommandHandler's timeout starts only after the write returns, so nothing
+    else bounds this. Releasing the lock alone would be wrong too: the
+    underlying write may still be in flight, and a second write racing it
+    re-creates the overlap the lock exists to prevent.
+    """
+    from meshcore.ble_cx import BLEConnection
+
+    conn = BLEConnection.__new__(BLEConnection)
+    conn.rx_char = object()
+    reasons = []
+
+    async def capture(reason):
+        reasons.append(reason)
+
+    conn._disconnect_callback = capture
+    conn.WRITE_TIMEOUT = 0.05
+
+    class Stalling:
+        async def write_gatt_char(self, char, data, response=True):
+            await asyncio.Event().wait()      # never completes
+
+    conn.client = Stalling()
+
+    result = await asyncio.wait_for(conn.send(b"\x01"), timeout=2.0)
+    assert result is False
+    assert reasons == ["ble_write_timeout"]
+
+
+async def test_ble_stalled_write_does_not_block_later_commands_forever():
+    """Head-of-line: queued writes must not inherit an unbounded stall."""
+    from meshcore.ble_cx import BLEConnection
+
+    conn = BLEConnection.__new__(BLEConnection)
+    conn.rx_char = object()
+    conn._disconnect_callback = None
+    conn.WRITE_TIMEOUT = 0.05
+
+    class Stalling:
+        async def write_gatt_char(self, char, data, response=True):
+            await asyncio.Event().wait()
+
+    conn.client = Stalling()
+
+    # Five writers behind one stalled holder must all return, not hang.
+    done = await asyncio.wait_for(
+        asyncio.gather(*(conn.send(bytes([i])) for i in range(5))), timeout=3.0
+    )
+    assert done == [False] * 5
+
+
+async def test_ble_connection_init_provides_the_lock():
+    """__init__ must set up the lock slot; the tests must not paper over it."""
+    from meshcore.ble_cx import BLEConnection
+
+    conn = BLEConnection.__new__(BLEConnection)
+    BLEConnection.__init__(conn, address="AA:BB:CC:DD:EE:FF")
+    assert conn._write_lock_obj is None          # lazily created
+    assert isinstance(conn._write_lock, asyncio.Lock)
+    assert conn._write_lock is conn._write_lock  # stable across reads
+
+
+# ── reply-path bounds ────────────────────────────────────────
+
+async def test_encode_reply_path_rejects_unsupported_hash_mode():
+    # mode 3 -> 4-byte hops, which Packet::isValidPathLen refuses outright.
+    assert encode_reply_path(2, "aabbccddeeffaabb", 3) == b"\x00"
+
+
+async def test_encode_reply_path_never_overflows_the_server_buffer():
+    """The server memcpys into a fixed 64-byte reply_path with no length check."""
+    for mode in (0, 1, 2):
+        hash_size = mode + 1
+        out = encode_reply_path(63, "ab" * 200, mode)
+        body = out[1:]
+        assert len(body) <= 64, f"mode {mode} emitted {len(body)} bytes"
+        assert (out[0] & 63) * hash_size == len(body), "header disagrees with body"
+
+
+async def test_send_anon_req_timeout_tracks_emitted_hops_not_claimed_length():
+    """Scaling must follow the hops actually sent, not a length that got clamped."""
+    command_handler = CommandHandler()
+    command_handler.dispatcher = MagicMock()
+    command_handler._reader = MagicMock()
+    conn = MagicMock()
+    conn.send = AsyncMock()
+
+    async def sender(data):
+        await conn.send(data)
+
+    command_handler._sender_func = sender
+    # Claims 8 hops but carries only 3 bytes -> 3 hops actually emitted.
+    command_handler._get_contact_by_prefix = MagicMock(return_value={
+        "public_key": VALID_PUBKEY_HEX,
+        "out_path_len": 8,
+        "out_path": "aabbcc",
+        "out_path_hash_mode": 0,
+    })
+    setup_event_response(
+        command_handler.dispatcher, EventType.MSG_SENT,
+        {"expected_ack": b"\x01\x02\x03\x04", "suggested_timeout": 1000},
+    )
+
+    result = await command_handler.send_anon_req(VALID_PUBKEY_HEX, MagicMock(value=1))
+
+    sent = conn.send.await_args.args[0]
+    assert sent[-4] & 63 == 3                     # 3 hops on the wire
+    assert result.payload["suggested_timeout"] == 4000   # (3 + 1) x 1000, not 9x
+
+
+async def test_encode_reply_path_saturates_rather_than_wrapping():
+    """hops is a 6-bit field; masking would wrap 64 to 0.
+
+    A 64-hop path would then be described as zero hops -- a zero-hop reply
+    request for a distant node -- instead of being clamped and logged.
+    """
+    out = encode_reply_path(64, "ab" * 64, 0)
+    assert out[0] & 63 == 63
+    assert len(out[1:]) == 63

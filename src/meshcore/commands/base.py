@@ -57,6 +57,13 @@ def _validate_destination(dst: DestinationType, prefix_length: int = 6) -> bytes
         )
 
 
+# Size of the server-side reply_path buffer (uint8_t reply_path[64] in
+# simple_repeater/MyMesh.h). It is memcpy'd into without a length check.
+MAX_REPLY_PATH_BYTES = 64
+# reply_path_len is the low 6 bits of the header byte.
+MAX_REPLY_PATH_HOPS = 63
+
+
 def encode_reply_path(out_path_len: int, out_path_hex: str, out_path_hash_mode: int) -> bytes:
     """Encode the reply path a server should use when answering us.
 
@@ -71,17 +78,36 @@ def encode_reply_path(out_path_len: int, out_path_hex: str, out_path_hash_mode: 
 
     The path itself is reversed by *hop*, not by byte: a return path visits the
     same hops in the opposite order, and each hop's multi-byte hash must stay
-    intact. (At hash mode 0 the two are indistinguishable, which is why this
-    went unnoticed - mode 0 is the default.)
+    intact. (For single-byte hops the two are indistinguishable, which is most
+    of why this went unnoticed - mode 0 is the default.)
     """
     hash_mode = max(out_path_hash_mode, 0)      # -1 means "flood", i.e. no path
+    if hash_mode > 2:
+        # The server computes hash_size = mode + 1, and Packet::isValidPathLen
+        # rejects 4-byte hops outright, so such a path is unusable on the wire.
+        logger.warning(
+            f"Unsupported out_path_hash_mode {out_path_hash_mode}; "
+            "requesting a zero-hop reply path instead"
+        )
+        return b"\x00"
     hash_size = hash_mode + 1
-    hops = max(out_path_len, 0) & 63
+    # Saturate rather than mask: `& 63` would silently wrap a 64-hop path to
+    # zero hops, i.e. a zero-hop reply for a distant node.
+    hops = min(max(out_path_len, 0), MAX_REPLY_PATH_HOPS)
 
     raw = bytes.fromhex(out_path_hex or "")
     # Never read past what the contact actually carries; a truncated or padded
     # field would otherwise yield short trailing hops.
     hops = min(hops, len(raw) // hash_size)
+    # The server memcpys into a fixed 64-byte reply_path with no bounds check
+    # (simple_repeater/MyMesh.cpp), so never describe more than fits.
+    max_hops = min(MAX_REPLY_PATH_HOPS, MAX_REPLY_PATH_BYTES // hash_size)
+    if hops > max_hops:
+        logger.warning(
+            f"Reply path of {hops} hops x {hash_size}B exceeds the "
+            f"{MAX_REPLY_PATH_BYTES}B the server can hold; truncating to {max_hops}"
+        )
+        hops = max_hops
 
     path = b"".join(
         raw[i * hash_size:(i + 1) * hash_size] for i in range(hops - 1, -1, -1)
@@ -362,7 +388,15 @@ class CommandHandlerBase:
             if contact["out_path_len"] == -1:
                 logger.info("No path set trying zero hop")
                 zero_hop = True
-                await self.change_contact_path(contact, "")
+                path_res = await self.change_contact_path(contact, "")
+                if path_res is not None and path_res.type == EventType.ERROR:
+                    # The device still has this contact as flood, so sendAnonReq
+                    # will flood the request -- and the server gates REGIONS,
+                    # OWNER and BASIC behind isRouteDirect(), silently dropping
+                    # it. Better to fail here than to wait out a full timeout
+                    # for a reply that cannot come.
+                    logger.error("Could not set zero-hop path, aborting anon request")
+                    return Event(EventType.ERROR, {"reason": "path_reset_failed"})
             # update_contact() normally reflects the change back onto the dict, so
             # out_path_len reads 0 here. Clamp anyway: if that call failed (e.g. the
             # device query inside it errored) the dict is still -1, and the unsigned
@@ -388,7 +422,8 @@ class CommandHandlerBase:
 
             exp_tag = result.payload["expected_ack"].hex()
             # Use provided timeout or fallback to suggested timeout (with 5s default)
-            result.payload["suggested_timeout"] = result.payload.get("suggested_timeout", 4000) * (out_path_len + 1) # update timeout from path_len
+            emitted_hops = reply_path[0] & 63   # what actually went on the wire
+            result.payload["suggested_timeout"] = result.payload.get("suggested_timeout", 4000) * (emitted_hops + 1) # update timeout from path_len
             actual_timeout = timeout if timeout is not None and timeout > 0 else result.payload.get("suggested_timeout", 4000) / 800.0
             actual_timeout = min_timeout if actual_timeout < min_timeout else actual_timeout
             self._reader.register_binary_request(pubkey_prefix.hex(), exp_tag, request_type, actual_timeout, context=context, is_anon=True)
