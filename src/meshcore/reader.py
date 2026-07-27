@@ -112,7 +112,17 @@ class MessageReader:
                 else:
                     c["out_path_hash_mode"] = plen >> 6 
                     c["out_path_len"] = plen & 0x3F # 6 LSB
-                c["out_path"] = dbuf.read(64).replace(b"\0", b"").hex()
+                # The field is a fixed 64 bytes, NUL-padded past the real path.
+                # Take exactly the bytes the path occupies rather than stripping
+                # NULs: a hop hash may legitimately contain 0x00, and dropping
+                # those shortens the path and shifts every hop after it.
+                # (PATH_DISCOVERY_RESPONSE below already reads opl*opl_hlen.)
+                path_bytes = dbuf.read(64)
+                if c["out_path_len"] > 0:
+                    used = c["out_path_len"] * (c["out_path_hash_mode"] + 1)
+                    c["out_path"] = path_bytes[:used].hex()
+                else:
+                    c["out_path"] = ""
                 c["adv_name"] = dbuf.read(32).decode("utf-8", "ignore").replace("\0", "")
                 c["last_advert"] = int.from_bytes(dbuf.read(4), byteorder="little")
                 c["adv_lat"] = (

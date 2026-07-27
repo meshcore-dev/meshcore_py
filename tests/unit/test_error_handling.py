@@ -476,3 +476,122 @@ async def test_ble_send_releases_lock_on_write_failure():
     # Second write must still be able to acquire the lock.
     await asyncio.wait_for(conn.send(b"\x02"), timeout=1.0)
     assert conn.client.calls == 2
+
+
+# ── reply-path encoding (hash mode + hop-wise reversal) ──────
+
+from meshcore.commands.base import encode_reply_path  # noqa: E402
+
+
+async def test_encode_reply_path_zero_hop():
+    # len 0, mode 0 -> a single 0x00 byte, the zero-hop direct request.
+    assert encode_reply_path(0, "", 0) == b"\x00"
+
+
+async def test_encode_reply_path_mode0_reverses_hops():
+    # hops aa, bb -> reply visits bb then aa. Mode 0 leaves the top bits clear.
+    assert encode_reply_path(2, "aabb", 0) == b"\x02" + bytes.fromhex("bbaa")
+
+
+async def test_encode_reply_path_carries_hash_mode_in_top_bits():
+    """The server reads hash size from bits 6-7; omitting it truncates each hop.
+
+    Mode 2 = 3 bytes per hop. Without the mode the server would read hash_size 1
+    and reply to two 1-byte hops that do not exist.
+    """
+    out = encode_reply_path(2, "aabbccddeeff", 2)
+    assert out[0] == 0x82                      # 2 hops | (mode 2 << 6)
+    assert out[0] & 63 == 2                    # server: reply_path_len
+    assert (out[0] >> 6) + 1 == 3              # server: reply_path_hash_size
+    # Hop order reversed, each 3-byte hash intact.
+    assert out[1:] == bytes.fromhex("ddeeff") + bytes.fromhex("aabbcc")
+
+
+async def test_encode_reply_path_mode1_two_byte_hops():
+    out = encode_reply_path(3, "aabbccddeeff", 1)
+    assert out[0] == (3 | (1 << 6))
+    assert out[1:] == bytes.fromhex("eeff") + bytes.fromhex("ccdd") + bytes.fromhex("aabb")
+
+
+async def test_encode_reply_path_flood_mode_is_clamped():
+    # out_path_hash_mode is -1 for a flood contact; must not produce a negative shift.
+    assert encode_reply_path(0, "", -1) == b"\x00"
+
+
+async def test_encode_reply_path_ignores_padding_beyond_the_path():
+    # Real device fields are NUL-padded to 64 bytes; only the used hops count.
+    padded = "aabb" + "00" * 60
+    assert encode_reply_path(2, padded, 0) == b"\x02" + bytes.fromhex("bbaa")
+
+
+async def test_encode_reply_path_truncated_field_does_not_emit_short_hops():
+    # Claims 4 hops of 3 bytes but only 6 bytes present -> emit the 2 it has.
+    out = encode_reply_path(4, "aabbccddeeff", 2)
+    assert out[0] & 63 == 2
+    assert out[1:] == bytes.fromhex("ddeeff") + bytes.fromhex("aabbcc")
+
+
+async def test_send_anon_req_reply_path_uses_hash_mode(
+    command_handler, mock_connection, mock_dispatcher
+):
+    """End-to-end: a mode-2 multi-hop contact must get a correct reply path."""
+    command_handler._get_contact_by_prefix = MagicMock(return_value={
+        "public_key": VALID_PUBKEY_HEX,
+        "out_path_len": 2,
+        "out_path": "aabbccddeeff",
+        "out_path_hash_mode": 2,
+    })
+    command_handler.change_contact_path = AsyncMock()
+    command_handler.reset_path = AsyncMock()
+    setup_event_response(
+        mock_dispatcher, EventType.MSG_SENT,
+        {"expected_ack": b"\x01\x02\x03\x04", "suggested_timeout": 4000},
+    )
+
+    await command_handler.send_anon_req(VALID_PUBKEY_HEX, MagicMock(value=1))
+
+    sent = mock_connection.send.await_args.args[0]
+    assert sent == (
+        b"\x39" + bytes.fromhex(VALID_PUBKEY_HEX) + b"\x01"
+        + b"\x82" + bytes.fromhex("ddeeff") + bytes.fromhex("aabbcc")
+    )
+
+
+async def test_reader_contact_out_path_keeps_zero_bytes():
+    """A hop hash containing 0x00 must survive parsing by the real reader.
+
+    The 64-byte field is NUL-padded, but stripping every NUL also eats
+    legitimate hash bytes, shortening the path and shifting every hop after it.
+    """
+    from meshcore.reader import MessageReader
+    from meshcore.packets import PacketType
+
+    hops = bytes.fromhex("aa00bb")           # middle byte is a legitimate 0x00
+    frame = (
+        bytes([PacketType.CONTACT.value])
+        + bytes(32)                          # public_key
+        + b"\x02"                            # type
+        + b"\x00"                            # flags
+        + bytes([1 | (2 << 6)])              # 1 hop, hash mode 2 -> 3 bytes/hop
+        + hops + bytes(64 - len(hops))       # out_path, NUL-padded to 64
+        + b"name".ljust(32, b"\0")           # adv_name
+        + (0).to_bytes(4, "little")          # last_advert
+        + (0).to_bytes(4, "little", signed=True)   # adv_lat
+        + (0).to_bytes(4, "little", signed=True)   # adv_lon
+        + (0).to_bytes(4, "little")          # lastmod
+    )
+
+    seen = []
+
+    class Dispatcher:
+        async def dispatch(self, event):
+            seen.append(event)
+
+    reader = MessageReader(Dispatcher())
+    reader.contacts = {}
+    await reader.handle_rx(frame)
+
+    contact = next(e.payload for e in seen if e.type == EventType.NEXT_CONTACT)
+    assert contact["out_path_len"] == 1
+    assert contact["out_path_hash_mode"] == 2
+    assert contact["out_path"] == "aa00bb", "the 0x00 inside the hop hash was lost"

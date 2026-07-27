@@ -57,6 +57,38 @@ def _validate_destination(dst: DestinationType, prefix_length: int = 6) -> bytes
         )
 
 
+def encode_reply_path(out_path_len: int, out_path_hex: str, out_path_hash_mode: int) -> bytes:
+    """Encode the reply path a server should use when answering us.
+
+    The leading byte packs two fields, which the server unpacks as:
+
+        reply_path_len       = byte & 63
+        reply_path_hash_size = (byte >> 6) + 1
+
+    so the hash mode has to travel in the top two bits. Omitting it makes the
+    server read a hash size of 1 regardless of the real mode, take the wrong
+    number of bytes per hop, and route its reply to hops that do not exist.
+
+    The path itself is reversed by *hop*, not by byte: a return path visits the
+    same hops in the opposite order, and each hop's multi-byte hash must stay
+    intact. (At hash mode 0 the two are indistinguishable, which is why this
+    went unnoticed - mode 0 is the default.)
+    """
+    hash_mode = max(out_path_hash_mode, 0)      # -1 means "flood", i.e. no path
+    hash_size = hash_mode + 1
+    hops = max(out_path_len, 0) & 63
+
+    raw = bytes.fromhex(out_path_hex or "")
+    # Never read past what the contact actually carries; a truncated or padded
+    # field would otherwise yield short trailing hops.
+    hops = min(hops, len(raw) // hash_size)
+
+    path = b"".join(
+        raw[i * hash_size:(i + 1) * hash_size] for i in range(hops - 1, -1, -1)
+    )
+    return bytes([hops | (hash_mode << 6)]) + path
+
+
 class CommandHandlerBase:
     """Base class for command handlers.
 
@@ -325,7 +357,7 @@ class CommandHandlerBase:
         if contact is None:
             logger.debug("No contact found, requesting a zero-hop direct reply path")
             out_path_len = 0
-            out_path = b""
+            reply_path = encode_reply_path(0, "", 0)
         else:
             if contact["out_path_len"] == -1:
                 logger.info("No path set trying zero hop")
@@ -339,10 +371,13 @@ class CommandHandlerBase:
             # zero-hop on the device. Zero is the right value to send regardless,
             # since zero-hop is exactly what we just asked for.
             out_path_len = max(contact["out_path_len"], 0)
-            out_path = bytes.fromhex(contact["out_path"])[::-1]
+            reply_path = encode_reply_path(
+                out_path_len,
+                contact["out_path"],
+                contact.get("out_path_hash_mode", 0),
+            )
 
-        data = out_path_len.to_bytes(1, "little") + out_path
-        data = b"\x39" + dst_bytes + request_type.value.to_bytes(1, "little", signed=False) + (data if data else b"")
+        data = b"\x39" + dst_bytes + request_type.value.to_bytes(1, "little", signed=False) + reply_path
 
         result = await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
 
