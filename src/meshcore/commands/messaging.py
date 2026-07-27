@@ -353,7 +353,12 @@ class MessagingCommands(CommandHandlerBase):
         else:
             raise TypeError(f"set_flood_scope: unsupported scope type {type(scope).__name__}")
 
-        logger.debug(f"Setting scope to {scope_key.hex()}")
+        if force_unscoped:
+            logger.debug("Forcing unscoped messages")
+        elif scope_key is None:
+            logger.debug(f"Resetting scope")
+        else:
+            logger.debug(f"Setting scope to {scope_key.hex()}")
 
         cmd_data = bytearray([CommandType.SET_FLOOD_SCOPE.value])
         if force_unscoped:
@@ -397,6 +402,9 @@ class MessagingCommands(CommandHandlerBase):
         cmd_data.extend(scope_key)
 
         return await self.send(cmd_data, [EventType.OK, EventType.ERROR])
+
+    async def reset_default_flood_scope(self):
+        return await self.set_default_flood_scope(None)
 
     async def get_default_flood_scope(self):
         logger.debug(f"Getting default flood scope")
