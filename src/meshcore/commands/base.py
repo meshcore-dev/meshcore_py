@@ -57,6 +57,64 @@ def _validate_destination(dst: DestinationType, prefix_length: int = 6) -> bytes
         )
 
 
+# Size of the server-side reply_path buffer (uint8_t reply_path[64] in
+# simple_repeater/MyMesh.h). It is memcpy'd into without a length check.
+MAX_REPLY_PATH_BYTES = 64
+# reply_path_len is the low 6 bits of the header byte.
+MAX_REPLY_PATH_HOPS = 63
+
+
+def encode_reply_path(out_path_len: int, out_path_hex: str, out_path_hash_mode: int) -> bytes:
+    """Encode the reply path a server should use when answering us.
+
+    The leading byte packs two fields, which the server unpacks as:
+
+        reply_path_len       = byte & 63
+        reply_path_hash_size = (byte >> 6) + 1
+
+    so the hash mode has to travel in the top two bits. Omitting it makes the
+    server read a hash size of 1 regardless of the real mode, take the wrong
+    number of bytes per hop, and route its reply to hops that do not exist.
+
+    The path itself is reversed by *hop*, not by byte: a return path visits the
+    same hops in the opposite order, and each hop's multi-byte hash must stay
+    intact. (For single-byte hops the two are indistinguishable, which is most
+    of why this went unnoticed - mode 0 is the default.)
+    """
+    hash_mode = max(out_path_hash_mode, 0)      # -1 means "flood", i.e. no path
+    if hash_mode > 2:
+        # The server computes hash_size = mode + 1, and Packet::isValidPathLen
+        # rejects 4-byte hops outright, so such a path is unusable on the wire.
+        logger.warning(
+            f"Unsupported out_path_hash_mode {out_path_hash_mode}; "
+            "requesting a zero-hop reply path instead"
+        )
+        return b"\x00"
+    hash_size = hash_mode + 1
+    # Saturate rather than mask: `& 63` would silently wrap a 64-hop path to
+    # zero hops, i.e. a zero-hop reply for a distant node.
+    hops = min(max(out_path_len, 0), MAX_REPLY_PATH_HOPS)
+
+    raw = bytes.fromhex(out_path_hex or "")
+    # Never read past what the contact actually carries; a truncated or padded
+    # field would otherwise yield short trailing hops.
+    hops = min(hops, len(raw) // hash_size)
+    # The server memcpys into a fixed 64-byte reply_path with no bounds check
+    # (simple_repeater/MyMesh.cpp), so never describe more than fits.
+    max_hops = min(MAX_REPLY_PATH_HOPS, MAX_REPLY_PATH_BYTES // hash_size)
+    if hops > max_hops:
+        logger.warning(
+            f"Reply path of {hops} hops x {hash_size}B exceeds the "
+            f"{MAX_REPLY_PATH_BYTES}B the server can hold; truncating to {max_hops}"
+        )
+        hops = max_hops
+
+    path = b"".join(
+        raw[i * hash_size:(i + 1) * hash_size] for i in range(hops - 1, -1, -1)
+    )
+    return bytes([hops | (hash_mode << 6)]) + path
+
+
 class CommandHandlerBase:
     """Base class for command handlers.
 
@@ -299,34 +357,73 @@ class CommandHandlerBase:
         return result
 
     async def send_anon_req(self, dst: DestinationType, request_type: AnonReqType, data: Optional[bytes] = None, context={}, timeout=None, min_timeout=0) -> Event:
+        """Send an anonymous request to *dst*.
+
+        *dst* need not be a known contact. When it is, that contact's out path is
+        used as the reply path; otherwise a zero-hop direct reply path is
+        requested (see the comment below).
+
+        Note: *data* is currently ignored -- the request body is the reply path,
+        which is derived here rather than supplied by the caller.
+        """
         dst_bytes = _validate_destination(dst, prefix_length=32)
         pubkey_prefix = _validate_destination(dst, prefix_length=6)
         logger.debug(f"Anon Binary request to {dst_bytes.hex()}")
 
-        contact = self._get_contact_by_prefix(dst_bytes.hex()) # need a contact for return path
-        if contact is None:
-            logger.error("No contact found")
-            return Event(EventType.ERROR, {"reason": "contact_not_found"})
+        # The contact is consulted only to build the reply path appended to the
+        # request; it is not required to send one. Companion firmware from
+        # FIRMWARE_VER_CODE 13 synthesises a transient anon contact for an unknown
+        # pubkey (out_path_len = 0, zero-hop direct), so an unknown destination is
+        # reachable as long as we ask it to reply zero-hop. Refusing here would
+        # block probing any node the client has not already added - for instance
+        # asking a freshly discovered neighbour for its regions.
+        contact = self._get_contact_by_prefix(dst_bytes.hex())
 
         zero_hop = False
-        if contact["out_path_len"] == -1: 
-            logger.info("No path set trying zero hop")
-            zero_hop = True
-            await self.change_contact_path(contact, "")
+        if contact is None:
+            logger.debug("No contact found, requesting a zero-hop direct reply path")
+            out_path_len = 0
+            reply_path = encode_reply_path(0, "", 0)
+        else:
+            if contact["out_path_len"] == -1:
+                logger.info("No path set trying zero hop")
+                zero_hop = True
+                path_res = await self.change_contact_path(contact, "")
+                if path_res is not None and path_res.type == EventType.ERROR:
+                    # The device still has this contact as flood, so sendAnonReq
+                    # will flood the request -- and the server gates REGIONS,
+                    # OWNER and BASIC behind isRouteDirect(), silently dropping
+                    # it. Better to fail here than to wait out a full timeout
+                    # for a reply that cannot come.
+                    logger.error("Could not set zero-hop path, aborting anon request")
+                    return Event(EventType.ERROR, {"reason": "path_reset_failed"})
+            # update_contact() normally reflects the change back onto the dict, so
+            # out_path_len reads 0 here. Clamp anyway: if that call failed (e.g. the
+            # device query inside it errored) the dict is still -1, and the unsigned
+            # to_bytes below would raise OverflowError -- which would skip the
+            # reset_path at the end of this method and leave the contact pinned to
+            # zero-hop on the device. Zero is the right value to send regardless,
+            # since zero-hop is exactly what we just asked for.
+            out_path_len = max(contact["out_path_len"], 0)
+            reply_path = encode_reply_path(
+                out_path_len,
+                contact["out_path"],
+                contact.get("out_path_hash_mode", 0),
+            )
 
-        data = contact["out_path_len"].to_bytes(1, "little") + bytes.fromhex(contact["out_path"])[::-1]
-        data = b"\x39" + dst_bytes + request_type.value.to_bytes(1, "little", signed=False) + (data if data else b"")
+        data = b"\x39" + dst_bytes + request_type.value.to_bytes(1, "little", signed=False) + reply_path
 
         result = await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
-        
+
         # Register the request with the reader if we have both reader and request_type
-        if (result.type == EventType.MSG_SENT and 
-            self._reader is not None and 
+        if (result.type == EventType.MSG_SENT and
+            self._reader is not None and
             request_type is not None):
-            
+
             exp_tag = result.payload["expected_ack"].hex()
             # Use provided timeout or fallback to suggested timeout (with 5s default)
-            result.payload["suggested_timeout"] = result.payload.get("suggested_timeout", 4000) * (contact["out_path_len"] + 1) # update timeout from path_len
+            emitted_hops = reply_path[0] & 63   # what actually went on the wire
+            result.payload["suggested_timeout"] = result.payload.get("suggested_timeout", 4000) * (emitted_hops + 1) # update timeout from path_len
             actual_timeout = timeout if timeout is not None and timeout > 0 else result.payload.get("suggested_timeout", 4000) / 800.0
             actual_timeout = min_timeout if actual_timeout < min_timeout else actual_timeout
             self._reader.register_binary_request(pubkey_prefix.hex(), exp_tag, request_type, actual_timeout, context=context, is_anon=True)
