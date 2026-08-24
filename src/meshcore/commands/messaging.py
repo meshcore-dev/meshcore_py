@@ -72,11 +72,10 @@ class MessagingCommands(CommandHandlerBase):
             timestamp = int(time.time())
 
         if dst_type is None:
-            if isinstance(dst, dict) and "type" in dst :
-                dst_type = dst["type"]
-            else: # assume destination is a repeater
-                logger.warning("Can't determine destination type, please ensure contacts first or specify dst_type when calling `send_cmd`. Assuming it's a repeater.")
-                dst_type = AdvType.REPEATER.value
+            dst_type = dst["type"]
+        else: # assume destination is a repeater
+            logger.warning("Can't determine destination type, please ensure contacts first or specify dst_type when calling `send_cmd`. Assuming it's a repeater.")
+            dst_type = AdvType.REPEATER.value
 
         cmd_data = bytearray([CommandType.SEND_TXT_MSG.value])
         if dst_type == AdvType.REPEATER.value :

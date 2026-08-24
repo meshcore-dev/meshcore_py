@@ -16,15 +16,26 @@ class DeviceCommands(CommandHandlerBase):
         b1 = bytearray(b"\x01\x03      mccli")
         return await self.send(b1, [EventType.SELF_INFO, EventType.ERROR])
 
+    async def send_device_query(self) -> Event:
+        logger.debug("Sending device query command")
+        return await self.send(b"\x16\x03", [EventType.DEVICE_INFO, EventType.ERROR])
+
     async def run_cli_command(self, cmd: str) -> Event:
         logger.debug(f"Sending cli command: {cmd}")
         cmd_data = bytearray([CommandType.RUN_CLI_COMMAND.value])
         cmd_data.extend(cmd.encode("utf-8"))
         return await self.send(cmd_data, [EventType.CLI_REPLY, EventType.ERROR])
 
-    async def send_device_query(self) -> Event:
-        logger.debug("Sending device query command")
-        return await self.send(b"\x16\x03", [EventType.DEVICE_INFO, EventType.ERROR])
+    async def send_raw_packet(self, data, priority=0):
+        if isinstance(data, str): # got a string (assuming hex), change it to bytes
+            data=bytes.fromhex(data)
+
+        cmd_data = bytearray([CommandType.SEND_RAW_PACKET.value])
+        cmd_data.append(priority)
+        cmd_data.extend(data)
+
+        logger.debug(f"Sending raw packet {data.hex()}")
+        return await self.send(cmd_data, [EventType.OK, EventType.ERROR])
 
     async def send_advert(self, flood: bool = False) -> Event:
         logger.debug(f"Sending advertisement command (flood={flood})")

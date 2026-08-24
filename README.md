@@ -518,6 +518,8 @@ All commands are async methods that return `Event` objects. Commands are organiz
 | **Device Actions** ||||
 | `send_advert(flood=False)` | `flood: bool` | `OK` | Send advertisement (optionally flood network) |
 | `reboot()` | None | None | Reboot device (no response expected) |
+| `run_cli_command()` | `cmd: str` | `CLI_REPLY/ERROR` | Send a cli command to device |
+| `send_raw_packet()` | `data: str/bytes, priority=0` | `OK/ERROR` | Send a raw packet through device, can be an hex string or bytes |
 | **Security** ||||
 | `export_private_key()` | None | `PRIVATE_KEY/DISABLED` | Export device private key (requires PIN auth & enabled firmware) |
 | `import_private_key(key)` | `key: bytes` | `OK` | Import private key to device |
