@@ -25,6 +25,7 @@ class EventType(Enum):
     NEXT_CONTACT = "next_contact"
     AUTOADD_CONFIG = "autoadd_config"
     ADVERT_PATH = "advert_path"
+    CLI_REPLY = "cli_reply"
 
     # Push notifications
     ADVERTISEMENT = "advertisement"

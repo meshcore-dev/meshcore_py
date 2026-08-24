@@ -16,6 +16,12 @@ class DeviceCommands(CommandHandlerBase):
         b1 = bytearray(b"\x01\x03      mccli")
         return await self.send(b1, [EventType.SELF_INFO, EventType.ERROR])
 
+    async def run_cli_command(self, cmd: str) -> Event:
+        logger.debug(f"Sending cli command: {cmd}")
+        cmd_data = bytearray([CommandType.RUN_CLI_COMMAND.value])
+        cmd_data.extend(cmd.encode("utf-8"))
+        return await self.send(cmd_data, [EventType.CLI_REPLY, EventType.ERROR])
+
     async def send_device_query(self) -> Event:
         logger.debug("Sending device query command")
         return await self.send(b"\x16\x03", [EventType.DEVICE_INFO, EventType.ERROR])

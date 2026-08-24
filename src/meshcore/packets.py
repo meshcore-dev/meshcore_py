@@ -1,5 +1,18 @@
 from enum import Enum
 
+class AdvType(Enum):
+    NONE = 0x00
+    CHAT = 0x01
+    REPEATER = 0x02
+    ROOM = 0x03
+    SENSOR = 0x04
+
+class TxtType(Enum):
+    PLAIN = 0x00
+    CLI_DATA = 0x01
+    SIGNED_PLAIN = 0x02
+    CLI_CMD = 0x03
+
 class AnonReqType(Enum):
     REGIONS = 0x01
     OWNER = 0x02
@@ -75,6 +88,8 @@ class CommandType(Enum):
     SET_PATH_HASH_MODE = 61
     SET_DEFAULT_FLOOD_SCOPE = 63
     GET_DEFAULT_FLOOD_SCOPE = 64
+    SEND_RAW_PACKET = 65
+    RUN_CLI_COMMAND = 66
 
 # Packet prefixes for the protocol
 class PacketType(Enum):
@@ -107,6 +122,7 @@ class PacketType(Enum):
     ALLOWED_REPEAT_FREQ = 26
     CHANNEL_DATA_RECV = 27
     DEFAULT_FLOOD_SCOPE = 28
+    CLI_REPLY = 29
 
     # Push notifications
     ADVERTISEMENT = 0x80

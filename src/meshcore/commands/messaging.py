@@ -4,7 +4,7 @@ from typing import Optional, Union
 from hashlib import sha256
 
 from ..events import Event, EventType
-from ..packets import CommandType
+from ..packets import CommandType, TxtType, AdvType
 from .base import CommandHandlerBase, DestinationType, _validate_destination
 
 logger = logging.getLogger("meshcore")
@@ -61,23 +61,33 @@ class MessagingCommands(CommandHandlerBase):
         return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
 
     async def send_cmd(
-        self, dst: DestinationType, cmd: str, timestamp: Optional[int] = None
+        self, dst: DestinationType, cmd: str, timestamp: Optional[int] = None,
+        dst_type = None # if None, will have to get a contact to know this
     ) -> Event:
         dst_bytes = _validate_destination(dst)
         logger.debug(f"Sending command to {dst_bytes.hex()}: {cmd}")
 
         if timestamp is None:
             import time
-
             timestamp = int(time.time())
 
-        data = (
-            b"\x02\x01\x00"
-            + timestamp.to_bytes(4, "little")
-            + dst_bytes
-            + cmd.encode("utf-8")
-        )
-        return await self.send(data, [EventType.MSG_SENT, EventType.ERROR])
+        if dst_type is None:
+            if isinstance(dst, dict) and "type" in dst :
+                dst_type = dst["type"]
+            else: # assume destination is a repeater
+                logger.warning("Can't determine destination type, please ensure contacts first or specify dst_type when calling `send_cmd`. Assuming it's a repeater.")
+                dst_type = AdvType.REPEATER.value
+
+        cmd_data = bytearray([CommandType.SEND_TXT_MSG.value])
+        if dst_type == AdvType.REPEATER.value :
+            cmd_data.append(TxtType.CLI_DATA.value)
+        else:
+            cmd_data.append(TxtType.CLI_CMD.value)
+        cmd_data.append(0) # first and only attempt
+        cmd_data.extend(timestamp.to_bytes(4, "little"))
+        cmd_data.extend(dst_bytes)
+        cmd_data.extend(cmd.encode("utf-8"))
+        return await self.send(cmd_data, [EventType.MSG_SENT, EventType.ERROR])
 
     async def send_msg(
         self, dst: DestinationType, msg: str, timestamp: Optional[int] = None,

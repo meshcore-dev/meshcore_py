@@ -1052,6 +1052,11 @@ class MessageReader:
                 res = {"rx_delay": rx_delay, "airtime_factor": airtime_factor}
                 await self.dispatcher.dispatch(Event(EventType.TUNING_PARAMS, res))
 
+            elif packet_type_value == PacketType.CLI_REPLY.value:
+                res = {}
+                res["text"] = data[1:].decode("utf-8", "ignore")
+                await self.dispatcher.dispatch(Event(EventType.CLI_REPLY, res))
+
             else:
                 logger.debug(f"Unhandled data received {data}")
                 logger.debug(f"Unhandled packet type: {packet_type_value}")
