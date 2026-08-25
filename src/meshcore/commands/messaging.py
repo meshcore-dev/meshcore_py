@@ -78,10 +78,10 @@ class MessagingCommands(CommandHandlerBase):
             dst_type = AdvType.REPEATER.value
 
         cmd_data = bytearray([CommandType.SEND_TXT_MSG.value])
-        if dst_type == AdvType.REPEATER.value :
-            cmd_data.append(TxtType.CLI_DATA.value)
-        else:
+        if dst_type == AdvType.CHAT.value :
             cmd_data.append(TxtType.CLI_CMD.value)
+        else:
+            cmd_data.append(TxtType.CLI_DATA.value)
         cmd_data.append(0) # first and only attempt
         cmd_data.extend(timestamp.to_bytes(4, "little"))
         cmd_data.extend(dst_bytes)
