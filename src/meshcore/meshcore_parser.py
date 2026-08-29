@@ -160,11 +160,15 @@ class MeshcorePacketParser:
                     log_data["txt_type"] = txt_type
                 else:
                     # found: copy
-                    log_data["message"] = logged["message"]
-                    log_data["msg_hash"] = logged["msg_hash"]
-                    log_data["sender_timestamp"] = logged["sender_timestamp"]
-                    log_data["attempt"] = logged["attempt"]
-                    log_data["txt_type"] = logged["txt_type"]
+                    # A prior channels_log entry matched by pkt_hash may have been logged while the
+                    # channel could not be decrypted, so it has no "message"/"msg_hash"/etc. Copy with
+                    # .get() so a duplicate of an unreadable frame does not raise KeyError and abort
+                    # handle_rx for the whole packet.
+                    log_data["message"] = logged.get("message")
+                    log_data["msg_hash"] = logged.get("msg_hash")
+                    log_data["sender_timestamp"] = logged.get("sender_timestamp")
+                    log_data["attempt"] = logged.get("attempt")
+                    log_data["txt_type"] = logged.get("txt_type")
 
             self.channels_log.append(log_data)
             if len(self.channels_log) > 100:
