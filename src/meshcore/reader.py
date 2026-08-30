@@ -149,7 +149,8 @@ class MessageReader:
                 else:
                     r["path_hash_mode"] = plen >> 6 # 2 upper bytes
                     r["path_len"] = plen & 0x3F
-                r["path"] = dbuf.read().replace(b"\0", b"").hex()
+                path_byte_count = r["path_len"] * (r["path_hash_mode"] + 1)
+                r["path"] = dbuf.read(path_byte_count).hex()
 
                 await self.dispatcher.dispatch(Event(EventType.ADVERT_PATH, r))
 
