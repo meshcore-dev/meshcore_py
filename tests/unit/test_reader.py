@@ -278,3 +278,28 @@ async def test_parse_packet_payload_txt_type_decodes_high_bits():
     assert log_data["attempt"] == 1, (
         f"Expected attempt=1, got {log_data['attempt']}"
     )
+
+
+@pytest.mark.asyncio
+async def test_advert_path_preserves_embedded_zero_bytes():
+    """ADVERT_PATH must preserve valid 0x00 bytes inside path hashes."""
+    dispatcher = _CapturingDispatcher()
+    reader = MessageReader(dispatcher)
+
+    # ADVERT_PATH (0x0e), 2 hops, 3-byte hashes.
+    # path_len byte: hash mode 2 (3 bytes) + 2 hops = 0x82.
+    # The first hash deliberately contains an embedded 0x00 byte.
+    packet = bytearray.fromhex("0e8212003456789a")
+
+    await reader.handle_rx(packet)
+
+    advert_path_events = [
+        e for e in dispatcher.events if e.type == EventType.ADVERT_PATH
+    ]
+
+    assert len(advert_path_events) == 1
+
+    payload = advert_path_events[0].payload
+    assert payload["path_hash_mode"] == 2
+    assert payload["path_len"] == 2
+    assert payload["path"] == "12003456789a"
