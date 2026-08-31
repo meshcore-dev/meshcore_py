@@ -1,4 +1,5 @@
 import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -29,3 +30,28 @@ async def test_handle_rx_discards_leading_junk_before_frame_start():
     assert conn.header == b""
     assert conn.inframe == b""
     assert conn.frame_expected_size == 0
+
+
+@pytest.mark.asyncio
+async def test_connect_closes_transport_on_timeout():
+    """Regression for #95: if connection_made() never fires before the
+    connect() timeout, the fds create_serial_connection() already opened
+    must not leak -- connect() should close the transport before raising."""
+    conn = SerialConnection("/dev/null", 115200)
+
+    mock_transport = MagicMock()
+    mock_protocol = MagicMock()
+
+    async def fake_create_serial_connection(loop, protocol_factory, port, baudrate):
+        # Never call connection_made(), so _connected_event stays unset.
+        return mock_transport, mock_protocol
+
+    with patch(
+        "meshcore.serial_cx.serial_asyncio.create_serial_connection",
+        side_effect=fake_create_serial_connection,
+    ):
+        with pytest.raises(asyncio.TimeoutError):
+            await conn.connect(timeout=0.05)
+
+    mock_transport.close.assert_called_once()
+    assert conn.transport is None
