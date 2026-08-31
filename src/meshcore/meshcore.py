@@ -46,13 +46,13 @@ class MeshCore:
         self.commands = CommandHandler(default_timeout=default_timeout)
         self.commands.set_contact_getter_by_prefix(self.get_contact_by_key_prefix)
 
-        # Set up logger
+        # Set up logger. Only override the level when the caller explicitly
+        # asked for debug/only_error behavior - otherwise leave whatever
+        # level the embedding app already configured alone.
         if debug:
             logger.setLevel(logging.DEBUG)
         elif only_error:
             logger.setLevel(logging.ERROR)
-        else:
-            logger.setLevel(logging.INFO)
 
         # Set up connections
         self.commands.set_connection(self.connection_manager)
