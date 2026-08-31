@@ -9,9 +9,11 @@ from .packets import BinaryReqType
 from .serial_cx import SerialConnection
 from .tcp_cx import TCPConnection
 
-# Setup default logger
-logging.basicConfig(level=logging.INFO)
+# Setup default logger. Libraries must not configure the root logger (that's
+# the embedding application's call) - a NullHandler just silences the "no
+# handlers found" warning when the app hasn't configured logging at all.
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 __all__ = [
     "BinaryReqType",

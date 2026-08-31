@@ -371,6 +371,15 @@ meshcore = await MeshCore.create_serial("/dev/ttyUSB0", debug=True)
 
 This logs detailed information about commands sent and events received.
 
+meshcore_py does not configure Python's root logger or call `logging.basicConfig()` itself - it only attaches a `NullHandler` so it stays silent by default. To see its logs, configure logging in your own application, e.g.:
+
+```python
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logging.getLogger("meshcore").setLevel(logging.DEBUG)
+```
+
 ## Common Examples
 
 ### Sending Messages to Contacts
