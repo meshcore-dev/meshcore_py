@@ -529,6 +529,8 @@ All commands are async methods that return `Event` objects. Commands are organiz
 | `get_stats_packets()` | None | `STATS_PACKETS` | Get packet statistics (rx/tx totals, flood vs. direct, recv_errors when present) |
 | **Advanced Configuration** ||||
 | `set_multi_acks(multi_acks)` | `multi_acks: int` | `OK` | Set multi-acks mode (experimental ack repeats) |
+| `set_path_hash_mode(mode)` | `mode: int` | `OK` | Set the device's path hash mode: how many bytes of each hop's node ID are stored per hop in advertised/logged paths (bytes per hop = `mode + 1`, e.g. mode 0 = 1 byte/hop, mode 1 = 2 bytes/hop) |
+| `get_path_hash_mode()` | None | `int` | Get the device's current path hash mode |
 
 #### Contact Commands (`meshcore.commands.*`)
 
