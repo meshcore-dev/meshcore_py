@@ -1,6 +1,6 @@
 # Python MeshCore
 
-Python library for interacting with [MeshCore](https://meshcore.co.uk) companion radio nodes.
+Python library for interacting with [MeshCore](https://meshcore.io) companion radio nodes.
 
 ## Installation
 
