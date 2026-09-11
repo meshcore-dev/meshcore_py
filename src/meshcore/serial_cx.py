@@ -41,6 +41,7 @@ class SerialConnection:
             self.cx.transport = transport
             logger.debug('port opened')
             if isinstance(transport, serial_asyncio.SerialTransport) and transport.serial:
+                transport.serial.dtr = False  # Deassert DTR to avoid serial-open reset/handshake issues
                 transport.serial.rts = False  # You can manipulate Serial object via transport
             self.cx._connected_event.set()
 
