@@ -71,14 +71,24 @@ class SerialConnection:
         self._connected_event.clear()
 
         loop = asyncio.get_running_loop()
-        await serial_asyncio.create_serial_connection(
+        transport, _ = await serial_asyncio.create_serial_connection(
             loop,
             lambda: self.MCSerialClientProtocol(self),
             self.port,
             baudrate=self.baudrate,
         )
 
-        await asyncio.wait_for(self._connected_event.wait(), timeout=timeout)
+        try:
+            await asyncio.wait_for(self._connected_event.wait(), timeout=timeout)
+        except Exception:
+            # create_serial_connection() already opened the port's fds;
+            # connection_made() never fired (or didn't in time) to hand them
+            # to self.transport, so close directly on the local reference or
+            # they leak until the process runs out of fds (#95).
+            if self.transport is transport:
+                self.transport = None
+            transport.close()
+            raise
         logger.info("Serial Connection started")
         return self.port
 
