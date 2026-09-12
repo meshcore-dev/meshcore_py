@@ -87,6 +87,23 @@ class BLEConnection:
         task.add_done_callback(self._background_tasks.discard)
         return task
 
+    async def _cleanup_stale_client(self):
+        """Best-effort disconnect of an existing self.client before it is replaced.
+
+        connect() always overwrites self.client with a fresh BleakClient on
+        reconnect. If the previous client's GATT notification subscription
+        (start_notify on UART_TX_CHAR_UUID) is never torn down, the stale
+        registration survives at the BlueZ D-Bus level and every future
+        notification fires twice: once for the stale registration, once for
+        the new one.
+        """
+        if self.client is not None:
+            try:
+                if self.client.is_connected:
+                    await self.client.disconnect()
+            except Exception:
+                logger.debug("Best-effort cleanup of stale BLE client failed", exc_info=True)
+
     async def connect(self):
         """
         Connects to the device.
@@ -98,6 +115,8 @@ class BLEConnection:
             The address used for connection, or None on failure.
         """
         logger.debug(f"Connecting with client: {self.client}, address: {self.address}, device: {self.device}")
+
+        await self._cleanup_stale_client()
 
         if self.client:
             logger.debug("Using pre-configured BleakClient.")
