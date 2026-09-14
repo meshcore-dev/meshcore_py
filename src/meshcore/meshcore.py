@@ -118,9 +118,10 @@ class MeshCore:
         auto_reconnect: bool = False,
         max_reconnect_attempts: int = 3,
         cx_dly: float = 0.1,
+        rts = True
     ) -> "MeshCore":
         """Create and connect a MeshCore instance using serial connection"""
-        connection = SerialConnection(port, baudrate, cx_dly=cx_dly)
+        connection = SerialConnection(port, baudrate, cx_dly=cx_dly, rts=rts)
 
         mc = cls(
             connection,

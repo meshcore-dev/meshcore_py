@@ -11,7 +11,7 @@ logger = logging.getLogger("meshcore")
 
 
 class SerialConnection:
-    def __init__(self, port, baudrate, cx_dly=0.2):
+    def __init__(self, port, baudrate, cx_dly=0.2, rts=True):
         self.port = port
         self.baudrate = baudrate
         self.transport = None
@@ -21,6 +21,7 @@ class SerialConnection:
         self.cx_dly = cx_dly
         self._connected_event = asyncio.Event()
         self._background_tasks: set[asyncio.Task] = set()
+        self.rts = rts
 
         self.frame_expected_size = 0
         self.inframe = b""
@@ -42,7 +43,7 @@ class SerialConnection:
             logger.debug('port opened')
             if isinstance(transport, serial_asyncio.SerialTransport) and transport.serial:
                 transport.serial.dtr = False  # Deassert DTR to avoid serial-open reset/handshake issues
-                transport.serial.rts = False  # You can manipulate Serial object via transport
+                transport.serial.rts = self.cx.rts
             self.cx._connected_event.set()
 
         def data_received(self, data):
