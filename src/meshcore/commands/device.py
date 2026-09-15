@@ -11,10 +11,13 @@ logger = logging.getLogger("meshcore")
 
 
 class DeviceCommands(CommandHandlerBase):
-    async def send_appstart(self) -> Event:
+    async def send_appstart(self, timeout=None) -> Event:
         logger.debug("Sending appstart command")
         b1 = bytearray(b"\x01\x03      mccli")
-        return await self.send(b1, [EventType.SELF_INFO, EventType.ERROR])
+        if timeout is None:
+            return await self.send(b1, [EventType.SELF_INFO, EventType.ERROR])
+        else:
+            return await self.send(b1, [EventType.SELF_INFO, EventType.ERROR], timeout=timeout)
 
     async def send_device_query(self) -> Event:
         logger.debug("Sending device query command")

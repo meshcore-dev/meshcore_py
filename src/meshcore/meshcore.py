@@ -134,6 +134,19 @@ class MeshCore:
         )
         res = await mc.connect()
         if res is None:
+            logger.info("No response from meshcore node, trying to invert dtr")
+            await mc.disconnect()
+            connection = SerialConnection(port, baudrate, cx_dly=cx_dly, rts=rts, dtr=not dtr)
+            mc = cls(
+                connection,
+                debug=debug,
+                only_error=only_error,
+                default_timeout=default_timeout,
+                auto_reconnect=auto_reconnect,
+                max_reconnect_attempts=max_reconnect_attempts,
+            )
+            res = await mc.connect()
+        if res is None:
             logger.error("No response from meshcore node, disconnecting")
             logger.error("Are you sure your node is a serial companion ?")
             await mc.disconnect()
@@ -190,7 +203,7 @@ class MeshCore:
         to initialize the session.  MeshCore.connect() does this on the initial
         connection; this callback ensures it also happens on reconnects (F02).
         """
-        await self.commands.send_appstart()
+        await self.commands.send_appstart(timeout=2)
 
     async def connect(self):
         await self.dispatcher.start()
@@ -198,7 +211,7 @@ class MeshCore:
         if result is None:
             await self.dispatcher.stop()
             raise ConnectionError("Failed to connect to device")
-        res = await self.commands.send_appstart()
+        res = await self.commands.send_appstart(timeout=2)
         if res is None or res.type == EventType.ERROR:
             return None
         return res
