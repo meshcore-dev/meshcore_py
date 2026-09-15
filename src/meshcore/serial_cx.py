@@ -11,7 +11,7 @@ logger = logging.getLogger("meshcore")
 
 
 class SerialConnection:
-    def __init__(self, port, baudrate, cx_dly=0.2, rts=True):
+    def __init__(self, port, baudrate, cx_dly=0.2, rts=False, dtr=True):
         self.port = port
         self.baudrate = baudrate
         self.transport = None
@@ -22,6 +22,7 @@ class SerialConnection:
         self._connected_event = asyncio.Event()
         self._background_tasks: set[asyncio.Task] = set()
         self.rts = rts
+        self.dtr = dtr
 
         self.frame_expected_size = 0
         self.inframe = b""
@@ -42,7 +43,7 @@ class SerialConnection:
             self.cx.transport = transport
             logger.debug('port opened')
             if isinstance(transport, serial_asyncio.SerialTransport) and transport.serial:
-                transport.serial.dtr = False  # Deassert DTR to avoid serial-open reset/handshake issues
+                transport.serial.dtr = self.cx.dtr  # DTR should be deasserted on heltec_v2 to avoid serial-open reset/handshake issues
                 transport.serial.rts = self.cx.rts
             self.cx._connected_event.set()
 
