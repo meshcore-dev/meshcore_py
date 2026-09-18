@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import random
 from typing import Optional, Union
@@ -112,7 +113,7 @@ class MessagingCommands(CommandHandlerBase):
     async def send_msg_with_retry (
         self, dst: DestinationType, msg: str, timestamp: Optional[int] = None,
         max_attempts=3, max_flood_attempts=2, flood_after=2, timeout=0, min_timeout=0
-    ) -> Event:
+    ) -> Optional[Event]:
 
         # try to get a 32 bytes key (for flood reset), fallback to 6
         try:
@@ -127,50 +128,78 @@ class MessagingCommands(CommandHandlerBase):
         attempts = 0
         flood_attempts = 0
         flood = False # by default consider we sent direct (will be overriden after send)
-        res = None
-        while attempts < max_attempts and res is None \
-                    and (not flood or flood_attempts < max_flood_attempts):
-            if attempts == flood_after and not flood : # change path to flood
-                if len(dst_bytes) < 32: # can only reset with full key
-                    logger.info("Don't have full key, retreiving contacts so we can reset path")
-                    await self.get_contacts()
-                    contact = self._get_contact_by_prefix(dst_bytes.hex())
-                    if not contact is None:
-                        dst_bytes = _validate_destination(contact, prefix_length=32)
-                logger.info("Resetting path")
-                rp_res = await self.reset_path(dst_bytes)
-                if rp_res.type == EventType.ERROR:
-                    logger.error(f"Couldn't reset path {rp_res} continuing ...")
-                else:
-                    flood = True
-                    if not contact is None:
-                        contact["out_path"] = ""
-                        contact["out_path_len"] = -1
+        if timestamp is None:
+            # same timestamp on every attempt, the attempt number is what
+            # makes each packet unique (and lets receivers spot retries)
+            import time
+            timestamp = int(time.time())
 
-            if attempts > 0:
-                logger.info(f"Retry sending msg: {attempts + 1}")
+        # expected ack code -> MSG_SENT of the attempt that expects it
+        # the device keeps codes of earlier attempts, so a late ack for
+        # any of them still means the message got through
+        sent = {}
+        early_acks = set()
+        acked = asyncio.get_running_loop().create_future()
 
-            result = await self.send_msg(dst, msg, timestamp, attempt=attempts)
-            if result.is_error():
-                logger.error(f"Failed to send message: {result.payload}")
-                attempts += 1
-                if flood:
-                    flood_attempts += 1
-                continue
+        def on_ack(event):
+            code = event.attributes.get("code")
+            if code in sent:
+                if not acked.done():
+                    acked.set_result(code)
+            else:
+                # ack dispatched before send_msg returned its code
+                early_acks.add(code)
 
-            flood = result.payload["type"] == 1 # we can sync flood flag from result ...
-            exp_ack = result.payload["expected_ack"].hex()
-            atimeout = result.payload["suggested_timeout"] / 1000 * 1.2 if timeout==0 else timeout
-            atimeout = atimeout if atimeout > min_timeout else min_timeout
-            res = await self.dispatcher.wait_for_event(EventType.ACK,
-                        attribute_filters={"code": exp_ack},
-                        timeout=atimeout)
+        # subscribe before sending, the ack can be queued right behind MSG_SENT
+        ack_sub = self.dispatcher.subscribe(EventType.ACK, on_ack)
+        try:
+            while attempts < max_attempts and not acked.done() \
+                        and (not flood or flood_attempts < max_flood_attempts):
+                if attempts == flood_after and not flood : # change path to flood
+                    if len(dst_bytes) < 32: # can only reset with full key
+                        logger.info("Don't have full key, retreiving contacts so we can reset path")
+                        await self.get_contacts()
+                        contact = self._get_contact_by_prefix(dst_bytes.hex())
+                        if not contact is None:
+                            dst_bytes = _validate_destination(contact, prefix_length=32)
+                    logger.info("Resetting path")
+                    rp_res = await self.reset_path(dst_bytes)
+                    if rp_res.type == EventType.ERROR:
+                        logger.error(f"Couldn't reset path {rp_res} continuing ...")
+                    else:
+                        flood = True
+                        if not contact is None:
+                            contact["out_path"] = ""
+                            contact["out_path_len"] = -1
 
-            attempts = attempts + 1
-            if flood :
-                flood_attempts = flood_attempts + 1
+                if attempts > 0:
+                    logger.info(f"Retry sending msg: {attempts + 1}")
 
-        return None if res is None else result
+                result = await self.send_msg(dst, msg, timestamp, attempt=attempts)
+                if result.is_error():
+                    logger.error(f"Failed to send message: {result.payload}")
+                    attempts += 1
+                    if flood:
+                        flood_attempts += 1
+                    continue
+
+                flood = result.payload["type"] == 1 # we can sync flood flag from result ...
+                exp_ack = result.payload["expected_ack"].hex()
+                sent[exp_ack] = result
+                if exp_ack in early_acks and not acked.done():
+                    acked.set_result(exp_ack)
+
+                atimeout = result.payload["suggested_timeout"] / 1000 * 1.2 if timeout==0 else timeout
+                atimeout = atimeout if atimeout > min_timeout else min_timeout
+                await asyncio.wait([acked], timeout=atimeout)
+
+                attempts = attempts + 1
+                if flood :
+                    flood_attempts = flood_attempts + 1
+        finally:
+            ack_sub.unsubscribe()
+
+        return sent[acked.result()] if acked.done() else None
 
     async def send_chan_msg(self, chan: int, msg: str, timestamp: Optional[int|bytes] = None) -> Event:
         logger.debug(f"Sending channel message to channel {chan}: {msg}")
