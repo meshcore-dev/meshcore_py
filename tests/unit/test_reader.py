@@ -286,10 +286,10 @@ async def test_advert_path_preserves_embedded_zero_bytes():
     dispatcher = _CapturingDispatcher()
     reader = MessageReader(dispatcher)
 
-    # ADVERT_PATH (0x0e), 2 hops, 3-byte hashes.
+    # ADVERT_PATH (0x16), timestamp 1, 2 hops, 3-byte hashes.
     # path_len byte: hash mode 2 (3 bytes) + 2 hops = 0x82.
     # The first hash deliberately contains an embedded 0x00 byte.
-    packet = bytearray.fromhex("0e8212003456789a")
+    packet = bytearray.fromhex("16010000008212003456789a")
 
     await reader.handle_rx(packet)
 
