@@ -131,18 +131,21 @@ class MessagingCommands(CommandHandlerBase):
         while attempts < max_attempts and res is None \
                     and (not flood or flood_attempts < max_flood_attempts):
             if attempts == flood_after and not flood : # change path to flood
-                if len(dst_bytes) == 32: # can only reset with full key
-                    logger.info("Resetting path")
-                    rp_res = await self.reset_path(dst_bytes)
-                    if rp_res.type == EventType.ERROR:
-                        logger.error(f"Couldn't reset path {rp_res} continuing ...")
-                    else:
-                        flood = True
-                        if not contact is None:
-                            contact["out_path"] = ""
-                            contact["out_path_len"] = -1
+                if len(dst_bytes) < 32: # can only reset with full key
+                    logger.info("Don't have full key, retreiving contacts so we can reset path")
+                    await self.get_contacts()
+                    contact = self._get_contact_by_prefix(dst_bytes.hex())
+                    if not contact is None:
+                        dst_bytes = _validate_destination(contact, prefix_length=32)
+                logger.info("Resetting path")
+                rp_res = await self.reset_path(dst_bytes)
+                if rp_res.type == EventType.ERROR:
+                    logger.error(f"Couldn't reset path {rp_res} continuing ...")
                 else:
-                    logger.info("Don't have full key, can't reset path")
+                    flood = True
+                    if not contact is None:
+                        contact["out_path"] = ""
+                        contact["out_path_len"] = -1
 
             if attempts > 0:
                 logger.info(f"Retry sending msg: {attempts + 1}")
