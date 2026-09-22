@@ -37,3 +37,20 @@ class TestLppCurrentParsing:
         lpp = json.loads(json.dumps(LppFrame([lppdata]), default=lpp_json_encoder))
 
         assert lpp[0]['value'] == 0.5
+
+
+class TestLppDirectionParsing:
+    """Tests to verify LPP direction values are encoded as scalars."""
+
+    def test_direction_value_is_scalar(self):
+        """A direction value should not be serialized as a one-item list."""
+        from meshcore.lpp_json_encoder import lpp_json_encoder
+
+        # Channel 2, Type 132 (direction), 90 degrees = 0x00 0x5A.
+        raw_bytes = bytes([2, 132, 0x00, 0x5A])
+        lppdata = LppData.from_bytes(raw_bytes)
+
+        lpp = json.loads(json.dumps(LppFrame([lppdata]), default=lpp_json_encoder))
+
+        assert lpp[0]['type'] == 'direction'
+        assert lpp[0]['value'] == 90.0
