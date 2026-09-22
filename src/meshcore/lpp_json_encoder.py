@@ -25,7 +25,7 @@ my_lpp_types = {
     128: ("power", []),
     130: ("distance", []),
     131: ("energy", []),
-    132: ("direction", None),
+    132: ("direction", []),
     133: ("time", []),
     134: ("gyrometer", None),
     135: ("colour", ["red", "green", "blue"]),
