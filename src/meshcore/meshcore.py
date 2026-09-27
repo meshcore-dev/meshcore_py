@@ -207,11 +207,16 @@ class MeshCore:
 
     async def connect(self):
         await self.dispatcher.start()
-        result = await self.connection_manager.connect()
-        if result is None:
-            await self.dispatcher.stop()
-            raise ConnectionError("Failed to connect to device")
-        res = await self.commands.send_appstart(timeout=2)
+        try:
+            result = await self.connection_manager.connect()
+            if result is None:
+                raise ConnectionError("Failed to connect to device")
+            res = await self.commands.send_appstart(timeout=2)
+        except BaseException:
+            # The create_* factories drop this instance when connect() raises, so
+            # nothing else can stop the dispatcher task or close an opened transport.
+            await self.disconnect()
+            raise
         if res is None or res.type == EventType.ERROR:
             return None
         return res

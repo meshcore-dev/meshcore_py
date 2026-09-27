@@ -4,9 +4,11 @@ Verification tests for asyncio lifecycle fixes.
 
 import asyncio
 import gc
+import socket
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from meshcore import MeshCore
 from meshcore.events import Event, EventDispatcher, EventType
 from meshcore.tcp_cx import TCPConnection
 from meshcore.serial_cx import SerialConnection
@@ -227,6 +229,68 @@ class TestGetRunningLoop(unittest.TestCase):
                 mock_grl.assert_called()
 
             await dispatcher.stop()
+
+        asyncio.run(_run())
+
+
+class TestConnectFailureCleanup(unittest.TestCase):
+    """A connect() that raises or is cancelled must not leave the dispatcher running."""
+
+    def setUp(self):
+        # Without collection, a leaked task stays visible instead of being destroyed
+        gc.disable()
+        self.addCleanup(gc.enable)
+
+    @staticmethod
+    def _dispatcher_tasks():
+        return [
+            task
+            for task in asyncio.all_tasks()
+            if not task.done()
+            and task.get_coro().__qualname__ == "EventDispatcher._process_events"
+        ]
+
+    def test_refused_create_tcp_leaves_no_dispatcher_task(self):
+        """create_tcp() raising on a refused connection stops the dispatcher."""
+        async def _run():
+            with socket.socket() as sock:
+                sock.bind(("127.0.0.1", 0))
+                port = sock.getsockname()[1]
+
+            with self.assertRaises(OSError):
+                await MeshCore.create_tcp("127.0.0.1", port)
+
+            assert self._dispatcher_tasks() == []
+
+        asyncio.run(_run())
+
+    def test_cancelled_connect_closes_transport_and_dispatcher(self):
+        """Cancelling connect() while it waits for appstart releases everything."""
+        async def _run():
+            peers = []
+            accepted = asyncio.Event()
+
+            async def accept(reader, _writer):
+                peers.append(reader)
+                accepted.set()
+
+            server = await asyncio.start_server(accept, "127.0.0.1", 0)
+            port = server.sockets[0].getsockname()[1]
+            try:
+                mc = MeshCore(TCPConnection("127.0.0.1", port))
+                attempt = asyncio.create_task(mc.connect())
+                await asyncio.wait_for(accepted.wait(), 1.0)
+                attempt.cancel()
+                with self.assertRaises(asyncio.CancelledError):
+                    await attempt
+
+                assert self._dispatcher_tasks() == []
+                assert not mc.dispatcher.running
+                # EOF on the server side means the client transport was closed
+                await asyncio.wait_for(peers[0].read(), 1.0)
+            finally:
+                server.close()
+                await server.wait_closed()
 
         asyncio.run(_run())
 
