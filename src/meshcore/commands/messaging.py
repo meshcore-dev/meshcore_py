@@ -19,6 +19,7 @@ class MessagingCommands(CommandHandlerBase):
             [
                 EventType.CONTACT_MSG_RECV,
                 EventType.CHANNEL_MSG_RECV,
+                EventType.CHANNEL_DATA_RECV,
                 EventType.ERROR,
                 EventType.NO_MORE_MSGS,
             ],
