@@ -368,6 +368,41 @@ class MessagingCommands(CommandHandlerBase):
         data = bytes([0x19, len(path)]) + path + bytes(payload)
         return await self.send(data, [EventType.OK, EventType.ERROR])
 
+    async def send_channel_data(
+        self, chan: int, data_type: int, payload: bytes, path: Optional[bytes] = None
+    ) -> Event:
+        """Send a binary datagram to a channel via CMD_SEND_CHANNEL_DATA (0x3E).
+
+        Command format:
+            0x3E | channel_idx(1) | path_len(1) | path(path_len bytes) | data_type(2, LE) | payload
+
+        Args:
+            chan:      Channel index (0-255, must fit in one byte; the firmware rejects unknown channels).
+            data_type: Application identifier, 0x0001-0xFFFF (0xFFFF is the developer namespace).
+            payload:   Binary payload, at most 163 bytes (MAX_CHANNEL_DATA_LENGTH).
+            path:      Optional path bytes to send along (default None = flood, path_len 0xFF).
+
+        Returns:
+            Event with OK or ERROR.
+        """
+        if not isinstance(payload, (bytes, bytearray)):
+            raise TypeError("payload must be bytes-like")
+        if not 0 <= chan <= 0xFF:
+            raise ValueError("chan must fit in one byte (0-255)")
+        if not 0x0001 <= data_type <= 0xFFFF:
+            raise ValueError("data_type must be between 0x0001 and 0xFFFF")
+        if len(payload) > 163:
+            raise ValueError("payload must be at most 163 bytes")
+        if path is None:
+            path_bytes = b"\xff"
+        else:
+            path = bytes(path)
+            if len(path) >= 0xFF:
+                raise ValueError("path must be shorter than 255 bytes")
+            path_bytes = bytes([len(path)]) + path
+        data = bytes([0x3E, chan]) + path_bytes + data_type.to_bytes(2, "little") + bytes(payload)
+        return await self.send(data, [EventType.OK, EventType.ERROR])
+
     async def set_flood_scope(self, scope, force_unscoped=False):
         if scope is None:
             logger.debug(f"Resetting scope")
