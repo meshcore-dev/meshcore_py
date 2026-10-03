@@ -490,6 +490,77 @@ async def test_channel_data_recv_widened_data_type():
 
 
 # ---------------------------------------------------------------------------
+# Command wrapper: send_channel_data (CMD_SEND_CHANNEL_DATA, 0x3E)
+# ---------------------------------------------------------------------------
+
+def _make_channel_data_commands():
+    """MessagingCommands whose send() records the written frame and expected events."""
+    from meshcore.commands.messaging import MessagingCommands
+
+    cmd = MessagingCommands.__new__(MessagingCommands)
+    sent = []
+
+    async def mock_send(data, expected_events, timeout=None):
+        sent.append((bytes(data), expected_events))
+        return Event(EventType.OK, {})
+
+    cmd.send = mock_send
+    return cmd, sent
+
+
+@pytest.mark.asyncio
+async def test_send_channel_data_flood_matches_protocol_example():
+    """Flood frame equals the companion protocol example: 3E 01 FF FF FF A1 B2 C3."""
+    cmd, sent = _make_channel_data_commands()
+
+    evt = await cmd.send_channel_data(1, 0xFFFF, b"\xA1\xB2\xC3")
+
+    assert evt.type == EventType.OK
+    assert sent == [
+        (bytes.fromhex("3E01FFFFFFA1B2C3"), [EventType.OK, EventType.ERROR]),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_send_channel_data_with_path():
+    """A path is sent after its length byte; data_type is little-endian."""
+    cmd, sent = _make_channel_data_commands()
+
+    await cmd.send_channel_data(2, 0x0102, b"\x07", path=b"\xAA\xBB")
+
+    assert sent[0][0] == bytes.fromhex("3E02" "02" "AABB" "0201" "07")
+
+
+@pytest.mark.asyncio
+async def test_send_channel_data_max_payload_accepted():
+    """A 163-byte payload (MAX_CHANNEL_DATA_LENGTH) is sent."""
+    cmd, sent = _make_channel_data_commands()
+
+    await cmd.send_channel_data(0, 0x0100, b"\x00" * 163)
+
+    assert len(sent[0][0]) == 3 + 2 + 163
+
+
+@pytest.mark.asyncio
+async def test_send_channel_data_rejects_invalid_arguments():
+    """Reserved data_type, oversized payload, bad chan and non-bytes payload never reach send()."""
+    cmd, sent = _make_channel_data_commands()
+
+    with pytest.raises(ValueError):
+        await cmd.send_channel_data(1, 0x0000, b"\x01")
+    with pytest.raises(ValueError):
+        await cmd.send_channel_data(1, 0x10000, b"\x01")
+    with pytest.raises(ValueError):
+        await cmd.send_channel_data(1, 0xFFFF, b"\x00" * 164)
+    with pytest.raises(ValueError):
+        await cmd.send_channel_data(256, 0xFFFF, b"\x01")
+    with pytest.raises(TypeError):
+        await cmd.send_channel_data(1, 0xFFFF, "text")
+
+    assert sent == []
+
+
+# ---------------------------------------------------------------------------
 # Wire-format parity bundle: AUTOADD_CONFIG (max_hops trailing byte)
 # ---------------------------------------------------------------------------
 # AUTOADD_CONFIG firmware emits 1 byte (legacy) or 2 bytes (companion-v1.14.0+,
