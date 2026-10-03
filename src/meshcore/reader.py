@@ -360,6 +360,7 @@ class MessageReader:
                     logger.debug(f"CHANNEL_DATA_RECV frame too short ({len(data)} bytes < 9), skipping parse")
                     return
                 res = {}
+                res["type"] = "DATA"
                 res["SNR"] = int.from_bytes(dbuf.read(1), byteorder="little", signed=True) / 4
                 dbuf.read(2)  # reserved
                 res["channel_idx"] = dbuf.read(1)[0]
