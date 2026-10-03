@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from meshcore.events import Event, EventType, EventDispatcher
 from meshcore.reader import MessageReader
 from meshcore.packets import PacketType, CommandType
+from meshcore.commands.messaging import MessagingCommands
 
 
 # ---------------------------------------------------------------------------
@@ -487,6 +488,50 @@ async def test_channel_data_recv_widened_data_type():
     assert evt.payload["data_type"] > 0xFF
     assert evt.payload["data_len"] == 0
     assert evt.payload["payload"] == ""
+
+
+@pytest.mark.asyncio
+async def test_get_msg_returns_channel_data_recv():
+    """get_msg() resolves on CHANNEL_DATA_RECV instead of timing out.
+
+    The companion protocol lists PACKET_CHANNEL_DATA_RECV (0x1B) as an answer
+    to GET_MESSAGE (0x0A). When the next queued message is a channel datagram
+    the device answers with that frame, and get_msg() must return it rather
+    than an ERROR event with reason "timeout".
+    """
+    dispatcher = EventDispatcher()
+    await dispatcher.start()
+    reader = MessageReader(dispatcher)
+    commands = MessagingCommands()
+    commands.dispatcher = dispatcher
+
+    frame = bytes([
+        PacketType.CHANNEL_DATA_RECV.value,
+        0x10,              # SNR
+        0x00, 0x00,        # reserved
+        0x01,              # channel_idx
+        0xFF,              # path_len direct
+        0x23, 0x01,        # data_type = 0x0123 (little-endian)
+        0x04,              # data_len
+        0xDE, 0xAD, 0xBE, 0xEF,  # payload
+    ])
+
+    async def device(data):
+        # The device answers GET_MESSAGE with the queued channel datagram.
+        assert data == b"\x0a"
+        await reader.handle_rx(bytearray(frame))
+
+    commands._sender_func = device
+
+    try:
+        result = await commands.get_msg(timeout=2.0)
+    finally:
+        await dispatcher.stop()
+
+    assert result.type == EventType.CHANNEL_DATA_RECV
+    assert result.payload["channel_idx"] == 1
+    assert result.payload["data_type"] == 0x0123
+    assert result.payload["payload"] == "deadbeef"
 
 
 # ---------------------------------------------------------------------------
