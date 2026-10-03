@@ -86,6 +86,7 @@ class CommandType(Enum):
     GET_ALLOWED_REPEAT_FREQ = 60
     GET_STATS = 56  # R04: CMD_GET_STATS — used by get_stats_core/radio/packets
     SET_PATH_HASH_MODE = 61
+    SEND_CHANNEL_DATA = 62
     SET_DEFAULT_FLOOD_SCOPE = 63
     GET_DEFAULT_FLOOD_SCOPE = 64
     SEND_RAW_PACKET = 65

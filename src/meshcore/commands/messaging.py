@@ -328,7 +328,7 @@ class MessagingCommands(CommandHandlerBase):
                 return Event(EventType.ERROR, {"reason": "unsupported_path_type"})
 
         # Prepare the command packet: CMD(1) + tag(4) + auth_code(4) + flags(1) + [path]
-        cmd_data = bytearray([36])  # CMD_SEND_TRACE_PATH
+        cmd_data = bytearray([CommandType.SEND_TRACE_PATH.value])  # CMD_SEND_TRACE_PATH
         cmd_data.extend(tag.to_bytes(4, "little"))
         cmd_data.extend(auth_code.to_bytes(4, "little"))
         cmd_data.append(flags)
@@ -366,7 +366,7 @@ class MessagingCommands(CommandHandlerBase):
         if len(payload) < 4:
             raise ValueError("payload must be at least 4 bytes")
         path = bytes(path)
-        data = bytes([0x19, len(path)]) + path + bytes(payload)
+        data = bytes([CommandType.SEND_RAW_DATA.value, len(path)]) + path + bytes(payload)
         return await self.send(data, [EventType.OK, EventType.ERROR])
 
     async def send_channel_data(
@@ -401,7 +401,7 @@ class MessagingCommands(CommandHandlerBase):
             if len(path) >= 0xFF:
                 raise ValueError("path must be shorter than 255 bytes")
             path_bytes = bytes([len(path)]) + path
-        data = bytes([0x3E, chan]) + path_bytes + data_type.to_bytes(2, "little") + bytes(payload)
+        data = bytes([CommandType.SEND_CHANNEL_DATA.value, chan]) + path_bytes + data_type.to_bytes(2, "little") + bytes(payload)
         return await self.send(data, [EventType.OK, EventType.ERROR])
 
     async def set_flood_scope(self, scope, force_unscoped=False):
