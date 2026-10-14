@@ -370,7 +370,8 @@ class MessagingCommands(CommandHandlerBase):
         return await self.send(data, [EventType.OK, EventType.ERROR])
 
     async def send_channel_data(
-        self, chan: int, data_type: int, payload: bytes, path: Optional[bytes] = None
+        self, chan: int, data_type: int, payload: bytes,
+        path: Optional[bytes] = None, path_hash_mode: Optional[int] = 0
     ) -> Event:
         """Send a binary datagram to a channel via CMD_SEND_CHANNEL_DATA (0x3E).
 
@@ -382,6 +383,7 @@ class MessagingCommands(CommandHandlerBase):
             data_type: Application identifier, 0x0001-0xFFFF (0xFFFF is the developer namespace).
             payload:   Binary payload, at most 163 bytes (MAX_CHANNEL_DATA_LENGTH).
             path:      Optional path bytes to send along (default None = flood, path_len 0xFF).
+            path_hash_mode: Optional path_hash_mode (size of the hash - 1)
 
         Returns:
             Event with OK or ERROR.
@@ -400,7 +402,9 @@ class MessagingCommands(CommandHandlerBase):
             path = bytes(path)
             if len(path) >= 0xFF:
                 raise ValueError("path must be shorter than 255 bytes")
-            path_bytes = bytes([len(path)]) + path
+            path_len = int(len(path) / (path_hash_mode + 1))
+            path_bytes = bytes([path_len | (path_hash_mode << 6)]) + path
+        logger.debug(f"Sending raw data {payload.hex()} through path {"Flood" if path is None else path.hex()} of len {"-1" if path is None else path_len} with mode {path_hash_mode} (raw path: {path_bytes.hex()})")
         data = bytes([CommandType.SEND_CHANNEL_DATA.value, chan]) + path_bytes + data_type.to_bytes(2, "little") + bytes(payload)
         return await self.send(data, [EventType.OK, EventType.ERROR])
 
