@@ -404,7 +404,7 @@ class MessagingCommands(CommandHandlerBase):
                 raise ValueError("path must be shorter than 255 bytes")
             path_len = int(len(path) / (path_hash_mode + 1))
             path_bytes = bytes([path_len | (path_hash_mode << 6)]) + path
-        logger.debug(f"Sending raw data {payload.hex()} through path {"Flood" if path is None else path.hex()} of len {"-1" if path is None else path_len} with mode {path_hash_mode} (raw path: {path_bytes.hex()})")
+        logger.debug(f"Sending raw data {payload.hex()} through path {'Flood' if path is None else path.hex()} of len {'-1' if path is None else path_len} with mode {path_hash_mode} (raw path: {path_bytes.hex()})")
         data = bytes([CommandType.SEND_CHANNEL_DATA.value, chan]) + path_bytes + data_type.to_bytes(2, "little") + bytes(payload)
         return await self.send(data, [EventType.OK, EventType.ERROR])
 
