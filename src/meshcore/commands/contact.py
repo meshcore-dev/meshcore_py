@@ -18,60 +18,39 @@ class ContactCommands(CommandHandlerBase):
         await self.send(data)
 
     async def get_contacts(self, lastmod=0, timeout=5) -> Event:
-        await self.get_contacts_async(lastmod)
-
-        # Inline wait for events to continue waiting for CONTACTS event 
-        # while receiving NEXT_CONTACTs (or it might be missed over serial)
+        loop = asyncio.get_running_loop()
+        result = loop.create_future()
+        state = {"activity": False}
+    
+        def on_next(event):
+            state["activity"] = True
+    
+        def on_end(event):
+            if not result.done():
+                result.set_result(event)
+    
+        subs = [
+            self.dispatcher.subscribe(EventType.NEXT_CONTACT, on_next),
+            self.dispatcher.subscribe(EventType.CONTACTS, on_end),
+            self.dispatcher.subscribe(EventType.ERROR, on_end),
+        ]
+    
         try:
-            # Create futures for all expected events
-            futures = []
-            for event_type in [EventType.ERROR, EventType.NEXT_CONTACT, EventType.CONTACTS] :
-                future = asyncio.create_task(
-                    self.dispatcher.wait_for_event(event_type, {}, timeout=timeout)
-                )
-                futures.append(future)
-
+            await self.get_contacts_async(lastmod)
+    
             while True:
-    
-                # Wait for the first event to complete or all to timeout
-                done, pending = await asyncio.wait(
-                    futures, timeout=timeout, return_when=asyncio.FIRST_COMPLETED
-                )
-    
-                # Check if any future completed successfully
-                if len(done) == 0:
+                state["activity"] = False
+                try:
+                    # shield so the timeout doesn't cancel the future itself
+                    return await asyncio.wait_for(asyncio.shield(result), timeout)
+                except asyncio.TimeoutError:
+                    if state["activity"]:
+                        continue  # still receiving contacts, keep waiting
                     logger.debug("Timeout while getting contacts")
-                    for future in pending: # cancel all futures
-                        future.cancel()
                     return Event(EventType.ERROR, {"reason": "timeout waiting for contacts"})
-
-                for future in done:
-                    event = await future
-                    if event is None:
-                        for f in pending:
-                            f.cancel()
-                        return Event(EventType.ERROR, {"reason": "no event received during contacts retrieval"})
-                    if event.type != EventType.NEXT_CONTACT:
-                        for f in pending:
-                            f.cancel()
-                        return event
-
-                futures = []
-
-                for future in pending: # put back pending
-                    futures.append(future)
-
-                future = asyncio.create_task( # and recreate NEXT_CONTACT
-                        self.dispatcher.wait_for_event(EventType.NEXT_CONTACT, {}, timeout)
-                    )
-                futures.append(future)
-    
-        except asyncio.TimeoutError:
-            logger.debug(f"Timeout receiving contacts")
-            return Event(EventType.ERROR, {"reason": "asyncio timeout receiving contacts"})
-        except Exception as e:
-            logger.debug(f"Command error: {e}")
-            return Event(EventType.ERROR, {"error": str(e)})
+        finally:
+            for s in subs:
+                s.unsubscribe()
 
     async def reset_path(self, key: DestinationType) -> Event:
         key_bytes = _validate_destination(key, prefix_length=32)
