@@ -454,30 +454,29 @@ class MessagingCommands(CommandHandlerBase):
         return await self.set_flood_scope(b"", force_unscoped=True)
 
     async def set_default_flood_scope(self, scope):
-        if scope is None:
-            logger.debug(f"Resetting default scope")
-            scope_key = b"\0"*16
-            scope_name = ""
-        elif isinstance (scope, str):
-            if scope == "0" or scope == "None" or scope == "*" or scope == "": # disable
-                logger.debug ("Resetting default scope")
-                scope_key = b"\0"*16
-                scope_name = ""
-            else:
-                logger.debug (f"Setting scope to {scope}")
-                if scope[0] != "#":
-                    scope = "#" + scope
-                scope_name = scope
-                scope_key = sha256(scope.encode("utf-8")).digest()[0:16]
-        else:
+
+        if not (scope is None or isinstance(scope, str)):
             raise TypeError(f"set_flood_scope: unsupported scope type {type(scope).__name__}")
 
-        logger.debug(f"Setting scope key to {scope_key.hex()}")
-
         cmd_data = bytearray([CommandType.SET_DEFAULT_FLOOD_SCOPE.value])
-        cmd_data.extend(scope_name.encode("utf-8"))
-        cmd_data.extend((31-len(scope))*b'\0')
-        cmd_data.extend(scope_key)
+
+        if scope is None or scope == "0" or scope == "None" or scope == "*" or scope == "": # disable
+            logger.debug(f"Resetting default scope")
+
+        else:
+            if scope[0] != "#":
+                scope = "#" + scope
+            scope_key = sha256(scope.encode("utf-8")).digest()[0:16]
+
+            logger.debug (f"Setting default scope to {scope} key : {scope_key.hex()}")
+
+            name = scope.encode("utf-8")
+            if len(name) >= 31:
+                raise ValueError("Scope name must be shorter than 31 bytes")
+
+            cmd_data.extend(name)
+            cmd_data.extend((31-len(name))*b'\0')
+            cmd_data.extend(scope_key)
 
         return await self.send(cmd_data, [EventType.OK, EventType.ERROR])
 
