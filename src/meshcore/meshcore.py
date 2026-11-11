@@ -136,6 +136,7 @@ class MeshCore:
         if res is None:
             logger.info("No response from meshcore node, trying to invert dtr")
             await mc.disconnect()
+            await asyncio.sleep(1)
             connection = SerialConnection(port, baudrate, cx_dly=cx_dly, rts=rts, dtr=not dtr)
             mc = cls(
                 connection,
