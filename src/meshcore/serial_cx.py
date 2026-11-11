@@ -11,7 +11,7 @@ logger = logging.getLogger("meshcore")
 
 
 class SerialConnection:
-    def __init__(self, port, baudrate, cx_dly=0.2, rts=False, dtr=True):
+    def __init__(self, port, baudrate, cx_dly=0.2, rts=None, dtr=None):
         self.port = port
         self.baudrate = baudrate
         self.transport = None
@@ -43,8 +43,10 @@ class SerialConnection:
             self.cx.transport = transport
             logger.debug('port opened')
             if isinstance(transport, serial_asyncio.SerialTransport) and transport.serial:
-                transport.serial.dtr = self.cx.dtr  # DTR should be deasserted on heltec_v2 to avoid serial-open reset/handshake issues
-                transport.serial.rts = self.cx.rts
+                if not self.cx.dtr is None:
+                    transport.serial.dtr = self.cx.dtr  # DTR should be deasserted on heltec_v2 to avoid serial-open reset/handshake issues
+                if not self.cx.rts is None:
+                    transport.serial.rts = self.cx.rts
             self.cx._connected_event.set()
 
         def data_received(self, data):

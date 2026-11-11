@@ -118,8 +118,8 @@ class MeshCore:
         auto_reconnect: bool = False,
         max_reconnect_attempts: int = 3,
         cx_dly: float = 0.1,
-        rts = False,
-        dtr = True
+        rts = None,
+        dtr = None
     ) -> "MeshCore":
         """Create and connect a MeshCore instance using serial connection"""
         connection = SerialConnection(port, baudrate, cx_dly=cx_dly, rts=rts, dtr=dtr)
@@ -133,11 +133,27 @@ class MeshCore:
             max_reconnect_attempts=max_reconnect_attempts,
         )
         res = await mc.connect()
-        if res is None:
-            logger.info("No response from meshcore node, trying to invert dtr")
+        if res is None and dtr is None:
+            logger.info("No response from meshcore node, trying to force DTR = True")
+            dtr = True
             await mc.disconnect()
             await asyncio.sleep(1)
-            connection = SerialConnection(port, baudrate, cx_dly=cx_dly, rts=rts, dtr=not dtr)
+            connection = SerialConnection(port, baudrate, cx_dly=cx_dly, rts=rts, dtr=dtr)
+            mc = cls(
+                connection,
+                debug=debug,
+                only_error=only_error,
+                default_timeout=default_timeout,
+                auto_reconnect=auto_reconnect,
+                max_reconnect_attempts=max_reconnect_attempts,
+            )
+            res = await mc.connect()
+        if res is None:
+            dtr = not dtr
+            logger.info(f"No response from meshcore node, trying to invert dtr (now {dtr})")
+            await mc.disconnect()
+            await asyncio.sleep(1)
+            connection = SerialConnection(port, baudrate, cx_dly=cx_dly, rts=rts, dtr=dtr)
             mc = cls(
                 connection,
                 debug=debug,
