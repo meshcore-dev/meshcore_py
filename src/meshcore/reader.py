@@ -1,5 +1,4 @@
 import logging
-import json
 import struct
 import time
 import io
@@ -8,9 +7,7 @@ from typing import Any, Dict
 from .events import Event, EventType, EventDispatcher, ErrorMessages
 from .meshcore_parser import MeshcorePacketParser
 from .packets import BinaryReqType, PacketType, ControlType
-from .parsing import lpp_parse, lpp_parse_mma, parse_acl, parse_status
-from cayennelpp import LppFrame, LppData
-from meshcore.lpp_json_encoder import lpp_json_encoder
+from .parsing import lpp_parse_mma, lpp_parse_readings, parse_acl, parse_status
 from Crypto.Hash import SHA256
 
 logger = logging.getLogger("meshcore")
@@ -784,19 +781,10 @@ class MessageReader:
                 res["pubkey_pre"] = dbuf.read(6).hex()
                 buf = dbuf.read()
 
-                """Parse a given byte string and return as a LppFrame object."""
-                i = 0
-                lpp_data_list = []
-                while i < len(buf) and buf[i] != 0:
-                    lppdata = LppData.from_bytes(buf[i:])
-                    lpp_data_list.append(lppdata)
-                    i = i + len(lppdata)
-
-                lpp = json.loads(
-                    json.dumps(LppFrame(lpp_data_list), default=lpp_json_encoder)
-                )
-
-                res["lpp"] = lpp
+                res["lpp"], undecoded = lpp_parse_readings(buf)
+                if undecoded:
+                    logger.debug(f"Telemetry from {res['pubkey_pre']}: {len(undecoded)} bytes not decoded")
+                    res["lpp_undecoded"] = undecoded.hex()
 
                 attributes = {
                     "raw": buf.hex(),
@@ -860,14 +848,14 @@ class MessageReader:
                             )
 
                         elif request_type == BinaryReqType.TELEMETRY :
-                            try:
-                                lpp = lpp_parse(response_data)
-                                telem_res = {"tag": tag, "lpp": lpp, "pubkey_prefix": pubkey_prefix}
-                                await self.dispatcher.dispatch(
-                                    Event(EventType.TELEMETRY_RESPONSE, telem_res, telem_res)
-                                )
-                            except Exception as e:
-                                logger.error(f"Error parsing binary telemetry response: {e}")
+                            lpp, undecoded = lpp_parse_readings(response_data)
+                            telem_res = {"tag": tag, "lpp": lpp, "pubkey_prefix": pubkey_prefix}
+                            if undecoded:
+                                logger.debug(f"Binary telemetry response {tag}: {len(undecoded)} bytes not decoded")
+                                telem_res["lpp_undecoded"] = undecoded.hex()
+                            await self.dispatcher.dispatch(
+                                Event(EventType.TELEMETRY_RESPONSE, telem_res, telem_res)
+                            )
         
                         elif request_type == BinaryReqType.MMA:
                             try:
