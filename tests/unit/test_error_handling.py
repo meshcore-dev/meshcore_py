@@ -353,6 +353,10 @@ async def test_send_anon_req_flood_contact_still_forces_and_restores_zero_hop(
         c["out_path"] = ""
 
     command_handler._get_contact_by_prefix = MagicMock(return_value=contact)
+    # The device's own record says flood too.
+    command_handler.get_contact_by_key = AsyncMock(
+        return_value=Event(EventType.NEXT_CONTACT, dict(contact, out_path_hash_mode=-1))
+    )
     command_handler.change_contact_path = AsyncMock(side_effect=fake_change_path)
     command_handler.reset_path = AsyncMock()
     setup_event_response(
@@ -380,6 +384,9 @@ async def test_send_anon_req_aborts_when_change_contact_path_fails(
     """
     contact = {"public_key": VALID_PUBKEY_HEX, "out_path_len": -1, "out_path": ""}
     command_handler._get_contact_by_prefix = MagicMock(return_value=contact)
+    command_handler.get_contact_by_key = AsyncMock(
+        return_value=Event(EventType.NEXT_CONTACT, dict(contact, out_path_hash_mode=-1))
+    )
     command_handler.change_contact_path = AsyncMock(
         return_value=Event(EventType.ERROR, {"reason": "device_query_failed"})
     )

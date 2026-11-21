@@ -379,6 +379,26 @@ class CommandHandlerBase:
         # asking a freshly discovered neighbour for its regions.
         contact = self._get_contact_by_prefix(dst_bytes.hex())
 
+        device_contact = None
+        if contact is not None and contact["out_path_len"] == -1:
+            # This copy says flood, but it can be out of date: another app, or
+            # the device itself since the contacts were last read, may have
+            # given the device a path. Read the device's own record first, so
+            # that a path it holds is used, not replaced by zero-hop and then
+            # reset to flood at the end.
+            res = await self.get_contact_by_key(dst_bytes)
+            if res.type == EventType.NEXT_CONTACT and res.payload.get("public_key") == dst_bytes.hex():
+                device_contact = res.payload
+                for field in ("out_path", "out_path_len", "out_path_hash_mode"):
+                    contact[field] = device_contact[field]
+            elif res.type == EventType.ERROR and res.payload.get("error_code") == 2:
+                # ERR_CODE_NOT_FOUND: the device doesn't hold it, so send as
+                # to any unknown destination rather than add it to the device.
+                contact = None
+            else:
+                logger.error("Could not read the contact from the device, aborting anon request")
+                return Event(EventType.ERROR, {"reason": "contact_read_failed"})
+
         zero_hop = False
         if contact is None:
             logger.debug("No contact found, requesting a zero-hop direct reply path")
@@ -386,9 +406,12 @@ class CommandHandlerBase:
             reply_path = encode_reply_path(0, "", 0)
         else:
             if contact["out_path_len"] == -1:
+                # The device holds it as flood too. Set zero-hop on the
+                # device's own record, so nothing else in it changes, and
+                # reset it to flood after sending.
                 logger.info("No path set trying zero hop")
                 zero_hop = True
-                path_res = await self.change_contact_path(contact, "")
+                path_res = await self.change_contact_path(device_contact, "")
                 if path_res is not None and path_res.type == EventType.ERROR:
                     # The device still has this contact as flood, so sendAnonReq
                     # will flood the request -- and the server gates REGIONS,
@@ -397,9 +420,8 @@ class CommandHandlerBase:
                     # for a reply that cannot come.
                     logger.error("Could not set zero-hop path, aborting anon request")
                     return Event(EventType.ERROR, {"reason": "path_reset_failed"})
-            # update_contact() normally reflects the change back onto the dict, so
-            # out_path_len reads 0 here. Clamp anyway: if that call failed (e.g. the
-            # device query inside it errored) the dict is still -1, and the unsigned
+            # After a zero-hop change, this dict still reads -1 (the change was
+            # reflected onto the device's record). Clamp it: the unsigned
             # to_bytes below would raise OverflowError -- which would skip the
             # reset_path at the end of this method and leave the contact pinned to
             # zero-hop on the device. Zero is the right value to send regardless,
