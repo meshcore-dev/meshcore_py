@@ -45,6 +45,7 @@ class MeshCore:
         self._reader = MessageReader(self.dispatcher)
         self.commands = CommandHandler(default_timeout=default_timeout)
         self.commands.set_contact_getter_by_prefix(self.get_contact_by_key_prefix)
+        self.commands.set_self_info_getter(lambda: self._self_info)
 
         # Set up logger. Only override the level when the caller explicitly
         # asked for debug/only_error behavior - otherwise leave whatever
