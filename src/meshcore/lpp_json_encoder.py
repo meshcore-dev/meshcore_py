@@ -33,6 +33,11 @@ my_lpp_types = {
     142: ("switch", []),
 }
 
+_name_to_lpp_type = {name: k for k, (name, _) in my_lpp_types.items()}
+
+def lpp_type_from_name(name):
+    """Return the LPP type integer for a given type name, or None if unknown."""
+    return _name_to_lpp_type.get(name)
 
 def lpp_format_val(type, val):
 
