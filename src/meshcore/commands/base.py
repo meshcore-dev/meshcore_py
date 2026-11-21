@@ -272,7 +272,7 @@ class CommandHandlerBase:
                 if self._sender_func:
                     logger.debug(
                         f"Sending raw data: "
-                        f"{data.hex() if isinstance(data, bytes) else data}"
+                        f"{data.hex() if isinstance(data, (bytes, bytearray)) else data}"
                     )
                     await self._sender_func(data)
 
@@ -316,7 +316,7 @@ class CommandHandlerBase:
             if self._sender_func:
                 logger.debug(
                     f"Sending raw data: "
-                    f"{data.hex() if isinstance(data, bytes) else data}"
+                    f"{data.hex() if isinstance(data, (bytes, bytearray)) else data}"
                 )
                 await self._sender_func(data)
             return Event(EventType.OK, {})

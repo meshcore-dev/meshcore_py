@@ -1063,10 +1063,13 @@ class MessageReader:
                 logger.debug(f"Unhandled data received {data}")
                 logger.debug(f"Unhandled packet type: {packet_type_value}")
         except Exception as e:
+            # Not the frame itself: a message frame carries the decrypted
+            # text, and this is logged at the default level.
             logger.error(
-                "handle_rx parse error: %s: %s | raw=%s\n%s",
+                "handle_rx parse error: packet type 0x%02x, %d bytes: %s: %s\n%s",
+                packet_type_value,
+                len(data),
                 type(e).__name__,
                 e,
-                data.hex(),
                 traceback.format_exc(),
             )
