@@ -162,11 +162,22 @@ class ContactCommands(CommandHandlerBase):
     async def change_contact_flags(self, contact, flags) -> Event:
         return await self.update_contact(contact, flags=flags)
 
-    async def set_autoadd_config(self, flag : int) -> Event:
+    async def set_autoadd_config(self, flag : int, max_hops: Optional[int] = None) -> Event:
+        """Set which adverts the device adds as contacts by itself.
+
+        Args:
+            flag: The auto-add flags.
+            max_hops: The most hops an advert may have come to be added. The
+                firmware caps it at 64. Left as it is when None.
+        """
         data = b"\x3A" + flag.to_bytes(1, "little", signed=False)
+        if max_hops is not None:
+            data += max_hops.to_bytes(1, "little", signed=False)
         return await self.send(data, [EventType.OK, EventType.ERROR])
 
     async def get_autoadd_config(self) -> Event:
+        """Read the auto-add flags ("config") and, from companion v1.14.0,
+        the hop limit ("max_hops")."""
         data = b"\x3B"
         return await self.send(data, [EventType.AUTOADD_CONFIG, EventType.ERROR])
 

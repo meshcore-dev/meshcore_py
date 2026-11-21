@@ -312,15 +312,23 @@ class DeviceCommands(CommandHandlerBase):
 
         return await self.sign_finish(timeout=timeout, data_size=len(data))
 
-    async def has_connection(self) -> Event:
-        """N09: Check if the device has an active connection (CMD 28).
+    async def has_connection(self, dst: DestinationType) -> Event:
+        """N09: Check whether the device holds a connection to *dst* (CMD 28).
+
+        A connection is the keep-alive the device keeps with a server it has
+        logged in to (a room server, for instance). The firmware handles the
+        command only with the server's 32-byte public key after it.
+
+        Args:
+            dst: The server, as a contact, a public key or its hex.
 
         Returns:
-            Event with a 1-byte response indicating connection status,
-            or ERROR.
+            OK if the device holds a connection to *dst*, ERROR
+            (ERR_CODE_NOT_FOUND) if not.
         """
-        logger.debug("Checking device connection status")
-        return await self.send(b"\x1c", [EventType.OK, EventType.ERROR])
+        dst_bytes = _validate_destination(dst, prefix_length=32)
+        logger.debug(f"Checking connection to {dst_bytes.hex()}")
+        return await self.send(b"\x1c" + dst_bytes, [EventType.OK, EventType.ERROR])
 
     async def get_tuning(self) -> Event:
         """N03/N09: Request current tuning parameters (CMD_GET_TUNING_PARAMS = 43).

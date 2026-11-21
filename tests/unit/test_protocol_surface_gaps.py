@@ -215,7 +215,7 @@ async def test_send_raw_data_wrapper():
 
 @pytest.mark.asyncio
 async def test_has_connection_wrapper():
-    """has_connection sends CMD 0x1c."""
+    """has_connection sends CMD 0x1c and the server's 32-byte key (#119: B1)."""
     from meshcore.commands.device import DeviceCommands
 
     cmd = DeviceCommands.__new__(DeviceCommands)
@@ -229,10 +229,61 @@ async def test_has_connection_wrapper():
 
     cmd.send = mock_send
 
-    await cmd.has_connection()
+    key = bytes(range(32))
+    await cmd.has_connection(key.hex())
 
     assert captured_data is not None
-    assert captured_data == b"\x1c"
+    assert captured_data == b"\x1c" + key
+
+
+@pytest.mark.asyncio
+async def test_has_connection_takes_a_contact():
+    from meshcore.commands.device import DeviceCommands
+
+    cmd = DeviceCommands.__new__(DeviceCommands)
+    sent = []
+
+    async def mock_send(data, expected_events, timeout=None):
+        sent.append(bytes(data))
+        return Event(EventType.ERROR, {"error_code": 2})
+
+    cmd.send = mock_send
+    key = bytes(range(32))
+
+    result = await cmd.has_connection({"public_key": key.hex(), "adv_name": "Room"})
+
+    assert sent == [b"\x1c" + key]
+    assert result.type == EventType.ERROR
+
+
+# ---------------------------------------------------------------------------
+# Command wrapper: set_autoadd_config's hop limit (#119: B2)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "kwargs, frame",
+    [
+        ({}, b"\x3a\x0e"),
+        ({"max_hops": 5}, b"\x3a\x0e\x05"),
+        ({"max_hops": 0}, b"\x3a\x0e\x00"),
+    ],
+)
+async def test_set_autoadd_config_hop_limit(kwargs, frame):
+    from meshcore.commands.contact import ContactCommands
+
+    cmd = ContactCommands.__new__(ContactCommands)
+    sent = []
+
+    async def mock_send(data, expected_events, timeout=None):
+        sent.append(bytes(data))
+        return Event(EventType.OK, {})
+
+    cmd.send = mock_send
+
+    await cmd.set_autoadd_config(0x0E, **kwargs)
+
+    assert sent == [frame]
 
 
 # ---------------------------------------------------------------------------
