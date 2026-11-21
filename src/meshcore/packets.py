@@ -25,6 +25,9 @@ class BinaryReqType(Enum):
     MMA = 0x04
     ACL = 0x05
     NEIGHBOURS = 0x06
+    OWNER_INFO = 0x07   # repeater, FIRMWARE_VER_LEVEL >= 2
+    SUBSCRIBE = 0x08    # sensor
+    UNSUBSCRIBE = 0x09  # sensor
 
 class ControlType(Enum):
     NODE_DISCOVER_REQ = 0x80
