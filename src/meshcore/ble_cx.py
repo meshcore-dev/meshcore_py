@@ -132,6 +132,7 @@ class BLEConnection:
         elif self.device:
             logger.debug("Directly using a passed device.")
             self.client = BleakClient(self.device, disconnected_callback=self.handle_disconnect)
+            self.address = self.client.address
         else:
 
             def match_meshcore_device(d: BLEDevice, adv: AdvertisementData):

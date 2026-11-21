@@ -89,8 +89,12 @@ class ConnectionManager:
                 pass
             self._reconnect_task = None
 
+        # Close the transport even when not marked connected: a link can be
+        # open after a connect() that returned None once it was up, or after
+        # handle_disconnect() marked it lost on a failed write. Each
+        # transport's disconnect() does nothing on a closed link.
+        await self.connection.disconnect()
         if self._is_connected:
-            await self.connection.disconnect()
             self._is_connected = False
             await self._emit_event(
                 EventType.DISCONNECTED, {"reason": "manual_disconnect"}
