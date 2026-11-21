@@ -123,7 +123,11 @@ class MessageReader:
                     c["out_path"] = path_bytes[:used].hex()
                 else:
                     c["out_path"] = ""
-                c["adv_name"] = dbuf.read(32).decode("utf-8", "ignore").replace("\0", "")
+                name_bytes = dbuf.read(32)
+                c["adv_name"] = name_bytes.decode("utf-8", "ignore").replace("\0", "")
+                # The field as read, for update_contact to write back: the
+                # decode above drops bytes of a name cut mid-character.
+                c["adv_name_raw"] = name_bytes.hex()
                 c["last_advert"] = int.from_bytes(dbuf.read(4), byteorder="little")
                 c["adv_lat"] = (
                     int.from_bytes(dbuf.read(4), byteorder="little", signed=True) / 1e6

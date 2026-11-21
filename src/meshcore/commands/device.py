@@ -57,8 +57,8 @@ class DeviceCommands(CommandHandlerBase):
         logger.debug(f"Setting coordinates to: lat={lat}, lon={lon}")
         return await self.send(
             b"\x0e"
-            + int(lat * 1e6).to_bytes(4, "little", signed=True)
-            + int(lon * 1e6).to_bytes(4, "little", signed=True)
+            + round(lat * 1e6).to_bytes(4, "little", signed=True)
+            + round(lon * 1e6).to_bytes(4, "little", signed=True)
             + int(0).to_bytes(4, "little"),
             [EventType.OK, EventType.ERROR],
         )

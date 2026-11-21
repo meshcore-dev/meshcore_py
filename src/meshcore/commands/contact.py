@@ -8,6 +8,11 @@ from .base import CommandHandlerBase, DestinationType, _validate_destination
 logger = logging.getLogger("meshcore")
 
 
+def _decode_name(raw_hex: str) -> str:
+    """A contact's name field decoded as the reader decodes it."""
+    return bytes.fromhex(raw_hex).decode("utf-8", "ignore").replace("\0", "")
+
+
 class ContactCommands(CommandHandlerBase):
     async def get_contacts_async(self, lastmod=0) :
         logger.debug("Getting contacts")
@@ -88,7 +93,12 @@ class ContactCommands(CommandHandlerBase):
         data = b"\x0f" + key_bytes
         return await self.send(data, [EventType.OK, EventType.ERROR])
 
-    async def update_contact(self, contact, path=None, flags=None, path_hash_mode=None) -> Event:
+    async def update_contact(self, contact, path=None, flags=None, path_hash_mode=None, lastmod=None) -> Event:
+        """Write *contact* to the device (CMD_ADD_UPDATE_CONTACT).
+
+        *lastmod*, when given, is sent as the record's lastmod; without it
+        the device sets the record's lastmod to its own clock.
+        """
         if path is None:
             out_path_hex = contact["out_path"]
             out_path_len = contact["out_path_len"]
@@ -137,7 +147,13 @@ class ContactCommands(CommandHandlerBase):
             # reflect the change
             contact["flags"] = flags
 
-        adv_name_hex = contact["adv_name"].encode().hex()
+        raw_name = contact.get("adv_name_raw")
+        if raw_name is not None and _decode_name(raw_name) == contact["adv_name"]:
+            # The name as read, unchanged: write back its bytes as they were,
+            # not re-encoded from the decode, which drops a cut character.
+            adv_name_hex = raw_name
+        else:
+            adv_name_hex = contact["adv_name"].encode().hex()
         adv_name_hex = adv_name_hex + (64 - len(adv_name_hex)) * "0"
         data = (
             b"\x09"
@@ -148,9 +164,13 @@ class ContactCommands(CommandHandlerBase):
             + bytes.fromhex(out_path_hex)
             + bytes.fromhex(adv_name_hex)
             + contact["last_advert"].to_bytes(4, "little")
-            + int(contact["adv_lat"] * 1e6).to_bytes(4, "little", signed=True)
-            + int(contact["adv_lon"] * 1e6).to_bytes(4, "little", signed=True)
+            # round, not int: the values were read as an integer / 1e6, and
+            # truncating gives some back one nearer zero
+            + round(contact["adv_lat"] * 1e6).to_bytes(4, "little", signed=True)
+            + round(contact["adv_lon"] * 1e6).to_bytes(4, "little", signed=True)
         )
+        if lastmod is not None:
+            data += int(lastmod).to_bytes(4, "little")
         return await self.send(data, [EventType.OK, EventType.ERROR])
 
     async def add_contact(self, contact) -> Event:
