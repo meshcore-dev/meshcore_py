@@ -15,6 +15,27 @@ from Crypto.Hash import SHA256
 
 logger = logging.getLogger("meshcore")
 
+
+def _read_path(dbuf):
+    """Read a path-length byte and the path after it.
+
+    Returns (hop count, bytes per hop, path as hex). 0xFF means no path
+    known (flood), returned as -1 hops and -1 bytes per hop, as a CONTACT's
+    out_path_len is. Raises ValueError if the frame ends first.
+    """
+    plen = dbuf.read(1)
+    if len(plen) < 1:
+        raise ValueError("frame ends before its path length")
+    if plen[0] == 0xFF:
+        return -1, -1, ""
+    hash_len = ((plen[0] & 0xC0) >> 6) + 1
+    hops = plen[0] & 0x3F
+    path = dbuf.read(hops * hash_len)
+    if len(path) < hops * hash_len:
+        raise ValueError(f"frame ends inside a path of {hops} hops of {hash_len} bytes")
+    return hops, hash_len, path.hex()
+
+
 class MessageReader:
     def __init__(self, dispatcher: EventDispatcher):
         self.dispatcher = dispatcher
@@ -205,6 +226,15 @@ class MessageReader:
                 await self.dispatcher.dispatch(Event(EventType.DEFAULT_FLOOD_SCOPE, res))
 
             elif packet_type_value == PacketType.MSG_SENT.value:
+                # type(1) + expected_ack(4) + suggested_timeout(4) after the code.
+                # A shorter frame would give an ack no ACK can match and a
+                # timeout of 0, so report it rather than dispatch MSG_SENT.
+                if len(data) < 10:
+                    logger.debug(f"MSG_SENT frame too short ({len(data)} bytes < 10), skipping parse")
+                    await self.dispatcher.dispatch(
+                        Event(EventType.ERROR, {"reason": "invalid_frame_length"})
+                    )
+                    return
                 res = {}
                 res["type"] = dbuf.read(1)[0]
                 res["expected_ack"] = dbuf.read(4)
@@ -446,8 +476,11 @@ class MessageReader:
                 if not rawdata == "":
                     pairs = rawdata.split(",")
                     for p in pairs:
-                        psplit = p.split(":")
-                        res[psplit[0]] = psplit[1]
+                        # skip a pair with no ':' (or the empty one after a
+                        # trailing ','); a value may itself contain ':'
+                        key, sep, value = p.partition(":")
+                        if sep:
+                            res[key] = value
                 logger.debug(f"got custom vars : {res}")
                 await self.dispatcher.dispatch(Event(EventType.CUSTOM_VARS, res))
 
@@ -930,18 +963,10 @@ class MessageReader:
                 res = {}
                 dbuf.read(1)
                 res["pubkey_pre"] = dbuf.read(6).hex()
-                opl = dbuf.read(1)[0]
-                opl_hlen = ((opl & 0xc0) >> 6) + 1
-                opl = opl & 0x3f
-                res["out_path_len"] = opl
-                res["out_path_hash_len"] = opl_hlen
-                res["out_path"] = dbuf.read(opl*opl_hlen).hex()
-                ipl = dbuf.read(1)[0]
-                ipl_hlen = ((ipl & 0xc0) >> 6) + 1
-                ipl = ipl & 0x3f
-                res["in_path_len"] = ipl
-                res["in_path_hash_len"] = ipl_hlen
-                res["in_path"] = dbuf.read(ipl*ipl_hlen).hex()
+                (res["out_path_len"], res["out_path_hash_len"],
+                    res["out_path"]) = _read_path(dbuf)
+                (res["in_path_len"], res["in_path_hash_len"],
+                    res["in_path"]) = _read_path(dbuf)
 
                 attributes = {"pubkey_pre": res["pubkey_pre"]}
 
