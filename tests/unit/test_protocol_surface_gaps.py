@@ -446,7 +446,8 @@ async def test_channel_data_recv_route_flood_path_len_bits():
 
 @pytest.mark.asyncio
 async def test_channel_data_recv_under_minimum_frame_ignored():
-    """A CHANNEL_DATA_RECV frame shorter than the 9-byte header is dropped."""
+    """A CHANNEL_DATA_RECV frame shorter than the 9-byte header is not parsed;
+    it is reported as an ERROR, since it answers SYNC_NEXT_MESSAGE."""
     reader, dispatched = _make_reader()
     # 8 bytes total (header needs 9) — missing the data_len byte.
     frame = bytes([
@@ -457,7 +458,7 @@ async def test_channel_data_recv_under_minimum_frame_ignored():
 
     await reader.handle_rx(bytearray(frame))
 
-    assert len(dispatched) == 0
+    assert [e.type for e in dispatched] == [EventType.ERROR]
 
 
 @pytest.mark.asyncio

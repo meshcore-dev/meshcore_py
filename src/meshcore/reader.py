@@ -81,6 +81,19 @@ class MessageReader:
             logger.debug(f"Cleaning up expired binary request: tag={tag}")
             del self.pending_binary_requests[tag]
 
+    async def _report_unreadable(self, packet_type: int, reason: str):
+        """Dispatch an ERROR for a reply that couldn't be read.
+
+        A reply code (below 0x80) answers the command in flight, so its
+        caller is told the reply couldn't be read instead of waiting out its
+        timeout. A push (0x80 and up) comes unasked: an ERROR for it would end
+        whatever unrelated command is waiting, so it is only logged.
+        """
+        if packet_type < 0x80:
+            await self.dispatcher.dispatch(
+                Event(EventType.ERROR, {"reason": reason, "packet_type": packet_type})
+            )
+
     async def handle_rx(self, data: bytearray):
         dbuf = io.BytesIO(data)
         try:
@@ -385,6 +398,7 @@ class MessageReader:
                 # firmware, so the high byte may be non-zero).
                 if len(data) < 9:
                     logger.debug(f"CHANNEL_DATA_RECV frame too short ({len(data)} bytes < 9), skipping parse")
+                    await self._report_unreadable(packet_type_value, "invalid_frame_length")
                     return
                 res = {}
                 res["type"] = "DATA"
@@ -1086,3 +1100,4 @@ class MessageReader:
                 e,
                 traceback.format_exc(),
             )
+            await self._report_unreadable(packet_type_value, "parse_error")
