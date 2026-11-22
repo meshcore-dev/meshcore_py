@@ -130,6 +130,7 @@ class CommandHandlerBase:
         self._sender_func: Optional[Callable[[bytes], Coroutine[Any, Any, None]]] = None
         self._reader: Optional[MessageReader] = None
         self.dispatcher: Optional[EventDispatcher] = None
+        self._get_self_info: Optional[Callable[[], Optional[Dict[str, Any]]]] = None
         self.__mesh_request_lock: Optional[asyncio.Lock] = None
         self.default_timeout = (
             default_timeout if default_timeout is not None else self.DEFAULT_TIMEOUT
@@ -157,6 +158,10 @@ class CommandHandlerBase:
     def set_contact_getter_by_prefix(self, func: Callable[[str], Optional[Dict[str,Any]]]
         )-> None:
         self._get_contact_by_prefix = func
+
+    def set_self_info_getter(self, func: Callable[[], Optional[Dict[str, Any]]]) -> None:
+        """Give the handler the last SELF_INFO payload held, read at connect."""
+        self._get_self_info = func
 
     async def wait_for_events(
         self,
