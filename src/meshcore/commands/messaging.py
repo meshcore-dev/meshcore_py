@@ -67,7 +67,7 @@ class MessagingCommands(CommandHandlerBase):
         dst_type = None # if None, will have to get a contact to know this
     ) -> Event:
         dst_bytes = _validate_destination(dst)
-        logger.debug(f"Sending command to {dst_bytes.hex()}: {cmd}")
+        logger.debug(f"Sending command to {dst_bytes.hex()}")  # not the command: it can carry a password
 
         if timestamp is None:
             import time

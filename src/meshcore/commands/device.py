@@ -24,7 +24,7 @@ class DeviceCommands(CommandHandlerBase):
         return await self.send(b"\x16\x03", [EventType.DEVICE_INFO, EventType.ERROR])
 
     async def run_cli_command(self, cmd: str) -> Event:
-        logger.debug(f"Sending cli command: {cmd}")
+        logger.debug("Sending cli command")  # not the command: it can carry a password
         cmd_data = bytearray([CommandType.RUN_CLI_COMMAND.value])
         cmd_data.extend(cmd.encode("utf-8"))
         return await self.send(cmd_data, [EventType.CLI_REPLY, EventType.ERROR])
@@ -198,7 +198,7 @@ class DeviceCommands(CommandHandlerBase):
         return await self.set_other_params_from_infos(infos)
 
     async def set_devicepin(self, pin: int) -> Event:
-        logger.debug(f"Setting device PIN to: {pin}")
+        logger.debug("Setting device PIN")
         return await self.send(
             b"\x25" + int(pin).to_bytes(4, "little"), [EventType.OK, EventType.ERROR]
         )
