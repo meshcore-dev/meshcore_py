@@ -127,3 +127,29 @@ async def test_channel_info_event():
     assert event.payload["channel_idx"] == 3
     assert event.payload["channel_name"] == "TestChannel"
     assert len(event.payload["channel_secret"]) == 16
+
+
+async def test_coroutine_callbacks_without_asyncio_iscoroutinefunction(dispatcher, monkeypatch):
+    """asyncio.iscoroutinefunction is deprecated in 3.14 and goes in 3.16;
+    the dispatcher must not depend on it (#119: C3). Under -W error it
+    raised in the dispatch loop, which ended the dispatcher for good."""
+    monkeypatch.delattr(asyncio, "iscoroutinefunction")
+    seen = []
+
+    async def callback(event):
+        seen.append(event.payload["n"])
+
+    dispatcher.subscribe(EventType.OK, callback)
+    await dispatcher.start()
+    try:
+        await dispatcher.dispatch(Event(EventType.OK, {"n": 1}))
+        await dispatcher.dispatch(Event(EventType.OK, {"n": 2}))
+        await asyncio.sleep(0.1)  # Allow processing
+
+        assert seen == [1, 2]
+        assert not dispatcher._task.done()
+    finally:
+        if dispatcher._task.done():  # stop() would wait on its queue for ever
+            dispatcher.running = False
+        else:
+            await dispatcher.stop()

@@ -234,7 +234,7 @@ class EventDispatcher:
                     # Call sync callbacks inline so futures are resolved before asyncio.wait()
                     # returns - avoids the race where create_task schedules the callback after
                     # the waiter has already timed out with done=set().
-                    if asyncio.iscoroutinefunction(subscription.callback):
+                    if inspect.iscoroutinefunction(subscription.callback):
                         self._spawn_background(self._execute_callback(subscription.callback, event.clone()))
                     else:
                         try:
@@ -247,7 +247,7 @@ class EventDispatcher:
     async def _execute_callback(self, callback, event):
         """Execute a callback with proper error handling"""
         try:
-            if asyncio.iscoroutinefunction(callback):
+            if inspect.iscoroutinefunction(callback):
                 await callback(event)
             else:
                 result = callback(event)
