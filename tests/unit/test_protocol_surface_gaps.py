@@ -840,3 +840,22 @@ async def test_default_flood_scope_sentinel_frame_empty_payload():
     # dispatches an empty payload (consumers detect "no scope" via key
     # presence, not via empty-string sentinel values).
     assert evt.payload == {}
+
+
+@pytest.mark.asyncio
+async def test_default_flood_scope_name_ends_at_first_nul():
+    """The name ends at its first NUL, not at the field's end (#119: A4).
+
+    Companion v1.18.0 strcpy's a new name over the stored one, so "#au" set
+    after "#au-vic-gipps" leaves the old tail in the field it sends.
+    """
+    reader, dispatched = _make_reader()
+    scope_name = b"#au\0vic-gipps".ljust(31, b"\0")
+    scope_key = bytes(range(16))
+    frame = bytes([PacketType.DEFAULT_FLOOD_SCOPE.value]) + scope_name + scope_key
+
+    await reader.handle_rx(bytearray(frame))
+
+    assert len(dispatched) == 1
+    assert dispatched[0].payload["scope_name"] == "#au"
+    assert dispatched[0].payload["scope_key"] == scope_key.hex()

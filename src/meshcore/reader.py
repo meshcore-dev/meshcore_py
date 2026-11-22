@@ -245,7 +245,10 @@ class MessageReader:
                 # scope is set. Gate the 31+16 byte read so the sentinel
                 # dispatches an empty payload instead of empty-string fields.
                 if len(data) >= 48:
-                    res["scope_name"] = dbuf.read(31).decode("utf-8", "ignore").replace("\0", "")
+                    # The name ends at its first NUL. The firmware strcpy's a
+                    # new name over the old one, so after a shorter name the
+                    # field still holds the old name's tail past the NUL.
+                    res["scope_name"] = dbuf.read(31).split(b"\0", 1)[0].decode("utf-8", "ignore")
                     res["scope_key"] = dbuf.read(16).hex()
                 await self.dispatcher.dispatch(Event(EventType.DEFAULT_FLOOD_SCOPE, res))
 
