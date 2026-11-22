@@ -207,7 +207,8 @@ class EventDispatcher:
         await self.queue.put(event)
 
     async def _process_events(self):
-        while self.running:
+        # Runs until stop() cancels it, once the queue has drained.
+        while True:
             event = await self.queue.get()
             logger.debug(
                 f"Dispatching event: {event.type}, {event.payload}, {event.attributes}"
