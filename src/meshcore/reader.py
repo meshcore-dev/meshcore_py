@@ -54,6 +54,16 @@ class MessageReader:
     def decrypt_channels(self, value):
         self.packet_parser.decrypt_channels = value
 
+    @property
+    def keep_channel_secrets(self):
+        return self.packet_parser.keep_channel_secrets
+
+    @keep_channel_secrets.setter
+    def keep_channel_secrets(self, value):
+        self.packet_parser.keep_channel_secrets = value
+        if not value:
+            self.packet_parser.forget_channels()
+
     def register_binary_request(self, prefix: str, tag: str, request_type: BinaryReqType, timeout_seconds: float, context={}, is_anon=False):
         """Register a pending binary request for proper response parsing"""
         # Clean up expired requests before adding new one

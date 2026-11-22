@@ -416,6 +416,17 @@ class MeshCore:
     def set_decrypt_channel_logs(self, v):
         self._reader.decrypt_channels = v
 
+    def set_keep_channel_secrets(self, v):
+        """Whether the packet parser keeps the channel secrets that
+        get_channel() reads (True by default).
+
+        It uses them to name, and with set_decrypt_channel_logs(True) to
+        decrypt, group posts in RX_LOG_DATA. A client that wants neither can
+        set this False: the secrets held, and the channel log, are dropped,
+        and none is kept after. CHANNEL_INFO events still carry the secret.
+        """
+        self._reader.keep_channel_secrets = v
+
     def pop_pending_contact(self, key: str) -> Optional[Dict[str, Any]]:
         return self._pending_contacts.pop(key, None)
 

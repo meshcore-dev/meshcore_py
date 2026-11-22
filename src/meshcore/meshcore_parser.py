@@ -17,8 +17,18 @@ class MeshcorePacketParser:
         self.channels = [{} for _ in range(40)] # keep our own copy of channels, 40 elements by default
         self.channels_log = [] # stores the channel msg events
         self.decrypt_channels = False
+        # When False, channel secrets are not kept (newChannel does nothing),
+        # so group posts in the RX log are neither named nor decrypted.
+        self.keep_channel_secrets = True
+
+    def forget_channels(self):
+        """Drop every channel (and its secret) held, and the channel log."""
+        self.channels = [{} for _ in range(40)]
+        self.channels_log = []
 
     async def newChannel(self, chan):
+        if not self.keep_channel_secrets:
+            return
         idx = chan['channel_idx']
         if len(self.channels) <= idx:
             self.channels.extend([{} for _ in range(1 + idx - len(self.channels))])
