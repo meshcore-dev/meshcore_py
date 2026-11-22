@@ -32,6 +32,22 @@ class MeshcorePacketParser:
         # search for the same packet
         return next((l for l in reversed(self.channels_log) if 'pkt_hash' in l and l['pkt_hash'] == pkt_hash), None)
 
+    @staticmethod
+    def _unknown_packet(log_data):
+        """Fill in sentinel packet fields for a packet too short to read, so
+        the caller's log_data['route_type'] etc. lookups don't KeyError."""
+        log_data["route_type"] = -1
+        log_data["route_typename"] = "UNK"
+        log_data["payload_type"] = -1
+        log_data["payload_typename"] = "UNK"
+        log_data["payload_ver"] = 0
+        log_data["path_len"] = 0
+        log_data["path_hash_size"] = 1
+        log_data["path"] = ""
+        log_data["pkt_payload"] = b""
+        log_data["pkt_hash"] = 0
+        return log_data
+
     async def parsePacketPayload(self, payload, log_data={}):
         """ Parses the payload of a log_rx packet
 
@@ -52,17 +68,7 @@ class MeshcorePacketParser:
         # KeyError, then return early.
         if len(payload) < 2:
             logger.debug(f"parsePacketPayload: payload too short ({len(payload)} bytes < 2), returning sentinel log_data")
-            log_data["route_type"] = -1
-            log_data["route_typename"] = "UNK"
-            log_data["payload_type"] = -1
-            log_data["payload_typename"] = "UNK"
-            log_data["payload_ver"] = 0
-            log_data["path_len"] = 0
-            log_data["path_hash_size"] = 1
-            log_data["path"] = ""
-            log_data["pkt_payload"] = b""
-            log_data["pkt_hash"] = 0
-            return log_data
+            return self._unknown_packet(log_data)
 
         pbuf = io.BytesIO(payload)
 
@@ -75,12 +81,23 @@ class MeshcorePacketParser:
         if route_type == 0x00 or route_type == 0x03: # has transport code
             transport_code = pbuf.read(4)    # discard transport code
 
-        path_byte = pbuf.read(1)[0]
+        # A transport-route packet of 5 bytes or fewer ends before its path
+        # byte, and any packet can end inside its path: treat both like the
+        # too-short payload above rather than raising or reading a short path.
+        path_byte = pbuf.read(1)
+        if len(path_byte) < 1:
+            logger.debug(f"parsePacketPayload: packet cut before its path byte ({len(payload)} bytes), returning sentinel log_data")
+            return self._unknown_packet(log_data)
+        path_byte = path_byte[0]
         path_hash_size = ((path_byte & 0xC0) >> 6) + 1
         path_len = (path_byte & 0x3F)
         # here path_len is number of hops, not number of bytes
 
-        path = pbuf.read(path_len*path_hash_size).hex() # Beware of traces where pathes are mixed
+        path_bytes = pbuf.read(path_len*path_hash_size) # Beware of traces where pathes are mixed
+        if len(path_bytes) < path_len*path_hash_size:
+            logger.debug(f"parsePacketPayload: packet cut inside its path ({len(payload)} bytes), returning sentinel log_data")
+            return self._unknown_packet(log_data)
+        path = path_bytes.hex()
 
         try :
             route_typename = ROUTE_TYPENAMES[route_type]
