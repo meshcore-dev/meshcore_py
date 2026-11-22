@@ -20,6 +20,36 @@ def lpp_parse(buf):
     return json.loads(json.dumps(LppFrame(lpp_data_list), default=lpp_json_encoder))
 
 
+def lpp_parse_readings(buf):
+    """Decode LPP readings one at a time, as far as they can be decoded.
+
+    Telemetry comes from a remote node, whose firmware may send an LPP type
+    cayennelpp doesn't know, or a reading cut short. Rather than lose the
+    whole response, stop at the first such reading.
+
+    Returns (readings, undecoded): the readings decoded before it, in
+    lpp_parse's form, and the bytes from it to the end (b"" when every
+    reading decoded).
+    """
+    i = 0
+    lpp_data_list = []
+    undecoded = b""
+    while i < len(buf) and buf[i] != 0:
+        if len(buf) - i < 2 or LppType.get_lpp_type(buf[i + 1]) is None:
+            undecoded = bytes(buf[i:])
+            break
+        try:
+            lppdata = LppData.from_bytes(buf[i:])
+        except BufferError:  # the reading is cut short
+            undecoded = bytes(buf[i:])
+            break
+        lpp_data_list.append(lppdata)
+        i = i + len(lppdata)
+
+    readings = json.loads(json.dumps(LppFrame(lpp_data_list), default=lpp_json_encoder))
+    return readings, undecoded
+
+
 def lpp_parse_mma(buf):
     i = 0
     res = []
