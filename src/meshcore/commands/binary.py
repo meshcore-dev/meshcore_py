@@ -245,6 +245,106 @@ class BinaryCommandHandler(CommandHandlerBase):
 
         return res
 
+    async def _binary_req_response(self, contact, request_type, data=None, timeout=0, min_timeout=0):
+        """Send a binary request and wait for its BINARY_RESPONSE.
+
+        Returns the response's data (after the tag), or None when the request
+        couldn't be sent or no answer came in time.
+        """
+        res = await self.send_binary_req(
+            contact,
+            request_type,
+            data=data,
+            timeout=timeout,
+            min_timeout=min_timeout,
+        )
+        if res.type == EventType.ERROR:
+            return None
+
+        timeout = res.payload["suggested_timeout"] / 800 if timeout == 0 else timeout
+        timeout = timeout if timeout > min_timeout else min_timeout
+
+        if self.dispatcher is None:
+            return None
+
+        event = await self.dispatcher.wait_for_event(
+            EventType.BINARY_RESPONSE,
+            attribute_filters={"tag": res.payload["expected_ack"].hex()},
+            timeout=timeout,
+        )
+        return bytes.fromhex(event.payload["data"]) if event else None
+
+    async def req_owner_info_sync(self, contact, timeout=0, min_timeout=0):
+        """Ask a repeater for its firmware version, name and owner info
+        (REQ_TYPE_GET_OWNER_INFO, repeater firmware at FIRMWARE_VER_LEVEL 2
+        and later). Needs a login to the repeater.
+
+        Returns a dict with "firmware_version", "name" and "owner", or None
+        with no answer.
+        """
+        async with self._mesh_request_lock:
+            data = await self._binary_req_response(
+                contact, BinaryReqType.OWNER_INFO, timeout=timeout, min_timeout=min_timeout
+            )
+        if data is None:
+            return None
+        # "<version>\n<name>\n<owner info>", the owner info may itself hold
+        # newlines; the reply is padded with NULs to the cipher's block size
+        fields = data.decode("utf-8", "ignore").rstrip("\x00").split("\n", 2)
+        fields += [""] * (3 - len(fields))
+        return dict(firmware_version=fields[0], name=fields[1], owner=fields[2])
+
+    async def req_subscribe_sync(self, contact, push_tag: bytes, duration: int, min_deltas: bytes, timeout=0, min_timeout=0):
+        """Subscribe to a sensor's telemetry pushes (REQ_TYPE_SUBSCRIBE,
+        simple_sensor firmware). Needs a login with at least read access.
+
+        Args:
+            push_tag: 4 bytes. Each push arrives as a BINARY_RESPONSE event
+                whose tag is this tag's hex, its data a 4-byte timestamp then
+                LPP readings.
+            duration: How long the subscription lasts, in seconds (16 bits).
+            min_deltas: The changes that trigger a push, LPP-encoded: for each
+                reading its channel, its LPP type and the least change, in that
+                type's encoding. 3 to 14 bytes.
+
+        Returns a dict with "expiry_secs" (0 when the sensor refused) and
+        "scope" (the region the pushes will be scoped to), or None with no
+        answer.
+        """
+        if len(push_tag) != 4:
+            raise ValueError("push_tag must be 4 bytes")
+        if not 3 <= len(min_deltas) <= 14:
+            raise ValueError("min_deltas must be 3 to 14 bytes")
+        req = (
+            bytes(push_tag)
+            + duration.to_bytes(2, "little", signed=False)
+            + b"\0"  # reserved
+            + len(min_deltas).to_bytes(1, "little")
+            + bytes(min_deltas)
+        )
+        async with self._mesh_request_lock:
+            data = await self._binary_req_response(
+                contact, BinaryReqType.SUBSCRIBE, data=req, timeout=timeout, min_timeout=min_timeout
+            )
+        if data is None:
+            return None
+        return dict(
+            expiry_secs=int.from_bytes(data[0:2], "little"),
+            scope=data[4:].decode("utf-8", "ignore").rstrip("\x00"),
+        )
+
+    async def req_unsubscribe_sync(self, contact, timeout=0, min_timeout=0):
+        """End a subscription to a sensor's telemetry pushes
+        (REQ_TYPE_UNSUBSCRIBE, simple_sensor firmware).
+
+        Returns True when the sensor answered, None with no answer.
+        """
+        async with self._mesh_request_lock:
+            data = await self._binary_req_response(
+                contact, BinaryReqType.UNSUBSCRIBE, timeout=timeout, min_timeout=min_timeout
+            )
+        return None if data is None else True
+
     async def req_regions_async(self, contact, timeout=0, min_timeout=0):
         req = b"\0" # The return path, I currently do nothing with, so direct only
         return await self.send_anon_req(
