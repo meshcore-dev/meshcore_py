@@ -32,6 +32,9 @@ class BLEConnection:
     # measured 0.06-0.17s against real hardware; observed stalls ran 20s to
     # minutes, so this preempts them rather than waiting for CoreBluetooth.
     WRITE_TIMEOUT = 10.0
+    # Upper bound on releasing a client whose link dropped (see
+    # _release_dropped_client).
+    DISCONNECT_TIMEOUT = 10.0
 
     def __init__(self, address=None, device=None, client=None, pin=None):
         """
@@ -103,6 +106,25 @@ class BLEConnection:
                     await self.client.disconnect()
             except Exception:
                 logger.debug("Best-effort cleanup of stale BLE client failed", exc_info=True)
+
+    async def _release_dropped_client(self, client):
+        """Best-effort disconnect of a client whose link has dropped.
+
+        On Linux, bleak releases the D-Bus connection it opened for a link only
+        in disconnect(), not when the link drops. BlueZ keeps the notify
+        session that connection started and turns it back on at the next
+        connect, so every later notification would arrive once more for each
+        link that dropped before. With the link already down, disconnect()
+        leaves the device alone and only lets go of the bus.
+
+        Bounded: bleak's disconnect() never returns for a client whose own
+        D-Bus connection never came up, and is_connected is False for every
+        dropped client, so that can't be ruled out from here.
+        """
+        try:
+            await asyncio.wait_for(client.disconnect(), timeout=self.DISCONNECT_TIMEOUT)
+        except Exception:
+            logger.debug("Best-effort release of dropped BLE client failed", exc_info=True)
 
     async def connect(self):
         """
@@ -206,6 +228,10 @@ class BLEConnection:
         logger.debug(
             f"BLE device disconnected: {client.address} (is_connected: {client.is_connected})"
         )
+        # Release the client that dropped -- the one bleak passes, not
+        # self.client -- so its notify session doesn't outlive the link.
+        self._spawn_background(self._release_dropped_client(client))
+
         # Reset the address/client/device we found to what user specified
         # this allows to reconnect to the same device
         self.address = self._user_provided_address
